@@ -302,3 +302,15 @@ On every message/tool call:
 * Open-source mirror: Apache 2.0 / MIT (TBD)
 
 ---
+
+## Additional Resources
+
+### ML System Design
+- [ML System Insights](./ML_SYSTEM_INSIGHTS.md) - Comprehensive analysis of 300+ production ML systems
+- [Agent Instructions](./AGENTS.md) - Specific guidance for AI agents working with ML systems
+
+### Documentation
+- [Product Requirements](./PRD.md) - Detailed product specifications
+- [Technical Architecture](./TECHNICAL_ARCHITECTURE.md) - System design and database schemas
+
+---
