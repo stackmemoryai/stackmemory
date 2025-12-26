@@ -110,3 +110,6 @@ credentials.json
 service-account.json
 # StackMemory local context
 .stackmemory/
+
+# Claude settings with secrets
+.claude/settings.local.json

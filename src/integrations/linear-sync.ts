@@ -69,8 +69,17 @@ export class LinearSyncEngine {
     this.taskStore = taskStore;
     this.authManager = authManager;
     this.config = config;
+
+    // Get token and initialize Linear client
+    const tokens = this.authManager.loadTokens();
+    if (!tokens) {
+      throw new Error(
+        'Linear authentication tokens not found. Run "stackmemory linear setup" first.'
+      );
+    }
+
     this.linearClient = new LinearClient({
-      apiKey: '', // Will be set from auth manager
+      apiKey: tokens.accessToken,
     });
 
     this.loadMappings();
@@ -336,13 +345,14 @@ export class LinearSyncEngine {
     task: PebblesTask,
     mapping: TaskMapping
   ): Promise<void> {
-    const updates: Partial<LinearCreateIssueInput> = {
+    const updates: Partial<LinearCreateIssueInput> & { stateId?: string } = {
       title: task.title,
       description: this.formatDescriptionForLinear(task),
       priority: this.mapPriorityToLinear(task.priority),
       estimate: task.estimated_effort
         ? Math.ceil(task.estimated_effort / 60)
         : undefined,
+      stateId: await this.mapStatusToLinearState(task.status),
     };
 
     await this.linearClient.updateIssue(mapping.linearId, updates);
@@ -485,6 +495,45 @@ export class LinearSyncEngine {
         return 'cancelled';
       default:
         return 'pending';
+    }
+  }
+
+  private async mapStatusToLinearState(
+    status: TaskStatus
+  ): Promise<string | undefined> {
+    // Get available states for the team
+    try {
+      const team = await this.linearClient.getTeam();
+      const states = await this.linearClient.getWorkflowStates(team.id);
+
+      // Map StackMemory status to Linear state types
+      const targetStateType = this.getLinearStateTypeFromStatus(status);
+
+      // Find the first state that matches the target type
+      const matchingState = states.find(
+        (state) => state.type === targetStateType
+      );
+      return matchingState?.id;
+    } catch (error) {
+      logger.warn('Failed to map status to Linear state:', error);
+      return undefined;
+    }
+  }
+
+  private getLinearStateTypeFromStatus(status: TaskStatus): string {
+    switch (status) {
+      case 'pending':
+        return 'unstarted';
+      case 'in_progress':
+        return 'started';
+      case 'completed':
+        return 'completed';
+      case 'cancelled':
+        return 'cancelled';
+      case 'blocked':
+        return 'unstarted'; // Map blocked to unstarted in Linear
+      default:
+        return 'unstarted';
     }
   }
 

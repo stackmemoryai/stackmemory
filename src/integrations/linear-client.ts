@@ -352,14 +352,14 @@ export class LinearClient {
   }
 
   /**
-   * Get workflow states for the team
+   * Get workflow states for a team
    */
   async getWorkflowStates(teamId: string): Promise<
     Array<{
       id: string;
       name: string;
-      type: string;
-      position: number;
+      type: 'backlog' | 'unstarted' | 'started' | 'completed' | 'cancelled';
+      color: string;
     }>
   > {
     const query = `
@@ -370,7 +370,7 @@ export class LinearClient {
               id
               name
               type
-              position
+              color
             }
           }
         }
@@ -383,8 +383,13 @@ export class LinearClient {
           nodes: Array<{
             id: string;
             name: string;
-            type: string;
-            position: number;
+            type:
+              | 'backlog'
+              | 'unstarted'
+              | 'started'
+              | 'completed'
+              | 'cancelled';
+            color: string;
           }>;
         };
       };
