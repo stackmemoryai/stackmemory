@@ -312,5 +312,6 @@ On every message/tool call:
 ### Documentation
 - [Product Requirements](./PRD.md) - Detailed product specifications
 - [Technical Architecture](./TECHNICAL_ARCHITECTURE.md) - System design and database schemas
+- [Beads Integration](./BEADS_INTEGRATION.md) - Git-native memory patterns from Beads ecosystem
 
 ---
