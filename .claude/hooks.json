@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "pre-message": {
+      "description": "Retrieve context before processing message",
+      "command": "node",
+      "args": ["{{PROJECT_ROOT}}/.claude/hooks/pre-message.js"],
+      "env": {
+        "PROJECT_ROOT": "{{PROJECT_ROOT}}",
+        "USER_MESSAGE": "{{MESSAGE}}"
+      }
+    },
+    "post-response": {
+      "description": "Track decisions and attention after response",
+      "command": "node",
+      "args": ["{{PROJECT_ROOT}}/.claude/hooks/post-response.js"],
+      "env": {
+        "PROJECT_ROOT": "{{PROJECT_ROOT}}",
+        "USER_MESSAGE": "{{USER_MESSAGE}}",
+        "ASSISTANT_RESPONSE": "{{RESPONSE}}"
+      }
+    },
+    "on-decision": {
+      "description": "Capture important decisions",
+      "triggers": ["decision:", "decided to", "will use", "choosing"],
+      "command": "node",
+      "args": ["{{PROJECT_ROOT}}/.claude/hooks/on-decision.js"],
+      "env": {
+        "DECISION_TEXT": "{{MATCHED_TEXT}}"
+      }
+    }
+  }
+}

@@ -7,7 +7,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "Bash(git commit:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

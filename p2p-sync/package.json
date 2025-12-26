@@ -1,0 +1,35 @@
+{
+  "name": "@stackmemory/p2p-sync",
+  "version": "0.1.0",
+  "description": "WebRTC P2P sync for distributed Beads/StackMemory",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "signaling": "tsx src/signaling-server.ts",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "simple-peer": "^9.11.1",
+    "y-webrtc": "^10.2.5",
+    "yjs": "^13.6.10",
+    "automerge": "^2.1.0",
+    "libp2p": "^1.0.10",
+    "@libp2p/websockets": "^8.0.0",
+    "@libp2p/webrtc": "^4.0.0",
+    "socket.io": "^4.6.0",
+    "socket.io-client": "^4.6.0",
+    "better-sqlite3": "^9.2.2",
+    "msgpackr": "^1.10.1",
+    "tweetnacl": "^1.0.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/simple-peer": "^9.11.8",
+    "@types/node": "^20.10.6",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.3"
+  }
+}
