@@ -108,3 +108,5 @@ Desktop.ini
 *.p12
 credentials.json
 service-account.json
+# StackMemory local context
+.stackmemory/

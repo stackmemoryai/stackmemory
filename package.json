@@ -1,5 +1,5 @@
 {
-  "name": "stackmemory",
+  "name": "@stackmemoryai/stackmemory",
   "version": "0.1.0",
   "description": "Lossless, project-scoped memory for AI tools",
   "type": "module",
