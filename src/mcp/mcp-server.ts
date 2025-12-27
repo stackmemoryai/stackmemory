@@ -944,6 +944,12 @@ class LocalStackMemoryMCP {
 // Export the class
 export default LocalStackMemoryMCP;
 
+// Export function to run the server
+export async function runMCPServer(): Promise<void> {
+  const server = new LocalStackMemoryMCP();
+  await server.start();
+}
+
 // Start the server
 if (import.meta.url === `file://${process.argv[1]}`) {
   const server = new LocalStackMemoryMCP();

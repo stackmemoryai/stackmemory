@@ -654,4 +654,31 @@ program
     }
   });
 
+program
+  .command('mcp-server')
+  .description('Start StackMemory MCP server for Claude Desktop')
+  .option('-p, --project <path>', 'Project root directory', process.cwd())
+  .action(async (options) => {
+    try {
+      const { runMCPServer } = await import('../mcp/mcp-server.js');
+
+      // Set project root
+      process.env.PROJECT_ROOT = options.project;
+
+      console.log('🚀 Starting StackMemory MCP Server...');
+      console.log(`   Project: ${options.project}`);
+      console.log(`   Version: ${VERSION}`);
+
+      // Check for updates silently
+      UpdateChecker.checkForUpdates(VERSION, true).catch(() => {});
+
+      // Start the MCP server
+      await runMCPServer();
+    } catch (error) {
+      logger.error('Failed to start MCP server', error as Error);
+      console.error('❌ MCP server failed:', (error as Error).message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
