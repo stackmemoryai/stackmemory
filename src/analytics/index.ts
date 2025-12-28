@@ -8,5 +8,5 @@ import { AnalyticsAPI } from './api/analytics-api.js';
 
 export default {
   AnalyticsService,
-  AnalyticsAPI
+  AnalyticsAPI,
 };

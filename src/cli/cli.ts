@@ -651,7 +651,8 @@ program
       }
 
       if (options.view) {
-        const { displayAnalyticsDashboard } = await import('./analytics-viewer.js');
+        const { displayAnalyticsDashboard } =
+          await import('./analytics-viewer.js');
         await displayAnalyticsDashboard(projectRoot);
         return;
       }
@@ -659,56 +660,67 @@ program
       if (options.export) {
         const { AnalyticsService } = await import('../analytics/index.js');
         const service = new AnalyticsService(projectRoot);
-        
+
         if (options.sync) {
           console.log('🔄 Syncing with Linear...');
           await service.syncLinearTasks();
         }
-        
+
         const state = await service.getDashboardState();
-        
+
         if (options.export === 'csv') {
           console.log('📊 Exporting metrics as CSV...');
           // Convert to CSV format
           const tasks = state.recentTasks;
-          const headers = ['ID', 'Title', 'State', 'Priority', 'Created', 'Completed'];
-          const rows = tasks.map(t => [
+          const headers = [
+            'ID',
+            'Title',
+            'State',
+            'Priority',
+            'Created',
+            'Completed',
+          ];
+          const rows = tasks.map((t) => [
             t.id,
             t.title,
             t.state,
             t.priority,
             t.createdAt.toISOString(),
-            t.completedAt?.toISOString() || ''
+            t.completedAt?.toISOString() || '',
           ]);
           console.log(headers.join(','));
-          rows.forEach(r => console.log(r.join(',')));
+          rows.forEach((r) => console.log(r.join(',')));
         } else {
           console.log(JSON.stringify(state, null, 2));
         }
-        
+
         service.close();
         return;
       }
 
       // Launch dashboard server
-      console.log(`🚀 Launching analytics dashboard on port ${options.port}...`);
-      
+      console.log(
+        `🚀 Launching analytics dashboard on port ${options.port}...`
+      );
+
       const express = (await import('express')).default;
       const { AnalyticsAPI } = await import('../analytics/index.js');
       const { createServer } = await import('http');
-      
+
       const app = express();
       const analyticsAPI = new AnalyticsAPI(projectRoot);
-      
+
       if (options.sync) {
         console.log('🔄 Syncing with Linear...');
-        const service = new (await import('../analytics/index.js')).AnalyticsService(projectRoot);
+        const service = new (
+          await import('../analytics/index.js')
+        ).AnalyticsService(projectRoot);
         await service.syncLinearTasks();
         service.close();
       }
-      
+
       app.use('/api/analytics', analyticsAPI.getRouter());
-      
+
       // Serve the HTML dashboard
       app.get('/', async (req, res) => {
         const { fileURLToPath } = await import('url');
@@ -716,7 +728,7 @@ program
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
         const dashboardPath = join(__dirname, '../analytics/dashboard.html');
-        
+
         if (existsSync(dashboardPath)) {
           res.sendFile(dashboardPath);
         } else {
@@ -724,7 +736,7 @@ program
           const { existsSync: fsExists } = await import('fs');
           const { join: pathJoin } = await import('path');
           const htmlPath = pathJoin(__dirname, '../analytics/dashboard.html');
-          
+
           if (fsExists(htmlPath)) {
             res.sendFile(htmlPath);
           } else {
@@ -755,22 +767,28 @@ program
           }
         }
       });
-      
+
       const server = createServer(app);
       analyticsAPI.setupWebSocket(server);
-      
+
       server.listen(options.port, async () => {
-        console.log(`✅ Analytics dashboard running at http://localhost:${options.port}`);
-        
+        console.log(
+          `✅ Analytics dashboard running at http://localhost:${options.port}`
+        );
+
         if (options.open) {
           const { exec } = await import('child_process');
           const url = `http://localhost:${options.port}`;
-          const command = process.platform === 'darwin' ? `open ${url}` :
-                         process.platform === 'win32' ? `start ${url}` : `xdg-open ${url}`;
+          const command =
+            process.platform === 'darwin'
+              ? `open ${url}`
+              : process.platform === 'win32'
+                ? `start ${url}`
+                : `xdg-open ${url}`;
           exec(command);
         }
       });
-      
+
       process.on('SIGINT', () => {
         console.log('\n👋 Shutting down analytics dashboard...');
         analyticsAPI.close();
