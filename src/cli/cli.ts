@@ -24,6 +24,8 @@ import {
 import { LinearConfigManager } from '../integrations/linear-config.js';
 import { UpdateChecker } from '../core/update-checker.js';
 import { ProgressTracker } from '../core/progress-tracker.js';
+import { registerProjectCommands } from './project-commands.js';
+import { ProjectManager } from '../core/project-manager.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
@@ -852,5 +854,16 @@ program
       process.exit(1);
     }
   });
+
+// Register project management commands
+registerProjectCommands(program);
+
+// Auto-detect current project on startup
+if (process.argv.length > 2) {
+  const manager = ProjectManager.getInstance();
+  manager.detectProject().catch(() => {
+    // Silently fail if not in a project directory
+  });
+}
 
 program.parse();
