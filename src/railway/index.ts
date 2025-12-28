@@ -16,7 +16,7 @@ import { existsSync, mkdirSync } from 'fs';
 
 // Configuration
 const config = {
-  port: parseInt(process.env.PORT || '8080'),
+  port: parseInt(process.env.PORT || '3000'),
   environment: process.env.NODE_ENV || 'development',
   corsOrigins: process.env.CORS_ORIGINS?.split(',') || [
     'http://localhost:3000',
