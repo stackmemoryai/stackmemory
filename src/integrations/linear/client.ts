@@ -402,4 +402,137 @@ export class LinearClient {
 
     return result.team.states.nodes;
   }
+
+  /**
+   * Get current viewer/user information
+   */
+  async getViewer(): Promise<{
+    id: string;
+    name: string;
+    email: string;
+  }> {
+    const query = `
+      query GetViewer {
+        viewer {
+          id
+          name
+          email
+        }
+      }
+    `;
+
+    const result = await this.graphql<{
+      viewer: {
+        id: string;
+        name: string;
+        email: string;
+      };
+    }>(query);
+
+    return result.viewer;
+  }
+
+  /**
+   * Get all teams for the organization
+   */
+  async getTeams(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      key: string;
+    }>
+  > {
+    const query = `
+      query GetTeams {
+        teams(first: 50) {
+          nodes {
+            id
+            name
+            key
+          }
+        }
+      }
+    `;
+
+    const result = await this.graphql<{
+      teams: {
+        nodes: Array<{
+          id: string;
+          name: string;
+          key: string;
+        }>;
+      };
+    }>(query);
+
+    return result.teams.nodes;
+  }
+
+  /**
+   * Get issues with filtering options
+   */
+  async getIssues(options?: {
+    teamId?: string;
+    assigneeId?: string;
+    stateType?: 'backlog' | 'unstarted' | 'started' | 'completed' | 'cancelled';
+    limit?: number;
+  }): Promise<LinearIssue[]> {
+    const query = `
+      query GetIssues($filter: IssueFilter, $first: Int!) {
+        issues(filter: $filter, first: $first) {
+          nodes {
+            id
+            identifier
+            title
+            description
+            state {
+              id
+              name
+              type
+            }
+            priority
+            assignee {
+              id
+              name
+              email
+            }
+            estimate
+            labels {
+              nodes {
+                id
+                name
+              }
+            }
+            createdAt
+            updatedAt
+            url
+          }
+        }
+      }
+    `;
+
+    const filter: any = {};
+    
+    if (options?.teamId) {
+      filter.team = { id: { eq: options.teamId } };
+    }
+    
+    if (options?.assigneeId) {
+      filter.assignee = { id: { eq: options.assigneeId } };
+    }
+    
+    if (options?.stateType) {
+      filter.state = { type: { eq: options.stateType } };
+    }
+
+    const result = await this.graphql<{
+      issues: {
+        nodes: LinearIssue[];
+      };
+    }>(query, {
+      filter: Object.keys(filter).length > 0 ? filter : undefined,
+      first: options?.limit || 50
+    });
+
+    return result.issues.nodes;
+  }
 }

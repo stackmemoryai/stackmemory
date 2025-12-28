@@ -25,6 +25,8 @@ import { LinearConfigManager } from '../integrations/linear/config.js';
 import { UpdateChecker } from '../core/utils/update-checker.js';
 import { ProgressTracker } from '../core/monitoring/progress-tracker.js';
 import { registerProjectCommands } from './commands/projects.js';
+import { registerLinearCommands } from './commands/linear.js';
+import { registerLinearTestCommand } from './commands/linear-test.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
@@ -89,6 +91,13 @@ program
 
       const db = new Database(dbPath);
       const frameManager = new FrameManager(db, 'cli-project');
+      
+      // Auto-create a status check context frame
+      frameManager.createFrame({
+        type: 'task',
+        name: 'status',
+        inputs: { timestamp: new Date().toISOString() }
+      });
 
       const activeFrames = frameManager.getActiveFramePath();
       const stackDepth = frameManager.getStackDepth();
@@ -855,8 +864,73 @@ program
     }
   });
 
+// Add test context command
+program
+  .command('context:test')
+  .description('Test context persistence by creating sample frames')
+  .action(async () => {
+    try {
+      const projectRoot = process.cwd();
+      const dbPath = join(projectRoot, '.stackmemory', 'context.db');
+
+      if (!existsSync(dbPath)) {
+        console.log('❌ StackMemory not initialized. Run "stackmemory init" first.');
+        return;
+      }
+
+      const db = new Database(dbPath);
+      const frameManager = new FrameManager(db, 'cli-project');
+
+      // Create test frames
+      console.log('📝 Creating test context frames...');
+      
+      const rootFrame = frameManager.createFrame({
+        type: 'task',
+        name: 'Test Session',
+        inputs: { test: true, timestamp: new Date().toISOString() }
+      });
+      
+      const taskFrame = frameManager.createFrame({
+        type: 'subtask',
+        name: 'Sample Task',
+        inputs: { description: 'Testing context persistence' },
+        parentFrameId: rootFrame
+      });
+      
+      const commandFrame = frameManager.createFrame({
+        type: 'tool_scope',
+        name: 'test-command',
+        inputs: { args: ['--test'] },
+        parentFrameId: taskFrame
+      });
+      
+      // Add some events
+      frameManager.addEvent('observation', {
+        message: 'Test event recorded'
+      }, commandFrame);
+      
+      console.log('✅ Test frames created!');
+      console.log(`📊 Stack depth: ${frameManager.getStackDepth()}`);
+      console.log(`🔄 Active frames: ${frameManager.getActiveFramePath().length}`);
+      
+      // Close one frame to test state changes
+      frameManager.closeFrame(commandFrame);
+      console.log(`📊 After closing command frame: depth = ${frameManager.getStackDepth()}`);
+      
+      db.close();
+    } catch (error) {
+      logger.error('Test context failed', error as Error);
+      console.error('❌ Test failed:', (error as Error).message);
+      process.exit(1);
+    }
+  });
+
 // Register project management commands
 registerProjectCommands(program);
+
+// Register Linear integration commands
+registerLinearCommands(program);
+registerLinearTestCommand(program);
 
 // Auto-detect current project on startup
 if (process.argv.length > 2) {
