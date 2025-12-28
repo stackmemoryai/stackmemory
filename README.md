@@ -251,6 +251,85 @@ On every message/tool call:
 
 ---
 
+## Claude Code Integration
+
+StackMemory can automatically save context when using Claude Code, ensuring your AI assistant always has access to previous context and decisions.
+
+### Quick Setup
+
+1. **Install the wrapper script**:
+```bash
+# Make scripts executable
+chmod +x scripts/claude-code-wrapper.sh scripts/stackmemory-daemon.sh
+
+# Add alias to your shell config
+echo 'alias claude="~/Dev/stackmemory/scripts/claude-code-wrapper.sh"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+2. **Use Claude Code with auto-save**:
+```bash
+# Instead of: claude-code
+# Use: claude
+
+# Context is automatically saved on exit (Ctrl+C)
+```
+
+### Integration Methods
+
+#### 1. Shell Wrapper (Recommended)
+Automatically saves context when Claude Code exits:
+```bash
+# Use the wrapper
+./scripts/claude-code-wrapper.sh
+
+# Or with the alias
+claude
+```
+
+#### 2. Background Daemon
+Continuously saves context every 5 minutes:
+```bash
+# Start daemon
+./scripts/stackmemory-daemon.sh &
+
+# Custom interval (60 seconds)
+./scripts/stackmemory-daemon.sh 60 &
+
+# Stop daemon
+kill $(cat /tmp/stackmemory-daemon.pid)
+```
+
+#### 3. Git Hooks
+Save context automatically on git commits:
+```bash
+# Install in current repo
+./scripts/setup-git-hooks.sh
+```
+
+#### 4. Manual Function
+Add to `~/.zshrc`:
+```bash
+claude_with_sm() {
+    claude "$@"
+    local exit_code=$?
+    if [ -d ".stackmemory" ]; then
+        stackmemory status
+        [ -n "$LINEAR_API_KEY" ] && stackmemory linear sync
+    fi
+    return $exit_code
+}
+```
+
+### Features
+
+- **Automatic context preservation** - Saves on exit (including Ctrl+C)
+- **Linear sync** - Syncs tasks if LINEAR_API_KEY is set
+- **Smart detection** - Only runs in StackMemory-enabled projects
+- **Zero overhead** - No performance impact during Claude Code sessions
+
+---
+
 ## Guarantees
 
 * ✅ Lossless storage (no destructive compaction)
