@@ -68,7 +68,7 @@ async function mergeDuplicateTasks(dryRun = true) {
     const tokens = JSON.parse(tokensData);
     accessToken = tokens.accessToken;
     console.log('✅ Loaded Linear authentication tokens\n');
-  } catch (error) {
+  } catch {
     console.error(
       '❌ Failed to load Linear tokens. Please run: stackmemory linear setup'
     );
@@ -94,7 +94,10 @@ async function mergeDuplicateTasks(dryRun = true) {
       );
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as {
+      errors?: unknown[];
+      data: unknown;
+    };
     if (result.errors) {
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
@@ -123,7 +126,9 @@ async function mergeDuplicateTasks(dryRun = true) {
     }
   `;
 
-  const teamData = await graphqlRequest(teamQuery);
+  const teamData = (await graphqlRequest(teamQuery)) as {
+    teams: { nodes: any[] };
+  };
   const team = teamData.teams.nodes[0];
 
   if (!team) {
@@ -179,9 +184,9 @@ async function mergeDuplicateTasks(dryRun = true) {
         `;
 
         // Get primary issue
-        const primaryData = await graphqlRequest(issueQuery, {
+        const primaryData = (await graphqlRequest(issueQuery, {
           identifier: group.primaryId,
-        });
+        })) as { issue: any };
         const primaryIssue = primaryData.issue;
 
         if (!primaryIssue) {
@@ -199,9 +204,9 @@ async function mergeDuplicateTasks(dryRun = true) {
 
         for (const duplicateId of duplicateIds) {
           try {
-            const dupData = await graphqlRequest(issueQuery, {
+            const dupData = (await graphqlRequest(issueQuery, {
               identifier: duplicateId,
-            });
+            })) as { issue: any };
             const duplicateIssue = dupData.issue;
 
             if (!duplicateIssue) {

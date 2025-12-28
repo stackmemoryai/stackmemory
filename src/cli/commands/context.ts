@@ -349,7 +349,9 @@ export function createContextCommands(): Command {
               const inputs = JSON.parse(frame.inputs || '{}');
               const instanceId = inputs.instanceId || 'unknown';
               const branch = inputs.branch || 'unknown';
-              const created = new Date(frame.created_at * 1000).toLocaleString();
+              const created = new Date(
+                frame.created_at * 1000
+              ).toLocaleString();
               console.log(`📍 ${frame.name || frame.frame_id.slice(0, 10)}`);
               console.log(`   Instance: ${instanceId}`);
               console.log(`   Branch: ${branch}`);
@@ -368,7 +370,7 @@ export function createContextCommands(): Command {
           }
 
           const frameId = frameManager.createFrame({
-            type: 'session',
+            type: 'task',
             name: `worktree-${branch}`,
             inputs: {
               worktree: true,
@@ -384,7 +386,7 @@ export function createContextCommands(): Command {
         } else if (action === 'load') {
           // Load worktree context
           const instanceId = options.instance || process.env.CLAUDE_INSTANCE_ID;
-          
+
           if (!instanceId) {
             console.log('⚠️ No instance ID provided.');
             return;
@@ -416,7 +418,10 @@ export function createContextCommands(): Command {
           console.log('Usage: stackmemory context worktree [save|load|list]');
         }
       } catch (error) {
-        console.error('❌ Failed to manage worktree context:', (error as Error).message);
+        console.error(
+          '❌ Failed to manage worktree context:',
+          (error as Error).message
+        );
       } finally {
         db.close();
       }

@@ -48,6 +48,12 @@ export default [
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', '*.js', 'src/integrations/'],
+    ignores: [
+      'dist/',
+      'node_modules/',
+      '*.js',
+      'src/integrations/',
+      'scripts/merge-linear-duplicates.ts',
+    ],
   },
 ];

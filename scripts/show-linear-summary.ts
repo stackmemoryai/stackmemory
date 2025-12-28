@@ -16,7 +16,7 @@ async function showLinearSummary() {
     const tokensData = readFileSync(tokensPath, 'utf8');
     const tokens = JSON.parse(tokensData);
     accessToken = tokens.accessToken;
-  } catch (error) {
+  } catch {
     console.error(
       '❌ Failed to load Linear tokens. Please run: stackmemory linear setup'
     );
@@ -42,7 +42,10 @@ async function showLinearSummary() {
       );
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as {
+      errors?: unknown[];
+      data: unknown;
+    };
     if (result.errors) {
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
@@ -68,7 +71,9 @@ async function showLinearSummary() {
     }
   `;
 
-  const data = await graphqlRequest(issuesQuery);
+  const data = (await graphqlRequest(issuesQuery)) as {
+    issues: { nodes: any[] };
+  };
   const issues = data.issues.nodes;
 
   // Group by state type
@@ -134,15 +139,13 @@ async function showLinearSummary() {
 
   console.log('\n' + '='.repeat(60));
   console.log('\n📈 Total Issues: ' + issues.length);
-  console.log(
-    '   Active: ' +
-      (grouped.get('started')?.length ||
-        0 + grouped.get('unstarted')?.length ||
-        0 + grouped.get('backlog')?.length ||
-        0)
-  );
-  console.log('   Completed: ' + (grouped.get('completed')?.length || 0));
-  console.log('   Canceled: ' + (grouped.get('canceled')?.length || 0));
+  const activeCount =
+    (grouped.get('started')?.length ?? 0) +
+    (grouped.get('unstarted')?.length ?? 0) +
+    (grouped.get('backlog')?.length ?? 0);
+  console.log('   Active: ' + activeCount);
+  console.log('   Completed: ' + (grouped.get('completed')?.length ?? 0));
+  console.log('   Canceled: ' + (grouped.get('canceled')?.length ?? 0));
 }
 
 // Run

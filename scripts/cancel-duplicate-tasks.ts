@@ -36,7 +36,7 @@ async function cancelDuplicateTasks(dryRun = true) {
     const tokens = JSON.parse(tokensData);
     accessToken = tokens.accessToken;
     console.log('✅ Loaded Linear authentication tokens\n');
-  } catch (error) {
+  } catch {
     console.error(
       '❌ Failed to load Linear tokens. Please run: stackmemory linear setup'
     );
@@ -62,7 +62,10 @@ async function cancelDuplicateTasks(dryRun = true) {
       );
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as {
+      errors?: unknown[];
+      data: unknown;
+    };
     if (result.errors) {
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
@@ -102,7 +105,9 @@ async function cancelDuplicateTasks(dryRun = true) {
     }
   `;
 
-  const issuesData = await graphqlRequest(issuesQuery);
+  const issuesData = (await graphqlRequest(issuesQuery)) as {
+    issues: { nodes: any[] };
+  };
   const allIssues = issuesData.issues.nodes;
 
   console.log(`Found ${allIssues.length} active issues\n`);

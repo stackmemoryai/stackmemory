@@ -40,9 +40,12 @@ class ClaudeSM {
     };
 
     this.stackmemoryPath = this.findStackMemory();
-    this.worktreeScriptPath = path.join(__dirname, '../../scripts/claude-worktree-manager.sh');
+    this.worktreeScriptPath = path.join(
+      __dirname,
+      '../../scripts/claude-worktree-manager.sh'
+    );
     this.claudeConfigDir = path.join(os.homedir(), '.claude');
-    
+
     // Ensure config directory exists
     if (!fs.existsSync(this.claudeConfigDir)) {
       fs.mkdirSync(this.claudeConfigDir, { recursive: true });
@@ -85,7 +88,9 @@ class ClaudeSM {
 
   private getCurrentBranch(): string {
     try {
-      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+      return execSync('git rev-parse --abbrev-ref HEAD', {
+        encoding: 'utf8',
+      }).trim();
     } catch {
       return 'main';
     }
@@ -107,10 +112,18 @@ class ClaudeSM {
 
     console.log(chalk.blue('🌳 Setting up isolated worktree...'));
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-    const branch = this.config.branch || `claude-${this.config.task || 'work'}-${timestamp}-${this.config.instanceId}`;
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .substring(0, 19);
+    const branch =
+      this.config.branch ||
+      `claude-${this.config.task || 'work'}-${timestamp}-${this.config.instanceId}`;
     const repoName = path.basename(process.cwd());
-    const worktreePath = path.join(path.dirname(process.cwd()), `${repoName}--${branch}`);
+    const worktreePath = path.join(
+      path.dirname(process.cwd()),
+      `${repoName}--${branch}`
+    );
 
     try {
       // Create worktree
@@ -148,8 +161,8 @@ class ClaudeSM {
       }
 
       return worktreePath;
-    } catch (error) {
-      console.error(chalk.red('❌ Failed to create worktree:'), error);
+    } catch (err) {
+      console.error(chalk.red('❌ Failed to create worktree:'), err);
       return null;
     }
   }
@@ -170,7 +183,7 @@ class ClaudeSM {
 
       const cmd = `${this.stackmemoryPath} context save --json '${JSON.stringify(contextData)}'`;
       execSync(cmd, { stdio: 'ignore' });
-    } catch (error) {
+    } catch {
       // Silently fail - don't interrupt Claude
     }
   }
@@ -180,7 +193,7 @@ class ClaudeSM {
 
     try {
       console.log(chalk.blue('📚 Loading previous context...'));
-      
+
       const cmd = `${this.stackmemoryPath} context list --limit 5 --format json`;
       const output = execSync(cmd, { encoding: 'utf8' });
       const contexts = JSON.parse(output);
@@ -188,10 +201,12 @@ class ClaudeSM {
       if (contexts.length > 0) {
         console.log(chalk.gray('Recent context loaded:'));
         contexts.forEach((ctx: any) => {
-          console.log(chalk.gray(`  - ${ctx.message} (${ctx.metadata?.timestamp})`));
+          console.log(
+            chalk.gray(`  - ${ctx.message} (${ctx.metadata?.timestamp})`)
+          );
         });
       }
-    } catch (error) {
+    } catch {
       // Silently continue
     }
   }
@@ -201,8 +216,8 @@ class ClaudeSM {
       const lockDir = path.join(process.cwd(), '.claude-worktree-locks');
       if (!fs.existsSync(lockDir)) return false;
 
-      const locks = fs.readdirSync(lockDir).filter(f => f.endsWith('.lock'));
-      const activeLocks = locks.filter(lockFile => {
+      const locks = fs.readdirSync(lockDir).filter((f) => f.endsWith('.lock'));
+      const activeLocks = locks.filter((lockFile) => {
         const lockPath = path.join(lockDir, lockFile);
         const lockData = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
         const lockAge = Date.now() - new Date(lockData.created).getTime();
@@ -218,12 +233,16 @@ class ClaudeSM {
   private suggestWorktreeMode(): void {
     if (this.hasUncommittedChanges()) {
       console.log(chalk.yellow('⚠️  Uncommitted changes detected'));
-      console.log(chalk.gray('   Consider using --worktree to work in isolation'));
+      console.log(
+        chalk.gray('   Consider using --worktree to work in isolation')
+      );
     }
 
     if (this.detectMultipleInstances()) {
       console.log(chalk.yellow('⚠️  Other Claude instances detected'));
-      console.log(chalk.gray('   Using --worktree is recommended to avoid conflicts'));
+      console.log(
+        chalk.gray('   Using --worktree is recommended to avoid conflicts')
+      );
     }
   }
 
@@ -267,7 +286,8 @@ class ClaudeSM {
         case '-a':
           // Auto mode: detect and apply best settings
           if (this.isGitRepo()) {
-            this.config.useWorktree = this.hasUncommittedChanges() || this.detectMultipleInstances();
+            this.config.useWorktree =
+              this.hasUncommittedChanges() || this.detectMultipleInstances();
           }
           break;
         default:
@@ -286,7 +306,7 @@ class ClaudeSM {
     if (this.isGitRepo()) {
       const branch = this.getCurrentBranch();
       console.log(chalk.gray(`📍 Current branch: ${branch}`));
-      
+
       if (!this.config.useWorktree) {
         this.suggestWorktreeMode();
       }
@@ -298,7 +318,7 @@ class ClaudeSM {
       if (worktreePath) {
         this.config.worktreePath = worktreePath;
         process.chdir(worktreePath);
-        
+
         // Save context about worktree creation
         this.saveContext('Created worktree for Claude instance', {
           action: 'worktree_created',
@@ -319,7 +339,7 @@ class ClaudeSM {
 
     console.log(chalk.gray(`🤖 Instance ID: ${this.config.instanceId}`));
     console.log(chalk.gray(`📁 Working in: ${process.cwd()}`));
-    
+
     if (this.config.useSandbox) {
       console.log(chalk.yellow('🔒 Sandbox mode enabled'));
     }
@@ -390,7 +410,7 @@ program
   .option('--no-context', 'Disable StackMemory context integration')
   .helpOption('-h, --help', 'Display help')
   .allowUnknownOption(true)
-  .action(async (options) => {
+  .action(async (_options) => {
     const claudeSM = new ClaudeSM();
     const args = process.argv.slice(2);
     await claudeSM.run(args);
