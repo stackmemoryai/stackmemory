@@ -631,6 +631,160 @@ program
   });
 
 program
+  .command('analytics')
+  .description('Launch task analytics dashboard')
+  .option('-p, --port <port>', 'Port for dashboard server', '3000')
+  .option('-o, --open', 'Open dashboard in browser')
+  .option('--export <format>', 'Export metrics (json|csv)')
+  .option('--sync', 'Sync with Linear before launching')
+  .option('--view', 'Show analytics in terminal')
+  .action(async (options) => {
+    try {
+      const projectRoot = process.cwd();
+      const dbPath = join(projectRoot, '.stackmemory', 'context.db');
+
+      if (!existsSync(dbPath)) {
+        console.log(
+          '❌ StackMemory not initialized. Run "stackmemory init" first.'
+        );
+        return;
+      }
+
+      if (options.view) {
+        const { displayAnalyticsDashboard } = await import('./analytics-viewer.js');
+        await displayAnalyticsDashboard(projectRoot);
+        return;
+      }
+
+      if (options.export) {
+        const { AnalyticsService } = await import('../analytics/index.js');
+        const service = new AnalyticsService(projectRoot);
+        
+        if (options.sync) {
+          console.log('🔄 Syncing with Linear...');
+          await service.syncLinearTasks();
+        }
+        
+        const state = await service.getDashboardState();
+        
+        if (options.export === 'csv') {
+          console.log('📊 Exporting metrics as CSV...');
+          // Convert to CSV format
+          const tasks = state.recentTasks;
+          const headers = ['ID', 'Title', 'State', 'Priority', 'Created', 'Completed'];
+          const rows = tasks.map(t => [
+            t.id,
+            t.title,
+            t.state,
+            t.priority,
+            t.createdAt.toISOString(),
+            t.completedAt?.toISOString() || ''
+          ]);
+          console.log(headers.join(','));
+          rows.forEach(r => console.log(r.join(',')));
+        } else {
+          console.log(JSON.stringify(state, null, 2));
+        }
+        
+        service.close();
+        return;
+      }
+
+      // Launch dashboard server
+      console.log(`🚀 Launching analytics dashboard on port ${options.port}...`);
+      
+      const express = (await import('express')).default;
+      const { AnalyticsAPI } = await import('../analytics/index.js');
+      const { createServer } = await import('http');
+      
+      const app = express();
+      const analyticsAPI = new AnalyticsAPI(projectRoot);
+      
+      if (options.sync) {
+        console.log('🔄 Syncing with Linear...');
+        const service = new (await import('../analytics/index.js')).AnalyticsService(projectRoot);
+        await service.syncLinearTasks();
+        service.close();
+      }
+      
+      app.use('/api/analytics', analyticsAPI.getRouter());
+      
+      // Serve the HTML dashboard
+      app.get('/', async (req, res) => {
+        const { fileURLToPath } = await import('url');
+        const { dirname } = await import('path');
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const dashboardPath = join(__dirname, '../analytics/dashboard.html');
+        
+        if (existsSync(dashboardPath)) {
+          res.sendFile(dashboardPath);
+        } else {
+          // Fallback to inline HTML if file not found
+          const { existsSync: fsExists } = await import('fs');
+          const { join: pathJoin } = await import('path');
+          const htmlPath = pathJoin(__dirname, '../analytics/dashboard.html');
+          
+          if (fsExists(htmlPath)) {
+            res.sendFile(htmlPath);
+          } else {
+            res.send(`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>StackMemory Analytics</title>
+                <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; }
+                  h1 { color: #333; }
+                  .status { color: #22c55e; }
+                </style>
+              </head>
+              <body>
+                <h1>📊 StackMemory Analytics Dashboard</h1>
+                <p class="status">✅ Server running</p>
+                <p>Dashboard available at: /src/analytics/dashboard.html</p>
+                <p>API Endpoints:</p>
+                <ul>
+                  <li>GET /api/analytics/metrics</li>
+                  <li>GET /api/analytics/tasks</li>
+                  <li>POST /api/analytics/sync</li>
+                </ul>
+              </body>
+              </html>
+            `);
+          }
+        }
+      });
+      
+      const server = createServer(app);
+      analyticsAPI.setupWebSocket(server);
+      
+      server.listen(options.port, async () => {
+        console.log(`✅ Analytics dashboard running at http://localhost:${options.port}`);
+        
+        if (options.open) {
+          const { exec } = await import('child_process');
+          const url = `http://localhost:${options.port}`;
+          const command = process.platform === 'darwin' ? `open ${url}` :
+                         process.platform === 'win32' ? `start ${url}` : `xdg-open ${url}`;
+          exec(command);
+        }
+      });
+      
+      process.on('SIGINT', () => {
+        console.log('\n👋 Shutting down analytics dashboard...');
+        analyticsAPI.close();
+        server.close();
+        process.exit(0);
+      });
+    } catch (error) {
+      logger.error('Analytics command failed', error as Error);
+      console.error('❌ Analytics failed:', (error as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('progress')
   .description('Show current progress and recent changes')
   .action(async () => {

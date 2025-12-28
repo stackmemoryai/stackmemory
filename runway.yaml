@@ -1,0 +1,385 @@
+# Runway Platform Deployment Configuration
+# Production deployment for StackMemory MCP Server
+
+name: stackmemory-mcp
+version: 1.0.0
+description: "Lossless memory runtime for AI coding tools with authentication"
+
+# Global environment variables (can be overridden per service)
+environment:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  ENABLE_ANALYTICS: "true"
+  ENABLE_LINEAR_SYNC: "true"
+  ENABLE_WEBSOCKET: "true"
+
+services:
+  # Main MCP Server Application
+  - name: mcp-server
+    type: web
+    runtime: node20
+    dockerfile: Dockerfile.runway
+    
+    build:
+      command: npm run build
+      environment:
+        NODE_ENV: production
+    
+    start:
+      command: node --max-old-space-size=2048 dist/src/runway/index.js
+      
+    health_check:
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    environment:
+      # Injected from Runway secrets
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      DATADOG_API_KEY: ${DATADOG_API_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
+      
+      # Service configuration
+      PORT: 8080
+      DATABASE_POOL_SIZE: 20
+      RATE_LIMIT_FREE: 100
+      RATE_LIMIT_PRO: 1000
+      RATE_LIMIT_ENTERPRISE: 10000
+      CORS_ORIGINS: "https://claude.ai,https://app.stackmemory.com"
+    
+    resources:
+      cpu: 2000m      # 2 vCPUs
+      memory: 4096Mi  # 4GB RAM
+      storage: 20Gi   # 20GB disk
+    
+    scaling:
+      min_instances: 2
+      max_instances: 20
+      target_cpu_utilization: 70
+      target_memory_utilization: 80
+      scale_down_delay: 300s
+      scale_up_delay: 30s
+    
+    ports:
+      - protocol: TCP
+        port: 8080
+        expose: true
+        
+    domains:
+      - mcp.stackmemory.com
+      - stackmemory-mcp.runway.app
+    
+    tls:
+      enabled: true
+      redirect_http: true
+      min_version: "1.2"
+      
+  # Background Worker for Queue Processing
+  - name: queue-worker
+    type: worker
+    runtime: node20
+    dockerfile: Dockerfile.runway
+    
+    start:
+      command: node dist/src/runway/queue/worker.js
+    
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      WORKER_CONCURRENCY: 5
+      WORKER_MAX_JOBS: 100
+    
+    resources:
+      cpu: 1000m
+      memory: 2048Mi
+    
+    scaling:
+      min_instances: 1
+      max_instances: 10
+      target_queue_size: 100
+      scale_down_delay: 600s
+
+  # Database Migration Job
+  - name: db-migrate
+    type: job
+    runtime: node20
+    dockerfile: Dockerfile.runway
+    
+    command: node dist/src/runway/database/migrate.js
+    
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    
+    resources:
+      cpu: 500m
+      memory: 1024Mi
+    
+    schedule: "@deployment" # Run on each deployment
+    timeout: 300s
+    retries: 3
+
+databases:
+  # PostgreSQL Database
+  - name: postgres
+    type: postgresql
+    version: "15"
+    plan: production-4vcpu-8gb
+    
+    configuration:
+      max_connections: 200
+      shared_buffers: 2GB
+      effective_cache_size: 6GB
+      work_mem: 10MB
+      maintenance_work_mem: 512MB
+      random_page_cost: 1.1
+      effective_io_concurrency: 200
+      
+    backup:
+      enabled: true
+      schedule: "0 2 * * *" # Daily at 2 AM
+      retention: 30 # Keep 30 days of backups
+      type: continuous # Point-in-time recovery
+    
+    high_availability:
+      enabled: true
+      replicas: 2
+      regions:
+        - us-east-1
+        - us-west-2
+    
+    monitoring:
+      enabled: true
+      slow_query_log: true
+      slow_query_threshold: 1000ms
+
+caches:
+  # Redis Cache
+  - name: redis
+    type: redis
+    version: "7.0"
+    plan: production-2vcpu-4gb
+    
+    configuration:
+      maxmemory: 4GB
+      maxmemory_policy: allkeys-lru
+      appendonly: yes
+      appendfsync: everysec
+      
+    high_availability:
+      enabled: true
+      replicas: 2
+      failover: automatic
+    
+    persistence:
+      enabled: true
+      type: aof # Append-only file
+
+storage:
+  # Object Storage for file uploads
+  - name: uploads
+    type: s3
+    size: 100Gi
+    
+    lifecycle:
+      - rule: delete-old-temp-files
+        prefix: /tmp/
+        expiration_days: 7
+      
+      - rule: archive-old-contexts
+        prefix: /contexts/
+        transition_to_glacier_days: 90
+    
+    cors:
+      - allowed_origins:
+          - "https://app.stackmemory.com"
+          - "https://claude.ai"
+        allowed_methods:
+          - GET
+          - PUT
+          - POST
+        allowed_headers:
+          - "*"
+        max_age_seconds: 3600
+
+monitoring:
+  # DataDog Integration
+  datadog:
+    enabled: true
+    api_key: ${DATADOG_API_KEY}
+    tags:
+      - "env:production"
+      - "service:stackmemory-mcp"
+    
+    apm:
+      enabled: true
+      sample_rate: 0.1
+    
+    logs:
+      enabled: true
+      include_patterns:
+        - "*.log"
+        - "stdout"
+        - "stderr"
+    
+    metrics:
+      enabled: true
+      custom_metrics: true
+  
+  # Sentry Error Tracking
+  sentry:
+    enabled: true
+    dsn: ${SENTRY_DSN}
+    environment: production
+    traces_sample_rate: 0.1
+    profiles_sample_rate: 0.1
+    
+  # CloudWatch Logs
+  cloudwatch:
+    enabled: true
+    log_group: /runway/stackmemory-mcp
+    retention_days: 30
+    
+alerts:
+  # PagerDuty Integration
+  pagerduty:
+    enabled: true
+    integration_key: ${PAGERDUTY_KEY}
+    
+  rules:
+    - name: high-error-rate
+      condition: "error_rate > 0.05"
+      duration: 5m
+      severity: critical
+      
+    - name: high-latency
+      condition: "p95_latency > 2000"
+      duration: 10m
+      severity: warning
+      
+    - name: database-connection-pool
+      condition: "db_connections_used / db_connections_total > 0.9"
+      duration: 5m
+      severity: warning
+      
+    - name: memory-usage
+      condition: "memory_used / memory_total > 0.9"
+      duration: 10m
+      severity: warning
+      
+    - name: disk-usage
+      condition: "disk_used / disk_total > 0.85"
+      duration: 15m
+      severity: warning
+
+security:
+  # Web Application Firewall
+  waf:
+    enabled: true
+    mode: blocking
+    rules:
+      - owasp-top-10
+      - known-bad-inputs
+      - sql-injection
+      - xss
+    
+    rate_limiting:
+      enabled: true
+      requests_per_minute: 1000
+      burst: 100
+    
+    ip_whitelist:
+      - "35.235.240.0/20" # Claude.ai IP range
+    
+    geo_blocking:
+      enabled: false
+      blocked_countries: []
+  
+  # DDoS Protection
+  ddos_protection:
+    enabled: true
+    mode: automatic
+    threshold: 10000 # requests per second
+  
+  # Secrets Management
+  secrets:
+    provider: runway-vault
+    auto_rotate: true
+    rotation_days: 90
+
+deployment:
+  strategy: rolling
+  max_surge: 2
+  max_unavailable: 1
+  
+  pre_deployment:
+    - name: database-backup
+      command: ./scripts/backup-db.sh
+      
+    - name: run-tests
+      command: npm test
+      
+  post_deployment:
+    - name: smoke-tests
+      command: ./scripts/smoke-test.sh
+      timeout: 300s
+      
+    - name: notify-team
+      command: ./scripts/notify-deployment.sh
+  
+  rollback:
+    automatic: true
+    on_error_rate: 0.1
+    on_latency_p99: 5000
+    
+  canary:
+    enabled: true
+    percentage: 10
+    duration: 30m
+    metrics:
+      - error_rate
+      - latency_p95
+      - success_rate
+
+compliance:
+  # GDPR Compliance
+  gdpr:
+    enabled: true
+    data_retention_days: 365
+    right_to_be_forgotten: true
+    data_portability: true
+  
+  # SOC2 Compliance
+  soc2:
+    enabled: true
+    audit_logging: true
+    encryption_at_rest: true
+    encryption_in_transit: true
+
+cost_optimization:
+  # Auto-scaling policies to optimize costs
+  quiet_hours:
+    enabled: true
+    schedule: "0 22 * * 1-5" # 10 PM weekdays
+    min_instances: 1
+    
+  weekend_scaling:
+    enabled: true
+    schedule: "0 0 * * 6" # Saturday midnight
+    min_instances: 1
+    max_instances: 5
+
+# Runway CLI commands
+commands:
+  deploy: runway deploy --environment production --wait
+  status: runway status stackmemory-mcp
+  logs: runway logs stackmemory-mcp --tail 100
+  scale: runway scale stackmemory-mcp --replicas
+  rollback: runway rollback stackmemory-mcp --to-previous
