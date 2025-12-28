@@ -1,0 +1,14 @@
+# Nixpacks configuration for Railway
+# Ensures Node.js 20 is used
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x"]
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]
+
+[phases.build]
+cmds = ["echo 'Skipping build for simple server'"]
+
+[start]
+cmd = "node src/railway/simple.js"

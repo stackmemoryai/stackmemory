@@ -2,6 +2,10 @@
   "name": "@stackmemoryai/stackmemory",
   "version": "0.2.5",
   "description": "Lossless, project-scoped memory for AI tools",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "type": "module",
   "main": "dist/src/index.js",
   "bin": {
