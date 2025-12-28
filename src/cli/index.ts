@@ -91,12 +91,12 @@ program
 
       const db = new Database(dbPath);
       const frameManager = new FrameManager(db, 'cli-project');
-      
+
       // Auto-create a status check context frame
       frameManager.createFrame({
         type: 'task',
         name: 'status',
-        inputs: { timestamp: new Date().toISOString() }
+        inputs: { timestamp: new Date().toISOString() },
       });
 
       const activeFrames = frameManager.getActiveFramePath();
@@ -874,7 +874,9 @@ program
       const dbPath = join(projectRoot, '.stackmemory', 'context.db');
 
       if (!existsSync(dbPath)) {
-        console.log('❌ StackMemory not initialized. Run "stackmemory init" first.');
+        console.log(
+          '❌ StackMemory not initialized. Run "stackmemory init" first.'
+        );
         return;
       }
 
@@ -883,40 +885,48 @@ program
 
       // Create test frames
       console.log('📝 Creating test context frames...');
-      
+
       const rootFrame = frameManager.createFrame({
         type: 'task',
         name: 'Test Session',
-        inputs: { test: true, timestamp: new Date().toISOString() }
+        inputs: { test: true, timestamp: new Date().toISOString() },
       });
-      
+
       const taskFrame = frameManager.createFrame({
         type: 'subtask',
         name: 'Sample Task',
         inputs: { description: 'Testing context persistence' },
-        parentFrameId: rootFrame
+        parentFrameId: rootFrame,
       });
-      
+
       const commandFrame = frameManager.createFrame({
         type: 'tool_scope',
         name: 'test-command',
         inputs: { args: ['--test'] },
-        parentFrameId: taskFrame
+        parentFrameId: taskFrame,
       });
-      
+
       // Add some events
-      frameManager.addEvent('observation', {
-        message: 'Test event recorded'
-      }, commandFrame);
-      
+      frameManager.addEvent(
+        'observation',
+        {
+          message: 'Test event recorded',
+        },
+        commandFrame
+      );
+
       console.log('✅ Test frames created!');
       console.log(`📊 Stack depth: ${frameManager.getStackDepth()}`);
-      console.log(`🔄 Active frames: ${frameManager.getActiveFramePath().length}`);
-      
+      console.log(
+        `🔄 Active frames: ${frameManager.getActiveFramePath().length}`
+      );
+
       // Close one frame to test state changes
       frameManager.closeFrame(commandFrame);
-      console.log(`📊 After closing command frame: depth = ${frameManager.getStackDepth()}`);
-      
+      console.log(
+        `📊 After closing command frame: depth = ${frameManager.getStackDepth()}`
+      );
+
       db.close();
     } catch (error) {
       logger.error('Test context failed', error as Error);
