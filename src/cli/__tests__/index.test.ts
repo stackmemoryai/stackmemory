@@ -206,8 +206,8 @@ describe('CLI Commands', () => {
   describe('init command', () => {
     beforeEach(async () => {
       // Dynamically import to get fresh instance
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
     });
 
     it('should initialize StackMemory in current directory', async () => {
@@ -251,8 +251,8 @@ describe('CLI Commands', () => {
       mkdirSync(dbDir, { recursive: true });
       writeFileSync(join(dbDir, 'context.db'), '');
 
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
     });
 
     it('should show status when StackMemory is initialized', async () => {
@@ -321,8 +321,8 @@ describe('CLI Commands', () => {
 
   describe('Linear commands', () => {
     beforeEach(async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
     });
 
     describe('linear setup', () => {
@@ -551,8 +551,8 @@ describe('CLI Commands', () => {
     });
 
     it('should create test context frames', async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       const { FrameManager } = await import('../core/context/frame-manager');
       const mockFrameManager = FrameManager as Mock;
@@ -574,8 +574,8 @@ describe('CLI Commands', () => {
     });
 
     it('should handle context test errors', async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       const { FrameManager } = await import('../core/context/frame-manager');
       const mockFrameManager = FrameManager as Mock;
@@ -597,8 +597,8 @@ describe('CLI Commands', () => {
     it('should show warning when not initialized', async () => {
       rmSync(join(tempDir, '.stackmemory'), { recursive: true });
 
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       process.argv = ['node', 'stackmemory', 'context:test'];
       
@@ -612,8 +612,8 @@ describe('CLI Commands', () => {
 
   describe('update-check command', () => {
     beforeEach(async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
     });
 
     it('should check for updates', async () => {
@@ -652,8 +652,8 @@ describe('CLI Commands', () => {
     });
 
     it('should show progress summary', async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       process.argv = ['node', 'stackmemory', 'progress'];
       
@@ -663,8 +663,8 @@ describe('CLI Commands', () => {
     });
 
     it('should handle progress errors', async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       const { ProgressTracker } = await import('../core/monitoring/progress-tracker');
       const mockProgressTracker = ProgressTracker as Mock;
@@ -688,8 +688,8 @@ describe('CLI Commands', () => {
     it('should show warning when not initialized', async () => {
       rmSync(join(tempDir, '.stackmemory'), { recursive: true });
 
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       process.argv = ['node', 'stackmemory', 'progress'];
       
@@ -703,7 +703,7 @@ describe('CLI Commands', () => {
 
   describe('mcp-server command', () => {
     beforeEach(async () => {
-      delete require.cache[require.resolve('../index.js')];
+      delete require.cache[require.resolve('../index.ts')];
     });
 
     it('should start MCP server with default options', async () => {
@@ -712,7 +712,7 @@ describe('CLI Commands', () => {
         runMCPServer: vi.fn().mockResolvedValue(undefined)
       }));
 
-      await import('../index.js');
+      await import('../index.ts');
 
       process.argv = ['node', 'stackmemory', 'mcp-server'];
       
@@ -729,7 +729,7 @@ describe('CLI Commands', () => {
         runMCPServer: vi.fn().mockResolvedValue(undefined)
       }));
 
-      await import('../index.js');
+      await import('../index.ts');
 
       process.argv = ['node', 'stackmemory', 'mcp-server', '--project', customPath];
       
@@ -744,7 +744,7 @@ describe('CLI Commands', () => {
         runMCPServer: vi.fn().mockRejectedValue(new Error('MCP server error'))
       }));
 
-      await import('../index.js');
+      await import('../index.ts');
 
       process.argv = ['node', 'stackmemory', 'mcp-server'];
       
@@ -768,8 +768,8 @@ describe('CLI Commands', () => {
       const registerOnboardingCommand = (await import('./commands/onboard')).registerOnboardingCommand;
       const webhookCommand = (await import('./commands/webhook')).webhookCommand;
 
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       expect(registerProjectCommands).toHaveBeenCalledWith(expect.any(Object));
       expect(registerLinearCommands).toHaveBeenCalledWith(expect.any(Object));
@@ -783,8 +783,8 @@ describe('CLI Commands', () => {
 
   describe('Error handling and edge cases', () => {
     beforeEach(async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
     });
 
     it('should handle missing command arguments gracefully', async () => {
@@ -868,8 +868,8 @@ describe('CLI Commands', () => {
     });
 
     it('should handle network failures in Linear integration', async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       const { LinearSyncEngine } = await import('../integrations/linear/sync');
       const mockSyncEngine = LinearSyncEngine as Mock;
@@ -895,8 +895,8 @@ describe('CLI Commands', () => {
     });
 
     it('should handle file system permission issues', async () => {
-      delete require.cache[require.resolve('../index.js')];
-      await import('../index.js');
+      delete require.cache[require.resolve('../index.ts')];
+      await import('../index.ts');
 
       // Mock fs operations to throw permission errors
       const originalWriteFileSync = require('fs').writeFileSync;

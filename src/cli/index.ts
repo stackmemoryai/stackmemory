@@ -32,6 +32,10 @@ import { createSessionCommands } from './commands/session.js';
 import { registerWorktreeCommands } from './commands/worktree.js';
 import { registerOnboardingCommand } from './commands/onboard.js';
 import { webhookCommand } from './commands/webhook.js';
+import { createTaskCommands } from './commands/tasks.js';
+import { createSearchCommand } from './commands/search.js';
+import { createLogCommand } from './commands/log.js';
+import { createContextCommands } from './commands/context.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
@@ -1147,6 +1151,12 @@ program.addCommand(createSessionCommands());
 
 // Register webhook command
 program.addCommand(webhookCommand());
+
+// Register enhanced CLI commands
+program.addCommand(createTaskCommands());
+program.addCommand(createSearchCommand());
+program.addCommand(createLogCommand());
+program.addCommand(createContextCommands());
 
 // Auto-detect current project on startup
 if (process.argv.length > 2) {

@@ -7,13 +7,19 @@ import { Command } from 'commander';
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { PebblesTaskStore, TaskPriority, TaskStatus } from '../../features/tasks/pebbles-task-store.js';
+import {
+  PebblesTaskStore,
+  TaskPriority,
+  TaskStatus,
+} from '../../features/tasks/pebbles-task-store.js';
 import { logger } from '../../core/monitoring/logger.js';
 
 function getTaskStore(projectRoot: string): PebblesTaskStore | null {
   const dbPath = join(projectRoot, '.stackmemory', 'context.db');
   if (!existsSync(dbPath)) {
-    console.log('❌ StackMemory not initialized. Run "stackmemory init" first.');
+    console.log(
+      '❌ StackMemory not initialized. Run "stackmemory init" first.'
+    );
     return null;
   }
   const db = new Database(dbPath);
@@ -30,8 +36,14 @@ export function createTaskCommands(): Command {
     .command('list')
     .alias('ls')
     .description('List tasks')
-    .option('-s, --status <status>', 'Filter by status (pending, in_progress, completed, blocked)')
-    .option('-p, --priority <priority>', 'Filter by priority (urgent, high, medium, low)')
+    .option(
+      '-s, --status <status>',
+      'Filter by status (pending, in_progress, completed, blocked)'
+    )
+    .option(
+      '-p, --priority <priority>',
+      'Filter by priority (urgent, high, medium, low)'
+    )
     .option('-q, --query <text>', 'Search in title/description')
     .option('-l, --limit <n>', 'Limit results', '20')
     .option('-a, --all', 'Include completed tasks')
@@ -42,7 +54,9 @@ export function createTaskCommands(): Command {
 
       try {
         // Get all tasks from DB
-        const db = new Database(join(projectRoot, '.stackmemory', 'context.db'));
+        const db = new Database(
+          join(projectRoot, '.stackmemory', 'context.db')
+        );
         let query = 'SELECT * FROM task_cache WHERE 1=1';
         const params: any[] = [];
 
@@ -78,9 +92,18 @@ export function createTaskCommands(): Command {
 
         console.log(`\n📋 Tasks (${rows.length})\n`);
 
-        const priorityIcon: Record<string, string> = { urgent: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
-        const statusIcon: Record<string, string> = { 
-          pending: '⏳', in_progress: '🔄', completed: '✅', blocked: '🚫', cancelled: '❌' 
+        const priorityIcon: Record<string, string> = {
+          urgent: '🔴',
+          high: '🟠',
+          medium: '🟡',
+          low: '🟢',
+        };
+        const statusIcon: Record<string, string> = {
+          pending: '⏳',
+          in_progress: '🔄',
+          completed: '✅',
+          blocked: '🚫',
+          cancelled: '❌',
         };
 
         rows.forEach((row, i) => {
@@ -90,7 +113,9 @@ export function createTaskCommands(): Command {
           console.log(`${sIcon} ${pIcon} [${id}] ${row.title}`);
           if (row.description) {
             const desc = row.description.split('\n')[0].slice(0, 60);
-            console.log(`      ${desc}${row.description.length > 60 ? '...' : ''}`);
+            console.log(
+              `      ${desc}${row.description.length > 60 ? '...' : ''}`
+            );
           }
         });
         console.log('');
@@ -104,7 +129,11 @@ export function createTaskCommands(): Command {
     .command('add <title>')
     .description('Add a new task')
     .option('-d, --description <text>', 'Task description')
-    .option('-p, --priority <priority>', 'Priority (urgent, high, medium, low)', 'medium')
+    .option(
+      '-p, --priority <priority>',
+      'Priority (urgent, high, medium, low)',
+      'medium'
+    )
     .option('-t, --tags <tags>', 'Comma-separated tags')
     .action(async (title, options) => {
       const projectRoot = process.cwd();
@@ -117,7 +146,9 @@ export function createTaskCommands(): Command {
           description: options.description,
           priority: options.priority as TaskPriority,
           frameId: 'cli',
-          tags: options.tags ? options.tags.split(',').map((t: string) => t.trim()) : [],
+          tags: options.tags
+            ? options.tags.split(',').map((t: string) => t.trim())
+            : [],
         });
 
         console.log(`✅ Created task: ${taskId.slice(0, 10)}`);
@@ -195,9 +226,13 @@ export function createTaskCommands(): Command {
         console.log(`Title:       ${task.title}`);
         console.log(`Status:      ${task.status}`);
         console.log(`Priority:    ${task.priority}`);
-        console.log(`Created:     ${new Date(task.created_at * 1000).toLocaleString()}`);
+        console.log(
+          `Created:     ${new Date(task.created_at * 1000).toLocaleString()}`
+        );
         if (task.completed_at) {
-          console.log(`Completed:   ${new Date(task.completed_at * 1000).toLocaleString()}`);
+          console.log(
+            `Completed:   ${new Date(task.completed_at * 1000).toLocaleString()}`
+          );
         }
         if (task.description) {
           console.log(`\nDescription:\n${task.description}`);
@@ -215,24 +250,31 @@ export function createTaskCommands(): Command {
   return tasks;
 }
 
-function findTaskByPartialId(projectRoot: string, partialId: string): any | null {
+function findTaskByPartialId(
+  projectRoot: string,
+  partialId: string
+): any | null {
   const dbPath = join(projectRoot, '.stackmemory', 'context.db');
   if (!existsSync(dbPath)) return null;
-  
+
   const db = new Database(dbPath);
-  
+
   // Try exact match first, then partial
   let row = db.prepare('SELECT * FROM task_cache WHERE id = ?').get(partialId);
-  
+
   if (!row) {
-    row = db.prepare('SELECT * FROM task_cache WHERE id LIKE ?').get(`${partialId}%`);
+    row = db
+      .prepare('SELECT * FROM task_cache WHERE id LIKE ?')
+      .get(`${partialId}%`);
   }
-  
+
   // Also try matching Linear identifier in title
   if (!row && partialId.match(/^ENG-\d+$/i)) {
-    row = db.prepare('SELECT * FROM task_cache WHERE title LIKE ?').get(`%[${partialId.toUpperCase()}]%`);
+    row = db
+      .prepare('SELECT * FROM task_cache WHERE title LIKE ?')
+      .get(`%[${partialId.toUpperCase()}]%`);
   }
-  
+
   db.close();
   return row || null;
 }
