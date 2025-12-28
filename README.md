@@ -280,14 +280,40 @@ source ~/.zshrc
 #### 1. Shell Wrapper (Recommended)
 Automatically saves context when Claude Code exits:
 ```bash
-# Use the wrapper
-./scripts/claude-code-wrapper.sh
-
-# Or with the alias
+# Basic usage
 claude
+
+# With Linear auto-sync (syncs every 5 minutes)
+claude --auto-sync
+
+# Custom sync interval (10 minutes)
+claude --auto-sync --sync-interval=10
 ```
 
-#### 2. Background Daemon
+#### 2. Linear Auto-Sync Daemon
+Continuously syncs with Linear in the background:
+```bash
+# Start auto-sync (default: 5 minutes)
+./scripts/linear-auto-sync.sh start
+
+# Custom interval (10 minutes)
+./scripts/linear-auto-sync.sh start 10
+
+# Check status
+./scripts/linear-auto-sync.sh status
+
+# View logs
+./scripts/linear-auto-sync.sh logs
+
+# Stop daemon
+./scripts/linear-auto-sync.sh stop
+```
+
+**Requirements:**
+- Set `LINEAR_API_KEY` environment variable
+- Run in a StackMemory-initialized project
+
+#### 3. Background Daemon
 Continuously saves context every 5 minutes:
 ```bash
 # Start daemon
@@ -300,14 +326,14 @@ Continuously saves context every 5 minutes:
 kill $(cat /tmp/stackmemory-daemon.pid)
 ```
 
-#### 3. Git Hooks
+#### 4. Git Hooks
 Save context automatically on git commits:
 ```bash
 # Install in current repo
 ./scripts/setup-git-hooks.sh
 ```
 
-#### 4. Manual Function
+#### 5. Manual Function
 Add to `~/.zshrc`:
 ```bash
 claude_with_sm() {
@@ -324,9 +350,12 @@ claude_with_sm() {
 ### Features
 
 - **Automatic context preservation** - Saves on exit (including Ctrl+C)
-- **Linear sync** - Syncs tasks if LINEAR_API_KEY is set
+- **Linear auto-sync** - Continuous bidirectional sync with Linear
 - **Smart detection** - Only runs in StackMemory-enabled projects
 - **Zero overhead** - No performance impact during Claude Code sessions
+- **Flexible sync intervals** - Configure sync frequency (default: 5 minutes)
+- **Background operation** - Sync continues while you work
+- **Comprehensive logging** - Track all sync operations
 
 ---
 
