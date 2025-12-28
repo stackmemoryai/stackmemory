@@ -7,14 +7,14 @@ export {
   FrameManager,
   type FrameType,
   type FrameState,
-} from './core/frame-manager.js';
-export { logger, Logger, LogLevel } from './core/logger.js';
+} from './core/context/frame-manager.js';
+export { logger, Logger, LogLevel } from './core/monitoring/logger.js';
 export {
   StackMemoryError,
   ErrorCode,
   ErrorHandler,
-} from './core/error-handler.js';
-export { default as LocalStackMemoryMCP } from './mcp/mcp-server.js';
+} from './core/monitoring/error-handler.js';
+export { default as LocalStackMemoryMCP } from './integrations/mcp/server.js';
 
 // Re-export key types
 export interface StackMemoryConfig {

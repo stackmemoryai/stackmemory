@@ -9,7 +9,7 @@
   "type": "module",
   "main": "dist/src/index.js",
   "bin": {
-    "stackmemory": "dist/src/cli/cli.js"
+    "stackmemory": "dist/src/cli/index.js"
   },
   "types": "dist/src/index.d.ts",
   "files": [
@@ -44,7 +44,7 @@
     "build": "tsc",
     "lint": "eslint src/**/*.ts scripts/**/*.ts",
     "lint:fix": "eslint src/**/*.ts scripts/**/*.ts --fix",
-    "lint:autofix": "node scripts/fix-lint-loop.cjs",
+    "lint:autofix": "node scripts/development/fix-lint-loop.cjs",
     "format": "prettier --write src/**/*.ts scripts/**/*.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -52,7 +52,7 @@
     "prepublishOnly": "npm run build",
     "quality": "npm run lint && npm run test:run && npm run build",
     "dev": "tsx watch src/mcp/mcp-server.ts",
-    "mcp:start": "node dist/src/mcp/mcp-server.js",
+    "mcp:start": "node dist/src/integrations/mcp/server.js",
     "mcp:dev": "tsx src/mcp/mcp-server.ts",
     "status": "node dist/scripts/status.js",
     "status:dev": "tsx scripts/status.ts",
@@ -77,9 +77,12 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "helmet": "^8.1.0",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.3",
+    "jwks-rsa": "^3.2.0",
     "msgpackr": "^1.10.1",
     "puppeteer": "^24.34.0",
+    "rate-limiter-flexible": "^9.0.1",
     "simple-peer": "^9.11.1",
     "socket.io": "^4.6.0",
     "socket.io-client": "^4.6.0",

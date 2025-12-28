@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { logger, LogLevel } from './logger.js';
+import { logger, LogLevel } from './monitoring/logger.js';
 
 describe('Logger', () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;

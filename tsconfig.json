@@ -3,8 +3,12 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "node",
-    "lib": ["ES2022"],
-    "types": ["vitest/globals"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "vitest/globals"
+    ],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": false,
@@ -31,8 +35,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "src/runway.bak",
-    "src/runway"
+    "dist"
   ]
 }
