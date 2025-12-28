@@ -14,7 +14,6 @@ import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
-
 // Configuration
 const config = {
   port: parseInt(process.env.PORT || '8080'),
