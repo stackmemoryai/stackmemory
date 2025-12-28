@@ -76,11 +76,11 @@ export function createContextCommands(): Command {
             const icon = typeIcon[frame.type] || '📦';
             const indent = '  '.repeat(i);
             console.log(
-              `${indent}${i === activePath.length - 1 ? '└─' : '├─'} ${icon} ${frame.name || frame.id.slice(0, 10)}`
+              `${indent}${i === activePath.length - 1 ? '└─' : '├─'} ${icon} ${frame.name || frame.frame_id.slice(0, 10)}`
             );
 
             if (options.verbose) {
-              console.log(`${indent}   ID: ${frame.id}`);
+              console.log(`${indent}   ID: ${frame.frame_id}`);
               console.log(`${indent}   Type: ${frame.type}`);
               console.log(
                 `${indent}   Created: ${new Date(frame.created_at * 1000).toLocaleString()}`
@@ -135,7 +135,7 @@ export function createContextCommands(): Command {
         const activePath = frameManager.getActiveFramePath();
         const parentId =
           activePath.length > 0
-            ? activePath[activePath.length - 1].id
+            ? activePath[activePath.length - 1].frame_id
             : undefined;
 
         // Parse metadata if provided
@@ -205,15 +205,15 @@ export function createContextCommands(): Command {
         if (options.all) {
           // Close all frames from top to bottom
           for (let i = activePath.length - 1; i >= 0; i--) {
-            frameManager.closeFrame(activePath[i].id);
+            frameManager.closeFrame(activePath[i].frame_id);
           }
           console.log(`✅ Cleared all ${activePath.length} context frames.`);
         } else {
           // Close just the top frame
           const topFrame = activePath[activePath.length - 1];
-          frameManager.closeFrame(topFrame.id);
+          frameManager.closeFrame(topFrame.frame_id);
           console.log(
-            `✅ Popped: ${topFrame.name || topFrame.id.slice(0, 10)}`
+            `✅ Popped: ${topFrame.name || topFrame.frame_id.slice(0, 10)}`
           );
           console.log(`   Depth: ${frameManager.getStackDepth()}`);
         }
@@ -244,15 +244,14 @@ export function createContextCommands(): Command {
       const db = new Database(dbPath);
 
       try {
-        const projectRow = db
-          .prepare(
-            `
-          SELECT value FROM metadata WHERE key = 'project_id'
-        `
-          )
-          .get() as any;
+        let projectId = 'default';
+        try {
+          const projectRow = db
+            .prepare(`SELECT value FROM metadata WHERE key = 'project_id'`)
+            .get() as any;
+          if (projectRow?.value) projectId = projectRow.value;
+        } catch {}
 
-        const projectId = projectRow?.value || 'default';
         const frameManager = new FrameManager(db, projectId);
 
         const activePath = frameManager.getActiveFramePath();
@@ -260,7 +259,7 @@ export function createContextCommands(): Command {
         if (activePath.length === 0) {
           console.log('⚠️ No active context frame. Creating one...');
           frameManager.createFrame({
-            type: 'session',
+            type: 'task',
             name: 'cli-session',
             inputs: {},
           });
@@ -283,7 +282,7 @@ export function createContextCommands(): Command {
         frameManager.addEvent(
           type,
           { message, content: message },
-          currentFrame.id
+          currentFrame.frame_id
         );
 
         console.log(

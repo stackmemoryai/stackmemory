@@ -63,6 +63,11 @@
     "analytics": "node dist/src/cli/cli.js analytics --view",
     "analytics:server": "node dist/src/cli/cli.js analytics --port 3000 --open",
     "analytics:export": "node dist/src/cli/cli.js analytics --export json",
+    "tasks": "node dist/src/cli/index.js tasks list",
+    "tasks:add": "node dist/src/cli/index.js task add",
+    "search": "node dist/src/cli/index.js search",
+    "log": "node dist/src/cli/index.js log",
+    "context": "node dist/src/cli/index.js context show",
     "claude:setup": "node scripts/setup-claude-integration.js",
     "prepare": "husky"
   },
@@ -124,5 +129,8 @@
     "*.ts": [
       "vitest related --run"
     ]
+  },
+  "optionalDependencies": {
+    "chokidar": "^5.0.0"
   }
 }

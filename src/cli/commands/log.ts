@@ -177,8 +177,8 @@ export function createLogCommand(): Command {
         console.log('👀 Watching for changes... (Ctrl+C to stop)\n');
 
         // Watch for file changes
-        const chokidar = await import('chokidar').catch(() => null);
-        if (chokidar) {
+        try {
+          const chokidar = await import('chokidar');
           const watcher = chokidar.watch(join(projectRoot, '.stackmemory'), {
             persistent: true,
             ignoreInitial: true,
@@ -197,7 +197,7 @@ export function createLogCommand(): Command {
 
           // Keep process alive
           await new Promise(() => {});
-        } else {
+        } catch {
           console.log('Install chokidar for follow mode: npm i chokidar');
         }
       }

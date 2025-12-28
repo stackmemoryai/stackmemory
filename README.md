@@ -4,10 +4,10 @@
 
 StackMemory is a **memory runtime** for AI coding and writing tools that preserves full project context across:
 
-* chat thread resets
-* model switching
-* editor restarts
-* long-running repos with thousands of interactions
+- chat thread resets
+- model switching
+- editor restarts
+- long-running repos with thousands of interactions
 
 Instead of a linear chat log, StackMemory organizes memory as a **call stack** of scoped work (frames), allowing context to naturally unwind without lossy compaction.
 
@@ -19,16 +19,16 @@ Instead of a linear chat log, StackMemory organizes memory as a **call stack** o
 
 Modern AI tools forget:
 
-* why decisions were made
-* which constraints still apply
-* what changed earlier in the repo
-* what tools already ran and why
+- why decisions were made
+- which constraints still apply
+- what changed earlier in the repo
+- what tools already ran and why
 
 StackMemory fixes this by:
 
-* storing **everything losslessly** (events, tool calls, decisions)
-* injecting only the **relevant working set** into model context
-* keeping memory **project-scoped**, not chat-scoped
+- storing **everything losslessly** (events, tool calls, decisions)
+- injecting only the **relevant working set** into model context
+- keeping memory **project-scoped**, not chat-scoped
 
 ---
 
@@ -45,9 +45,9 @@ StackMemory fixes this by:
 
 Frames can span:
 
-* multiple chat turns
-* multiple tool calls
-* multiple sessions
+- multiple chat turns
+- multiple tool calls
+- multiple sessions
 
 ---
 
@@ -55,19 +55,19 @@ Frames can span:
 
 ### Hosted (default)
 
-* Cloud-backed memory runtime
-* Fast indexing + retrieval
-* Durable storage
-* Per-project pricing
-* Works out-of-the-box
+- Cloud-backed memory runtime
+- Fast indexing + retrieval
+- Durable storage
+- Per-project pricing
+- Works out-of-the-box
 
 ### Open-source local mirror
 
-* SQLite-based
-* Fully inspectable
-* Offline / air-gapped
-* Intentionally **N versions behind**
-* No sync, no org features
+- SQLite-based
+- Fully inspectable
+- Offline / air-gapped
+- Intentionally **N versions behind**
+- No sync, no org features
 
 > OSS is for trust and inspection.
 > Hosted is for scale, performance, and teams.
@@ -78,9 +78,9 @@ Frames can span:
 
 StackMemory integrates as an **MCP tool** and is invoked on **every interaction** in:
 
-* Claude Code
-* compatible editors
-* future MCP-enabled tools
+- Claude Code
+- compatible editors
+- future MCP-enabled tools
 
 The editor never manages memory directly — it simply asks StackMemory for the **context bundle**.
 
@@ -117,6 +117,7 @@ npm run claude:setup
 ```
 
 This automatically:
+
 - Creates `~/.claude/stackmemory-mcp.json` MCP configuration
 - Sets up session initialization hooks
 - Updates `~/.claude/config.json` with StackMemory integration
@@ -127,6 +128,7 @@ This automatically:
 <summary>Click to expand manual setup steps</summary>
 
 Create MCP configuration:
+
 ```bash
 mkdir -p ~/.claude
 cat > ~/.claude/stackmemory-mcp.json << 'EOF'
@@ -143,6 +145,7 @@ EOF
 ```
 
 Update Claude config:
+
 ```json
 {
   "mcp": {
@@ -150,6 +153,7 @@ Update Claude config:
   }
 }
 ```
+
 </details>
 
 **That's it.**
@@ -162,10 +166,20 @@ Every Claude Code session now automatically:
 4. **Syncs with Linear** - Bidirectional task synchronization when configured
 
 Available MCP tools in Claude Code:
-- `start_frame`, `close_frame` - Frame lifecycle management
-- `create_task`, `get_active_tasks` - Git-tracked task management
-- `linear_sync`, `linear_status` - Linear integration
-- `get_context`, `add_decision` - Context and decision tracking
+
+| Tool                 | Description                                |
+| -------------------- | ------------------------------------------ |
+| `get_context`        | Retrieve relevant context for current work |
+| `add_decision`       | Record a decision with rationale           |
+| `start_frame`        | Begin a new context frame                  |
+| `close_frame`        | Close current frame with summary           |
+| `create_task`        | Create a new task                          |
+| `update_task_status` | Update task status                         |
+| `get_active_tasks`   | List active tasks (with filters)           |
+| `get_task_metrics`   | Get task analytics                         |
+| `linear_sync`        | Sync with Linear                           |
+| `linear_update_task` | Update Linear issue                        |
+| `linear_get_tasks`   | Get tasks from Linear                      |
 
 No prompts to manage. No summaries to babysit. Just seamless context continuity.
 
@@ -219,24 +233,20 @@ All project memory lives locally.
 On every message/tool call:
 
 1. **Ingest**
-
-   * New message delta is appended as events
+   - New message delta is appended as events
 
 2. **Index**
-
-   * Anchors updated
-   * Digests generated when frames close
+   - Anchors updated
+   - Digests generated when frames close
 
 3. **Retrieve**
-
-   * Active call stack (hot)
-   * Relevant digests (warm)
-   * Pointers to raw data (cold)
+   - Active call stack (hot)
+   - Relevant digests (warm)
+   - Pointers to raw data (cold)
 
 4. **Return context bundle**
-
-   * Sized to token budget
-   * No global compaction
+   - Sized to token budget
+   - No global compaction
 
 ---
 
@@ -265,16 +275,16 @@ On every message/tool call:
 
 ### Free tier (hosted)
 
-* 1 project
-* Up to **X MB stored**
-* Up to **Y MB retrieval egress / month**
+- 1 project
+- Up to **X MB stored**
+- Up to **Y MB retrieval egress / month**
 
 ### Paid tiers
 
-* Per-project pricing
-* Higher storage + retrieval
-* Team sharing
-* Org controls
+- Per-project pricing
+- Higher storage + retrieval
+- Team sharing
+- Org controls
 
 **No seat-based pricing.**
 
@@ -287,6 +297,7 @@ StackMemory can automatically save context when using Claude Code, ensuring your
 ### Quick Setup
 
 1. **Install the wrapper script**:
+
 ```bash
 # Make scripts executable
 chmod +x scripts/claude-code-wrapper.sh scripts/stackmemory-daemon.sh
@@ -297,6 +308,7 @@ source ~/.zshrc
 ```
 
 2. **Use Claude Code with auto-save**:
+
 ```bash
 # Instead of: claude-code
 # Use: claude
@@ -307,7 +319,9 @@ source ~/.zshrc
 ### Integration Methods
 
 #### 1. Shell Wrapper (Recommended)
+
 Automatically saves context when Claude Code exits:
+
 ```bash
 # Basic usage
 claude
@@ -320,7 +334,9 @@ claude --auto-sync --sync-interval=10
 ```
 
 #### 2. Linear Auto-Sync Daemon
+
 Continuously syncs with Linear in the background:
+
 ```bash
 # Start auto-sync (default: 5 minutes)
 ./scripts/linear-auto-sync.sh start
@@ -339,11 +355,14 @@ Continuously syncs with Linear in the background:
 ```
 
 **Requirements:**
+
 - Set `LINEAR_API_KEY` environment variable
 - Run in a StackMemory-initialized project
 
 #### 3. Background Daemon
+
 Continuously saves context every 5 minutes:
+
 ```bash
 # Start daemon
 ./scripts/stackmemory-daemon.sh &
@@ -356,14 +375,18 @@ kill $(cat /tmp/stackmemory-daemon.pid)
 ```
 
 #### 4. Git Hooks
+
 Save context automatically on git commits:
+
 ```bash
 # Install in current repo
 ./scripts/setup-git-hooks.sh
 ```
 
 #### 5. Manual Function
+
 Add to `~/.zshrc`:
+
 ```bash
 claude_with_sm() {
     claude "$@"
@@ -390,20 +413,20 @@ claude_with_sm() {
 
 ## Guarantees
 
-* ✅ Lossless storage (no destructive compaction)
-* ✅ Project-scoped isolation
-* ✅ Survives new chat threads
-* ✅ Survives model switching
-* ✅ Inspectable local mirror
+- ✅ Lossless storage (no destructive compaction)
+- ✅ Project-scoped isolation
+- ✅ Survives new chat threads
+- ✅ Survives model switching
+- ✅ Inspectable local mirror
 
 ---
 
 ## Non-goals
 
-* ❌ Chat UI
-* ❌ Vector DB replacement
-* ❌ Tool execution runtime
-* ❌ Prompt engineering framework
+- ❌ Chat UI
+- ❌ Vector DB replacement
+- ❌ Tool execution runtime
+- ❌ Prompt engineering framework
 
 ---
 
@@ -415,38 +438,148 @@ claude_with_sm() {
 
 ---
 
+## CLI Commands Reference
+
+StackMemory provides a comprehensive CLI for task management, context tracking, and Linear integration.
+
+### Core Commands
+
+```bash
+stackmemory init              # Initialize StackMemory in current project
+stackmemory status            # Show current StackMemory status
+stackmemory progress          # Show recent changes and progress
+```
+
+### Task Management
+
+```bash
+# List tasks
+stackmemory tasks list                    # List all active tasks
+stackmemory tasks list --status pending   # Filter by status
+stackmemory tasks list --priority high    # Filter by priority
+stackmemory tasks list --query "bug"      # Search in title/description
+stackmemory tasks list --all              # Include completed tasks
+
+# Manage tasks
+stackmemory task add "Fix login bug" --priority high --tags "bug,auth"
+stackmemory task show <task-id>           # Show task details
+stackmemory task start <task-id>          # Start working on task
+stackmemory task done <task-id>           # Mark task complete
+```
+
+### Search
+
+```bash
+stackmemory search "analytics"            # Search tasks and context
+stackmemory search "api" --tasks          # Search only tasks
+stackmemory search "decision" --context   # Search only context
+```
+
+### Activity Log
+
+```bash
+stackmemory log                           # View recent activity
+stackmemory log --lines 50                # Show more entries
+stackmemory log --type task               # Filter by type (task, frame, event, sync)
+stackmemory log --follow                  # Watch for changes in real-time
+```
+
+### Context Stack Management
+
+```bash
+# View context
+stackmemory context show                  # Show current context stack
+stackmemory context show --verbose        # Show detailed frame info
+
+# Manage context frames
+stackmemory context push "feature-work" --type task
+stackmemory context push "debug-session" --type session
+stackmemory context add decision "Using SQLite for storage"
+stackmemory context add observation "API returns 404 on missing user"
+stackmemory context pop                   # Pop top frame
+stackmemory context pop --all             # Clear entire stack
+```
+
+### Analytics Dashboard
+
+```bash
+stackmemory analytics --view              # Terminal dashboard
+stackmemory analytics --port 3000         # Web dashboard
+stackmemory analytics --sync              # Sync before displaying
+stackmemory analytics --export json       # Export metrics as JSON
+stackmemory analytics --export csv        # Export as CSV
+```
+
+### Linear Integration
+
+```bash
+# Setup
+stackmemory linear setup                  # OAuth setup
+stackmemory linear status                 # Check connection
+
+# Sync
+stackmemory linear sync                   # Bidirectional sync
+stackmemory linear sync --direction from_linear
+stackmemory linear sync --direction to_linear
+
+# Auto-sync
+stackmemory linear auto-sync --start      # Start background sync
+stackmemory linear auto-sync --stop       # Stop background sync
+stackmemory linear auto-sync --status     # Check sync status
+
+# Update tasks
+stackmemory linear update ENG-123 --status in-progress
+stackmemory linear update ENG-123 --status done
+
+# Configure
+stackmemory linear config --show
+stackmemory linear config --set-interval 15
+```
+
+### MCP Server
+
+```bash
+stackmemory mcp-server                    # Start MCP server for Claude
+stackmemory mcp-server --port 3001        # Custom port
+```
+
+---
+
 ## Status
 
-* Hosted: **Private beta**
-* OSS mirror: **Early preview**
-* MCP integration: **Stable**
+- Hosted: **Private beta**
+- OSS mirror: **Early preview**
+- MCP integration: **Stable**
+- CLI: **v0.2.7** - Full task, context, and Linear management
 
 ---
 
 ## Roadmap (high level)
 
-* Team / org projects
-* Cross-repo memory
-* Background project compilers
-* Fine-grained retention policies
-* Editor UX surfacing frame boundaries
+- Team / org projects
+- Cross-repo memory
+- Background project compilers
+- Fine-grained retention policies
+- Editor UX surfacing frame boundaries
 
 ---
 
 ## License
 
-* Hosted service: Proprietary
-* Open-source mirror: Apache 2.0 / MIT (TBD)
+- Hosted service: Proprietary
+- Open-source mirror: Apache 2.0 / MIT (TBD)
 
 ---
 
 ## Additional Resources
 
 ### ML System Design
+
 - [ML System Insights](./ML_SYSTEM_INSIGHTS.md) - Comprehensive analysis of 300+ production ML systems
 - [Agent Instructions](./AGENTS.md) - Specific guidance for AI agents working with ML systems
 
 ### Documentation
+
 - [Product Requirements](./PRD.md) - Detailed product specifications
 - [Technical Architecture](./TECHNICAL_ARCHITECTURE.md) - System design and database schemas
 - [Beads Integration](./BEADS_INTEGRATION.md) - Git-native memory patterns from Beads ecosystem
