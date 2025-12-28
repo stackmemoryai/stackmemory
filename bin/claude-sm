@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+
+/**
+ * Claude-SM CLI Launcher
+ * Wrapper script to launch Claude with StackMemory and worktree support
+ */
+
+// Compile and run the TypeScript version if needed
+require('tsx');
+require('../dist/src/cli/claude-sm.js');
