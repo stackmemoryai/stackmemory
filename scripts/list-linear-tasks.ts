@@ -160,6 +160,5 @@ function getStatusEmoji(statusType: string): string {
   }
 }
 
-if (require.main === module) {
-  main();
-}
+// Direct execution
+main();
