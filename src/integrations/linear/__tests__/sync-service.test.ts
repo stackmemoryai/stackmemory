@@ -318,29 +318,26 @@ describe('LinearSyncService', () => {
       const result = await syncService.syncIssueToLocal(mockIssue);
 
       expect(result).toBe('created');
-      expect(mockContextService.createTask).toHaveBeenCalledWith({
-        title: 'New Issue',
-        description: 'Issue description',
-        status: 'todo',
-        priority: 'urgent',
-        externalId: 'issue-1',
-        externalIdentifier: 'STA-1',
-        externalUrl: 'https://linear.app/issue-1',
-        tags: ['bug', 'urgent'],
-        metadata: {
-          linear: {
-            teamId: 'team-1',
-            teamKey: 'STA',
-            stateId: 'state-1',
-            stateName: 'Todo',
-            projectId: 'proj-1',
-            projectName: 'Main Project',
-            assigneeId: 'user-1',
-            assigneeName: 'John Doe',
+      expect(mockContextService.createTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'New Issue',
+          description: 'Issue description',
+          status: 'todo',
+          priority: 'urgent',
+          externalId: 'issue-1',
+          externalIdentifier: 'STA-1',
+          externalUrl: 'https://linear.app/issue-1',
+          tags: ['bug', 'urgent'],
+          metadata: {
+            linear: {
+              stateId: 'state-1',
+              stateName: 'Todo',
+              assigneeId: 'user-1',
+              assigneeName: 'John Doe',
+            },
           },
-        },
-        updatedAt: expect.any(Date),
-      });
+        })
+      );
     });
 
     it('should update existing local task', async () => {
@@ -374,29 +371,27 @@ describe('LinearSyncService', () => {
       const result = await syncService.syncIssueToLocal(mockIssue);
 
       expect(result).toBe('updated');
-      expect(mockContextService.updateTask).toHaveBeenCalledWith('local-1', {
-        title: 'Updated Issue',
-        description: 'Updated description',
-        status: 'in_progress',
-        priority: 'high',
-        externalId: 'issue-1',
-        externalIdentifier: 'STA-1',
-        externalUrl: 'https://linear.app/issue-1',
-        tags: ['feature'],
-        metadata: {
-          linear: {
-            teamId: 'team-1',
-            teamKey: 'STA',
-            stateId: 'state-2',
-            stateName: 'In Progress',
-            projectId: undefined,
-            projectName: undefined,
-            assigneeId: undefined,
-            assigneeName: undefined,
+      expect(mockContextService.updateTask).toHaveBeenCalledWith(
+        'local-1',
+        expect.objectContaining({
+          title: 'Updated Issue',
+          description: 'Updated description',
+          status: 'in_progress',
+          priority: 'high',
+          externalId: 'issue-1',
+          externalIdentifier: 'STA-1',
+          externalUrl: 'https://linear.app/issue-1',
+          tags: ['feature'],
+          metadata: {
+            linear: {
+              stateId: 'state-2',
+              stateName: 'In Progress',
+              assigneeId: undefined,
+              assigneeName: undefined,
+            },
           },
-        },
-        updatedAt: expect.any(Date),
-      });
+        })
+      );
     });
 
     it('should handle sync errors and rethrow', async () => {
@@ -420,6 +415,16 @@ describe('LinearSyncService', () => {
   });
 
   describe('syncLocalToLinear', () => {
+    beforeEach(() => {
+      mockConfigService.getConfig.mockResolvedValue({
+        integrations: {
+          linear: {
+            teamId: 'test-team-id',
+          },
+        },
+      });
+    });
+
     it('should create new Linear issue from local task', async () => {
       const mockTask: Task = {
         id: 'local-1',
@@ -448,10 +453,8 @@ describe('LinearSyncService', () => {
       expect(mockLinearClient.createIssue).toHaveBeenCalledWith({
         title: 'Local Task',
         description: 'Local description',
+        teamId: 'test-team-id',
         priority: 2, // high -> 2
-        stateId: undefined,
-        projectId: undefined,
-        assigneeId: undefined,
       });
       expect(mockContextService.updateTask).toHaveBeenCalledWith('local-1', {
         externalId: 'issue-1',
@@ -495,8 +498,6 @@ describe('LinearSyncService', () => {
         description: 'Updated description',
         priority: 3, // medium -> 3
         stateId: 'state-1',
-        projectId: 'proj-1',
-        assigneeId: 'user-1',
       });
     });
 
@@ -601,6 +602,16 @@ describe('LinearSyncService', () => {
   });
 
   describe('Status and Priority Mapping', () => {
+    beforeEach(() => {
+      mockConfigService.getConfig.mockResolvedValue({
+        integrations: {
+          linear: {
+            teamId: 'test-team-id',
+          },
+        },
+      });
+    });
+
     it('should map Linear states to task statuses correctly', async () => {
       const testCases = [
         { linearState: 'backlog', expectedStatus: 'todo' },

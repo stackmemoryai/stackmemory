@@ -1,12 +1,29 @@
 export interface LinearWebhookPayload {
   action: string;
   type: string;
-  data: any;
+  data: LinearIssue | LinearComment | LinearProject;
   url?: string;
   createdAt: string;
   organizationId?: string;
   webhookId?: string;
   webhookTimestamp?: number;
+}
+
+export interface LinearIssueInput {
+  title: string;
+  description?: string;
+  priority?: number;
+  stateId?: string;
+  projectId?: string;
+  assigneeId?: string;
+  teamId?: string;
+  labelIds?: string[];
+}
+
+export interface LinearLabel {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export interface LinearIssue {

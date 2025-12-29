@@ -2,9 +2,15 @@
 
 import express from 'express';
 import crypto from 'crypto';
-import { LinearWebhookPayload } from './types.js';
+import http from 'http';
+import {
+  LinearWebhookPayload,
+  LinearIssue,
+  LinearComment,
+  LinearProject,
+} from './types.js';
 import { LinearSyncService } from './sync-service.js';
-import { ConfigService } from '../../services/config-service.js';
+import { LinearIssue as ClientLinearIssue } from './client.js';
 import { Logger } from '../../utils/logger.js';
 import chalk from 'chalk';
 
@@ -21,7 +27,7 @@ export interface WebhookServerConfig {
 
 export class LinearWebhookServer {
   private app: express.Application;
-  private server: any;
+  private server: http.Server | null = null;
   private logger: Logger;
   private syncService: LinearSyncService;
   private config: WebhookServerConfig;
@@ -32,7 +38,7 @@ export class LinearWebhookServer {
     this.app = express();
     this.logger = new Logger('LinearWebhook');
     this.syncService = new LinearSyncService();
-    
+
     this.config = {
       port: config?.port || parseInt(process.env.WEBHOOK_PORT || '3456'),
       host: config?.host || process.env.WEBHOOK_HOST || 'localhost',
@@ -41,7 +47,7 @@ export class LinearWebhookServer {
       rateLimit: {
         windowMs: config?.rateLimit?.windowMs || 60000,
         max: config?.rateLimit?.max || 100,
-      }
+      },
     };
 
     this.setupMiddleware();
@@ -49,10 +55,12 @@ export class LinearWebhookServer {
   }
 
   private setupMiddleware(): void {
-    this.app.use(express.raw({
-      type: 'application/json',
-      limit: this.config.maxPayloadSize,
-    }));
+    this.app.use(
+      express.raw({
+        type: 'application/json',
+        limit: this.config.maxPayloadSize,
+      })
+    );
 
     this.app.use((req, res, next) => {
       res.setHeader('X-Powered-By', 'StackMemory');
@@ -79,13 +87,15 @@ export class LinearWebhookServer {
         }
 
         const payload = JSON.parse(req.body.toString()) as LinearWebhookPayload;
-        
-        this.logger.info(`Received webhook: ${payload.type} - ${payload.action}`);
-        
+
+        this.logger.info(
+          `Received webhook: ${payload.type} - ${payload.action}`
+        );
+
         this.eventQueue.push(payload);
         this.processQueue();
 
-        res.status(200).json({ 
+        res.status(200).json({
           status: 'accepted',
           queued: true,
         });
@@ -116,10 +126,7 @@ export class LinearWebhookServer {
       .update(req.body)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(hash)
-    );
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(hash));
   }
 
   private async processQueue(): Promise<void> {
@@ -131,7 +138,7 @@ export class LinearWebhookServer {
 
     while (this.eventQueue.length > 0) {
       const event = this.eventQueue.shift()!;
-      
+
       try {
         await this.handleWebhookEvent(event);
       } catch (error) {
@@ -142,30 +149,37 @@ export class LinearWebhookServer {
     this.isProcessing = false;
   }
 
-  private async handleWebhookEvent(payload: LinearWebhookPayload): Promise<void> {
+  private async handleWebhookEvent(
+    payload: LinearWebhookPayload
+  ): Promise<void> {
     const { type, action, data } = payload;
 
     switch (type) {
       case 'Issue':
-        await this.handleIssueEvent(action, data);
+        await this.handleIssueEvent(action, data as LinearIssue);
         break;
       case 'Comment':
-        await this.handleCommentEvent(action, data);
+        await this.handleCommentEvent(action, data as LinearComment);
         break;
       case 'Project':
-        await this.handleProjectEvent(action, data);
+        await this.handleProjectEvent(action, data as LinearProject);
         break;
       default:
         this.logger.debug(`Unhandled event type: ${type}`);
     }
   }
 
-  private async handleIssueEvent(action: string, data: any): Promise<void> {
-    const issue = data;
-    
+  private async handleIssueEvent(
+    action: string,
+    data: LinearIssue
+  ): Promise<void> {
+    const issue = data as ClientLinearIssue;
+
     switch (action) {
       case 'create':
-        this.logger.info(`New issue created: ${issue.identifier} - ${issue.title}`);
+        this.logger.info(
+          `New issue created: ${issue.identifier} - ${issue.title}`
+        );
         await this.syncService.syncIssueToLocal(issue);
         break;
       case 'update':
@@ -181,27 +195,49 @@ export class LinearWebhookServer {
     }
   }
 
-  private async handleCommentEvent(action: string, data: any): Promise<void> {
-    this.logger.debug(`Comment event: ${action}`, data);
+  private async handleCommentEvent(
+    action: string,
+    data: LinearComment
+  ): Promise<void> {
+    this.logger.debug(`Comment event: ${action}`, { issueId: data.issue?.id });
   }
 
-  private async handleProjectEvent(action: string, data: any): Promise<void> {
-    this.logger.debug(`Project event: ${action}`, data);
+  private async handleProjectEvent(
+    action: string,
+    data: LinearProject
+  ): Promise<void> {
+    this.logger.debug(`Project event: ${action}`, { projectId: data.id });
   }
 
   public async start(): Promise<void> {
     return new Promise((resolve) => {
-      this.server = this.app.listen(this.config.port!, this.config.host!, () => {
-        console.log(chalk.green('✓') + chalk.bold(' Linear Webhook Server Started'));
-        console.log(chalk.cyan('  URL: ') + `http://${this.config.host}:${this.config.port}/webhook/linear`);
-        console.log(chalk.cyan('  Health: ') + `http://${this.config.host}:${this.config.port}/health`);
-        
-        if (!this.config.webhookSecret) {
-          console.log(chalk.yellow('  ⚠ Warning: No webhook secret configured (insecure)'));
+      this.server = this.app.listen(
+        this.config.port!,
+        this.config.host!,
+        () => {
+          console.log(
+            chalk.green('✓') + chalk.bold(' Linear Webhook Server Started')
+          );
+          console.log(
+            chalk.cyan('  URL: ') +
+              `http://${this.config.host}:${this.config.port}/webhook/linear`
+          );
+          console.log(
+            chalk.cyan('  Health: ') +
+              `http://${this.config.host}:${this.config.port}/health`
+          );
+
+          if (!this.config.webhookSecret) {
+            console.log(
+              chalk.yellow(
+                '  ⚠ Warning: No webhook secret configured (insecure)'
+              )
+            );
+          }
+
+          resolve();
         }
-        
-        resolve();
-      });
+      );
     });
   }
 
@@ -222,7 +258,7 @@ export class LinearWebhookServer {
 // Standalone execution support
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const server = new LinearWebhookServer();
-  
+
   server.start().catch((error) => {
     console.error(chalk.red('Failed to start webhook server:'), error);
     process.exit(1);

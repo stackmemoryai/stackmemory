@@ -384,7 +384,9 @@ export class LinearOAuthSetup {
       });
 
       if (response.ok) {
-        const result = (await response.json()) as any;
+        const result = (await response.json()) as {
+          data?: { viewer?: { id: string; name: string; email: string } };
+        };
         if (result.data?.viewer) {
           logger.info(
             `Connected to Linear as: ${result.data.viewer.name} (${result.data.viewer.email})`
