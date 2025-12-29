@@ -1,0 +1,111 @@
+# StackMemory MCP Tools Configuration
+# Quick reference for Claude Desktop integration
+
+tools:
+  task_management:
+    create_task:
+      description: Create tasks with optional auto-execution
+      required: [title]
+      optional: [description, priority, tags, autoExecute]
+      example: "Create task to implement OAuth2 with high priority"
+    
+    execute_task:
+      description: Start agent sessions with turn limits
+      required: [taskId]
+      optional: [maxTurns]
+      default_turns: 10
+      max_turns: 20
+    
+    task_status:
+      description: Monitor task progress
+      optional: [taskId]
+      shows: all active tasks if no ID provided
+    
+    breakdown_task:
+      description: Split complex tasks into subtasks
+      required: [taskId]
+      auto_generates: 5 standard subtasks (analyze, design, implement, test, polish)
+
+  agent_execution:
+    agent_turn:
+      description: Execute actions with verification loops
+      required: [sessionId, action]
+      optional: [context]
+      verifications: [formatter, linter, llm_judge]
+    
+    session_feedback:
+      description: Get verification feedback from last turn
+      required: [sessionId]
+      returns: turn count, status, verification results
+    
+    list_active_sessions:
+      description: View all active agent sessions
+      no_params: true
+      shows: sessionId, taskId, turnCount, status
+    
+    retry_session:
+      description: Retry failed session with learned context
+      required: [sessionId]
+      spotify_pattern: true
+      max_retries: 3
+      learns_from: previous verification failures
+
+  context_management:
+    save_context:
+      description: Persist decisions and learnings
+      required: [content, type]
+      optional: [importance]
+      types: [decision, constraint, learning, code, error]
+      importance_range: 0.0-1.0
+    
+    load_context:
+      description: Retrieve relevant context from memory
+      required: [query]
+      optional: [limit, frameId]
+      default_limit: 10
+      max_limit: 20
+      searches: frames and events
+
+spotify_strategies:
+  session_limits:
+    max_turns: 10
+    auto_breakdown: true
+    
+  verification:
+    formatter: check code formatting
+    linter: check code quality
+    llm_judge: semantic validation (25% veto rate)
+    
+  retry_mechanism:
+    max_retries: 3
+    learns_from_failures: true
+    course_correction: 50% success rate after veto
+    
+  context_optimization:
+    sliding_window: 5 events
+    digest_generation: automatic
+    memory_persistence: frame-based
+
+usage_patterns:
+  quick_task:
+    - create_task with autoExecute=true
+    - agent automatically starts execution
+    - monitor with task_status
+    
+  complex_workflow:
+    - create_task for main goal
+    - breakdown_task into subtasks
+    - execute_task with custom turn limit
+    - multiple agent_turn calls
+    - save_context for decisions
+    
+  recovery_flow:
+    - session fails or gets vetoed
+    - session_feedback to understand issue
+    - retry_session with learned context
+    - automatic course correction
+    
+  context_flow:
+    - save_context during work
+    - load_context in new sessions
+    - maintains continuity across sessions
