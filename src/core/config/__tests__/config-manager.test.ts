@@ -208,7 +208,7 @@ describe('ConfigManager', () => {
   });
 
   describe('hot reload', () => {
-    it('should reload config on file change', (done) => {
+    it('should reload config on file change', async () => {
       const mockWatcher = {
         close: vi.fn(),
       };
@@ -226,10 +226,11 @@ describe('ConfigManager', () => {
       const watchCallback = vi.mocked(fs.watch).mock.calls[0][1] as any;
       watchCallback('change');
 
-      setTimeout(() => {
-        expect(onChange).toHaveBeenCalled();
-        done();
-      }, 10);
+      // Wait a bit for the debounce and callback to trigger
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // The onChange callback should have been called after debounce
+      expect(onChange).toHaveBeenCalled();
     });
 
     it('should not reload invalid config', () => {

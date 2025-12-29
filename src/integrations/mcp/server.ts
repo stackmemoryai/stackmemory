@@ -755,26 +755,34 @@ class LocalStackMemoryMCP {
           throw err;
         } finally {
           const endTime = Date.now();
-          
+
           // Log tool result event after execution (success or failure)
-          if (currentFrameId) {
-            this.frameManager.addEvent('tool_result', {
-              tool_name: name,
-              success: !error,
-              result: error ? { error: error.message } : result,
-              timestamp: endTime,
-            });
+          // Skip for close_frame since the frame no longer exists after closing
+          if (currentFrameId && name !== 'close_frame') {
+            try {
+              this.frameManager.addEvent('tool_result', {
+                tool_name: name,
+                success: !error,
+                result: error ? { error: error.message } : result,
+                timestamp: endTime,
+              });
+            } catch {
+              // Frame may have been closed, ignore logging error
+            }
           }
 
           // Update tool call with results and add to trace detector
           toolCall.result = error ? undefined : result;
           toolCall.duration = endTime - startTime;
-          
+
           // Extract files affected if available from result or args
           if (args.file_path || args.path) {
-            toolCall.filesAffected = [args.file_path || args.path].filter(Boolean);
-          } else if (result?.files) {
-            toolCall.filesAffected = Array.isArray(result.files) ? result.files : [result.files];
+            toolCall.filesAffected = [args.file_path || args.path].filter(
+              Boolean
+            ) as string[];
+          } else if ((result as any)?.files) {
+            const files = (result as any).files;
+            toolCall.filesAffected = Array.isArray(files) ? files : [files];
           }
 
           // Add to trace detector
@@ -1550,20 +1558,18 @@ class LocalStackMemoryMCP {
 
     // Apply filters
     if (type) {
-      traces = traces.filter(t => t.type === type);
+      traces = traces.filter((t) => t.type === type);
     }
 
     if (minScore !== undefined) {
-      traces = traces.filter(t => t.score >= minScore);
+      traces = traces.filter((t) => t.score >= minScore);
     }
 
     // Sort by score and limit
-    traces = traces
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    traces = traces.sort((a, b) => b.score - a.score).slice(0, limit);
 
     // Format traces for display
-    const formattedTraces = traces.map(trace => ({
+    const formattedTraces = traces.map((trace) => ({
       id: trace.id,
       type: trace.type,
       score: trace.score.toFixed(2),
@@ -1580,7 +1586,10 @@ class LocalStackMemoryMCP {
         {
           type: 'text',
           text: `Found ${formattedTraces.length} traces:\n\n${formattedTraces
-            .map(t => `[${t.type}] Score: ${t.score} | Tools: ${t.toolCount} | Duration: ${t.duration}\n  ${t.summary}`)
+            .map(
+              (t) =>
+                `[${t.type}] Score: ${t.score} | Tools: ${t.toolCount} | Duration: ${t.duration}\n  ${t.summary}`
+            )
             .join('\n\n')}`,
         },
       ],
