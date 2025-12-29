@@ -1,0 +1,3 @@
+#!/bin/bash
+# Run StackMemory MCP server for testing
+node "$(dirname "$0")/dist/mcp/stackmemory-mcp-server.js"

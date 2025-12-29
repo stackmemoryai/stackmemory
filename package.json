@@ -39,6 +39,7 @@
   ],
   "scripts": {
     "setup": "npm install && npm run build && npm run init && node scripts/setup-claude-integration.js && node scripts/setup-alias.js",
+    "setup:claude": "npm run build && ./scripts/setup-claude-integration.sh",
     "postinstall": "node scripts/setup-alias.js || true",
     "init": "node dist/scripts/initialize.js",
     "build": "tsc",
