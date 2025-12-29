@@ -28,7 +28,8 @@ export class ConfigManager {
   private onChangeCallbacks: Array<(config: StackMemoryConfig) => void> = [];
 
   constructor(configPath?: string) {
-    this.configPath = configPath || path.join(process.cwd(), '.stackmemory', 'config.yaml');
+    this.configPath =
+      configPath || path.join(process.cwd(), '.stackmemory', 'config.yaml');
     this.config = this.loadConfig();
   }
 
@@ -45,23 +46,38 @@ export class ConfigManager {
     } catch (error) {
       console.warn(`Failed to load config from ${this.configPath}:`, error);
     }
-    return { ...DEFAULT_CONFIG };
+    // Deep clone to prevent mutation of DEFAULT_CONFIG
+    return this.mergeWithDefaults({});
   }
 
   /**
    * Merge loaded config with defaults
    */
-  private mergeWithDefaults(loaded: Partial<StackMemoryConfig>): StackMemoryConfig {
+  private mergeWithDefaults(
+    loaded: Partial<StackMemoryConfig>
+  ): StackMemoryConfig {
     const config: StackMemoryConfig = {
       version: loaded.version || DEFAULT_CONFIG.version,
       profile: loaded.profile,
       scoring: {
-        weights: { ...DEFAULT_CONFIG.scoring.weights, ...loaded.scoring?.weights },
-        tool_scores: { ...DEFAULT_CONFIG.scoring.tool_scores, ...loaded.scoring?.tool_scores },
+        weights: {
+          ...DEFAULT_CONFIG.scoring.weights,
+          ...loaded.scoring?.weights,
+        },
+        tool_scores: {
+          ...DEFAULT_CONFIG.scoring.tool_scores,
+          ...loaded.scoring?.tool_scores,
+        },
       },
       retention: {
-        local: { ...DEFAULT_CONFIG.retention.local, ...loaded.retention?.local },
-        remote: { ...DEFAULT_CONFIG.retention.remote, ...loaded.retention?.remote },
+        local: {
+          ...DEFAULT_CONFIG.retention.local,
+          ...loaded.retention?.local,
+        },
+        remote: {
+          ...DEFAULT_CONFIG.retention.remote,
+          ...loaded.retention?.remote,
+        },
         generational_gc: {
           ...DEFAULT_CONFIG.retention.generational_gc,
           ...loaded.retention?.generational_gc,
@@ -82,22 +98,37 @@ export class ConfigManager {
   /**
    * Apply a profile to the configuration
    */
-  private applyProfile(config: StackMemoryConfig, profile: ProfileConfig): void {
+  private applyProfile(
+    config: StackMemoryConfig,
+    profile: ProfileConfig
+  ): void {
     if (profile.scoring) {
       if (profile.scoring.weights) {
-        config.scoring.weights = { ...config.scoring.weights, ...profile.scoring.weights };
+        config.scoring.weights = {
+          ...config.scoring.weights,
+          ...profile.scoring.weights,
+        };
       }
       if (profile.scoring.tool_scores) {
-        config.scoring.tool_scores = { ...config.scoring.tool_scores, ...profile.scoring.tool_scores };
+        config.scoring.tool_scores = {
+          ...config.scoring.tool_scores,
+          ...profile.scoring.tool_scores,
+        };
       }
     }
 
     if (profile.retention) {
       if (profile.retention.local) {
-        config.retention.local = { ...config.retention.local, ...profile.retention.local };
+        config.retention.local = {
+          ...config.retention.local,
+          ...profile.retention.local,
+        };
       }
       if (profile.retention.remote) {
-        config.retention.remote = { ...config.retention.remote, ...profile.retention.remote };
+        config.retention.remote = {
+          ...config.retention.remote,
+          ...profile.retention.remote,
+        };
       }
       if (profile.retention.generational_gc) {
         config.retention.generational_gc = {
@@ -125,16 +156,21 @@ export class ConfigManager {
 
     // Validate weights sum to 1.0
     const weights = this.config.scoring.weights;
-    const weightSum = weights.base + weights.impact + weights.persistence + weights.reference;
+    const weightSum =
+      weights.base + weights.impact + weights.persistence + weights.reference;
     if (Math.abs(weightSum - 1.0) > 0.001) {
-      result.errors.push(`Weights must sum to 1.0 (current: ${weightSum.toFixed(3)})`);
+      result.errors.push(
+        `Weights must sum to 1.0 (current: ${weightSum.toFixed(3)})`
+      );
       result.valid = false;
     }
 
     // Validate weight ranges
     Object.entries(weights).forEach(([key, value]) => {
       if (value < 0 || value > 1) {
-        result.errors.push(`Weight ${key} must be between 0 and 1 (current: ${value})`);
+        result.errors.push(
+          `Weight ${key} must be between 0 and 1 (current: ${value})`
+        );
         result.valid = false;
       }
     });
@@ -142,7 +178,9 @@ export class ConfigManager {
     // Validate tool scores
     Object.entries(this.config.scoring.tool_scores).forEach(([tool, score]) => {
       if (score !== undefined && (score < 0 || score > 1)) {
-        result.errors.push(`Tool score for ${tool} must be between 0 and 1 (current: ${score})`);
+        result.errors.push(
+          `Tool score for ${tool} must be between 0 and 1 (current: ${score})`
+        );
         result.valid = false;
       }
     });
@@ -153,11 +191,15 @@ export class ConfigManager {
     const oldMs = this.parseDuration(this.config.retention.local.old);
 
     if (youngMs >= matureMs) {
-      result.errors.push('Young retention period must be less than mature period');
+      result.errors.push(
+        'Young retention period must be less than mature period'
+      );
       result.valid = false;
     }
     if (matureMs >= oldMs) {
-      result.errors.push('Mature retention period must be less than old period');
+      result.errors.push(
+        'Mature retention period must be less than old period'
+      );
       result.valid = false;
     }
 
@@ -172,7 +214,9 @@ export class ConfigManager {
 
     // Performance warnings
     if (this.config.performance.retrieval_timeout_ms < 100) {
-      result.warnings.push('retrieval_timeout_ms < 100ms may be too aggressive');
+      result.warnings.push(
+        'retrieval_timeout_ms < 100ms may be too aggressive'
+      );
     }
 
     if (this.config.performance.max_stack_depth > 10000) {
@@ -184,8 +228,10 @@ export class ConfigManager {
       result.suggestions.push('Consider using a profile for your use case');
     }
 
-    if (this.config.scoring.tool_scores.search < 0.5) {
-      result.suggestions.push('Search tool score seems low - consider increasing for better discovery');
+    if (this.config?.scoring?.tool_scores?.search && this.config.scoring.tool_scores.search < 0.5) {
+      result.suggestions.push(
+        'Search tool score seems low - consider increasing for better discovery'
+      );
     }
 
     return result;
@@ -270,12 +316,14 @@ export class ConfigManager {
    * Set active profile
    */
   setProfile(profileName: string): boolean {
-    if (!this.config.profiles?.[profileName] && !PRESET_PROFILES[profileName]) {
+    const allProfiles = { ...PRESET_PROFILES, ...this.config.profiles };
+    if (!allProfiles[profileName]) {
       return false;
     }
 
+    // Apply the profile to current config
     this.config.profile = profileName;
-    this.config = this.loadConfig(); // Reload with new profile
+    this.applyProfile(this.config, allProfiles[profileName]);
     this.notifyChange();
     return true;
   }
@@ -284,7 +332,10 @@ export class ConfigManager {
    * Update weights
    */
   updateWeights(weights: Partial<ScoringWeights>): void {
-    this.config.scoring.weights = { ...this.config.scoring.weights, ...weights };
+    this.config.scoring.weights = {
+      ...this.config.scoring.weights,
+      ...weights,
+    };
     this.notifyChange();
   }
 
@@ -292,7 +343,10 @@ export class ConfigManager {
    * Update tool scores
    */
   updateToolScores(scores: Record<string, number>): void {
-    this.config.scoring.tool_scores = { ...this.config.scoring.tool_scores, ...scores };
+    this.config.scoring.tool_scores = {
+      ...this.config.scoring.tool_scores,
+      ...scores,
+    };
     this.notifyChange();
   }
 
@@ -307,13 +361,16 @@ export class ConfigManager {
         if (eventType === 'change') {
           const newConfig = this.loadConfig();
           const validation = this.validate();
-          
+
           if (validation.valid) {
             this.config = newConfig;
             this.notifyChange();
             console.log('Configuration reloaded');
           } else {
-            console.error('Invalid configuration, keeping previous:', validation.errors);
+            console.error(
+              'Invalid configuration, keeping previous:',
+              validation.errors
+            );
           }
         }
       });
@@ -342,17 +399,20 @@ export class ConfigManager {
    */
   private notifyChange(): void {
     const config = this.getConfig();
-    this.onChangeCallbacks.forEach(cb => cb(config));
+    this.onChangeCallbacks.forEach((cb) => cb(config));
   }
 
   /**
    * Calculate importance score for a tool
    */
-  calculateScore(tool: string, additionalFactors?: {
-    filesAffected?: number;
-    isPermanent?: boolean;
-    referenceCount?: number;
-  }): number {
+  calculateScore(
+    tool: string,
+    additionalFactors?: {
+      filesAffected?: number;
+      isPermanent?: boolean;
+      referenceCount?: number;
+    }
+  ): number {
     const baseScore = this.config.scoring.tool_scores[tool] || 0.5;
     const weights = this.config.scoring.weights;
 
@@ -361,7 +421,10 @@ export class ConfigManager {
     if (additionalFactors) {
       // Impact multiplier (files affected)
       if (additionalFactors.filesAffected !== undefined) {
-        const impactMultiplier = Math.min(additionalFactors.filesAffected / 10, 1);
+        const impactMultiplier = Math.min(
+          additionalFactors.filesAffected / 10,
+          1
+        );
         score += impactMultiplier * weights.impact;
       }
 
@@ -372,7 +435,10 @@ export class ConfigManager {
 
       // Reference count
       if (additionalFactors.referenceCount !== undefined) {
-        const refMultiplier = Math.min(additionalFactors.referenceCount / 100, 1);
+        const refMultiplier = Math.min(
+          additionalFactors.referenceCount / 100,
+          1
+        );
         score += refMultiplier * weights.reference;
       }
     }

@@ -10,28 +10,37 @@ import { join } from 'path';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 
-// Mock the MCP SDK
-vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: vi.fn().mockImplementation(() => ({
-    setRequestHandler: vi.fn(),
-    connect: vi.fn()
-  }))
-}));
+// Create a mock server reference that can be updated per test
+let mockServerInstance: any = null;
+
+// Mock the MCP SDK - use a proper constructor function
+vi.mock('@modelcontextprotocol/sdk/server/index.js', () => {
+  const MockServer = vi.fn().mockImplementation(function (this: any) {
+    if (mockServerInstance) {
+      Object.assign(this, mockServerInstance);
+    } else {
+      this.setRequestHandler = vi.fn();
+      this.connect = vi.fn();
+    }
+    return this;
+  });
+  return { Server: MockServer };
+});
 
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: vi.fn()
+  StdioServerTransport: vi.fn(),
 }));
 
 // Mock child_process
 vi.mock('child_process', () => ({
-  execSync: vi.fn(() => Buffer.from('mocked git output'))
+  execSync: vi.fn(() => Buffer.from('mocked git output')),
 }));
 
 // Mock browser MCP integration
 vi.mock('../../features/browser/browser-mcp.js', () => ({
   BrowserMCPIntegration: vi.fn().mockImplementation(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined)
-  }))
+    initialize: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 // Mock Linear imports with dynamic imports
@@ -41,8 +50,8 @@ vi.mock('../../integrations/linear/auth.js', async () => {
     ...actual,
     LinearAuthManager: vi.fn().mockImplementation(() => ({
       loadTokens: vi.fn(),
-      isConfigured: vi.fn(() => false)
-    }))
+      isConfigured: vi.fn(() => false),
+    })),
   };
 });
 
@@ -57,8 +66,8 @@ vi.mock('../../integrations/linear/client.js', async () => {
       getTeam: vi.fn(),
       getWorkflowStates: vi.fn(),
       getViewer: vi.fn(),
-      getIssues: vi.fn()
-    }))
+      getIssues: vi.fn(),
+    })),
   };
 });
 
@@ -67,13 +76,13 @@ vi.mock('../../integrations/linear/sync.js', async () => {
   return {
     ...actual,
     LinearSyncEngine: vi.fn().mockImplementation(() => ({
-      sync: vi.fn()
+      sync: vi.fn(),
     })),
     DEFAULT_SYNC_CONFIG: {
       enabled: true,
       direction: 'bidirectional',
-      conflictResolution: 'newest_wins'
-    }
+      conflictResolution: 'newest_wins',
+    },
   };
 });
 
@@ -89,74 +98,79 @@ describe('LocalStackMemoryMCP', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'stackmemory-mcp-test-'));
     originalCwd = process.cwd();
     originalArgv = [...process.argv];
-    
+
     // Create .git directory to simulate git repo
     const gitDir = join(tempDir, '.git');
     mkdirSync(gitDir, { recursive: true });
-    writeFileSync(join(gitDir, 'config'), '[core]\n\trepositoryformatversion = 0');
-    
+    writeFileSync(
+      join(gitDir, 'config'),
+      '[core]\n\trepositoryformatversion = 0'
+    );
+
     // Create package.json
-    writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
-      name: 'test-project',
-      version: '1.0.0'
-    }));
-    
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-project',
+        version: '1.0.0',
+      })
+    );
+
     // Mock process.cwd() to return our temp directory
     vi.spyOn(process, 'cwd').mockReturnValue(tempDir);
-    
-    // Setup mock server
+
+    // Setup mock server - update the module-level reference
     mockServer = {
       setRequestHandler: vi.fn(),
-      connect: vi.fn()
+      connect: vi.fn(),
     };
-    
-    (Server as Mock).mockImplementation(() => mockServer);
+    mockServerInstance = mockServer;
   });
 
   afterEach(() => {
     if (mcpServer) {
       // Cleanup if needed
     }
-    
+
     // Restore original process state
     vi.spyOn(process, 'cwd').mockRestore();
     process.argv = originalArgv;
-    
+
     // Cleanup temp directory
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
     }
-    
+
     vi.clearAllMocks();
   });
 
   describe('Initialization', () => {
     it('should initialize server with correct project detection', () => {
       mcpServer = new LocalStackMemoryMCP();
-      
+
       expect(Server).toHaveBeenCalledWith(
         {
           name: 'stackmemory-local',
-          version: '0.1.0'
+          version: '0.1.0',
         },
         {
           capabilities: {
-            tools: {}
-          }
+            tools: {},
+          },
         }
       );
     });
 
     it('should create .stackmemory directory if it does not exist', () => {
       mcpServer = new LocalStackMemoryMCP();
-      
+
       const stackmemoryDir = join(tempDir, '.stackmemory');
       expect(existsSync(stackmemoryDir)).toBe(true);
     });
 
     it('should initialize database and frame manager', () => {
       mcpServer = new LocalStackMemoryMCP();
-      
+
       const dbPath = join(tempDir, '.stackmemory', 'context.db');
       expect(existsSync(dbPath)).toBe(true);
     });
@@ -164,7 +178,7 @@ describe('LocalStackMemoryMCP', () => {
     it('should handle missing .git directory gracefully', () => {
       // Remove .git directory
       rmSync(join(tempDir, '.git'), { recursive: true });
-      
+
       // Should still work, using current directory as project root
       expect(() => {
         mcpServer = new LocalStackMemoryMCP();
@@ -173,19 +187,24 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should setup tool handlers correctly', () => {
       mcpServer = new LocalStackMemoryMCP();
-      
+
       // Should have called setRequestHandler at least twice (tools/list and tools/call)
       expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(2);
-      
+
       // Check for tools/list handler
       const toolsListCall = mockServer.setRequestHandler.mock.calls.find(
-        (call: any) => call[0].parse({ method: 'tools/list' }).method === 'tools/list'
+        (call: any) =>
+          call[0].parse({ method: 'tools/list' }).method === 'tools/list'
       );
       expect(toolsListCall).toBeDefined();
-      
-      // Check for tools/call handler  
+
+      // Check for tools/call handler
       const toolsCallCall = mockServer.setRequestHandler.mock.calls.find(
-        (call: any) => call[0].parse({ method: 'tools/call', params: { name: 'test', arguments: {} } }).method === 'tools/call'
+        (call: any) =>
+          call[0].parse({
+            method: 'tools/call',
+            params: { name: 'test', arguments: {} },
+          }).method === 'tools/call'
       );
       expect(toolsCallCall).toBeDefined();
     });
@@ -198,13 +217,13 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should list all available tools', async () => {
       const toolsListHandler = mockServer.setRequestHandler.mock.calls[0][1];
-      
+
       const result = await toolsListHandler({ method: 'tools/list' });
-      
+
       expect(result.tools).toBeDefined();
       expect(Array.isArray(result.tools)).toBe(true);
       expect(result.tools.length).toBeGreaterThan(0);
-      
+
       // Check for essential tools
       const toolNames = result.tools.map((tool: any) => tool.name);
       expect(toolNames).toContain('get_context');
@@ -220,9 +239,9 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should include Linear integration tools', async () => {
       const toolsListHandler = mockServer.setRequestHandler.mock.calls[0][1];
-      
+
       const result = await toolsListHandler({ method: 'tools/list' });
-      
+
       const toolNames = result.tools.map((tool: any) => tool.name);
       expect(toolNames).toContain('linear_sync');
       expect(toolNames).toContain('linear_update_task');
@@ -232,17 +251,21 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should include proper tool schemas', async () => {
       const toolsListHandler = mockServer.setRequestHandler.mock.calls[0][1];
-      
+
       const result = await toolsListHandler({ method: 'tools/list' });
-      
-      const getContextTool = result.tools.find((tool: any) => tool.name === 'get_context');
+
+      const getContextTool = result.tools.find(
+        (tool: any) => tool.name === 'get_context'
+      );
       expect(getContextTool).toBeDefined();
       expect(getContextTool.description).toBeDefined();
       expect(getContextTool.inputSchema).toBeDefined();
       expect(getContextTool.inputSchema.type).toBe('object');
       expect(getContextTool.inputSchema.properties).toBeDefined();
-      
-      const startFrameTool = result.tools.find((tool: any) => tool.name === 'start_frame');
+
+      const startFrameTool = result.tools.find(
+        (tool: any) => tool.name === 'start_frame'
+      );
       expect(startFrameTool.inputSchema.required).toContain('name');
       expect(startFrameTool.inputSchema.required).toContain('type');
     });
@@ -261,8 +284,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'get_context',
-          arguments: { query: 'test', limit: 5 }
-        }
+          arguments: { query: 'test', limit: 5 },
+        },
       });
 
       expect(result.content).toBeDefined();
@@ -275,8 +298,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'add_decision',
-          arguments: { content: 'Test decision', type: 'decision' }
-        }
+          arguments: { content: 'Test decision', type: 'decision' },
+        },
       });
 
       expect(result.content).toBeDefined();
@@ -289,12 +312,12 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { 
+          arguments: {
             name: 'Test Frame',
             type: 'task',
-            constraints: ['constraint1', 'constraint2']
-          }
-        }
+            constraints: ['constraint1', 'constraint2'],
+          },
+        },
       });
 
       expect(result.content).toBeDefined();
@@ -310,8 +333,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Test Frame', type: 'task' }
-        }
+          arguments: { name: 'Test Frame', type: 'task' },
+        },
       });
 
       // Then close it
@@ -319,11 +342,11 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'close_frame',
-          arguments: { 
+          arguments: {
             result: 'Completed successfully',
-            outputs: { key: 'value' }
-          }
-        }
+            outputs: { key: 'value' },
+          },
+        },
       });
 
       expect(result.content).toBeDefined();
@@ -336,8 +359,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'close_frame',
-          arguments: { result: 'Test' }
-        }
+          arguments: { result: 'Test' },
+        },
       });
 
       expect(result.content[0].text).toContain('No active frame to close');
@@ -349,8 +372,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Test Frame', type: 'task' }
-        }
+          arguments: { name: 'Test Frame', type: 'task' },
+        },
       });
 
       // Then add an anchor
@@ -361,9 +384,9 @@ describe('LocalStackMemoryMCP', () => {
           arguments: {
             type: 'FACT',
             text: 'Important fact',
-            priority: 9
-          }
-        }
+            priority: 9,
+          },
+        },
       });
 
       expect(result.content[0].text).toContain('Added FACT');
@@ -377,24 +400,24 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Root Frame', type: 'task' }
-        }
+          arguments: { name: 'Root Frame', type: 'task' },
+        },
       });
 
       await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Child Frame', type: 'subtask' }
-        }
+          arguments: { name: 'Child Frame', type: 'subtask' },
+        },
       });
 
       const result = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'get_hot_stack',
-          arguments: { maxEvents: 10 }
-        }
+          arguments: { maxEvents: 10 },
+        },
       });
 
       expect(result.content[0].text).toContain('Active Call Stack');
@@ -408,8 +431,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'get_hot_stack',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(result.content[0].text).toContain('No active frames');
@@ -422,14 +445,14 @@ describe('LocalStackMemoryMCP', () => {
     beforeEach(() => {
       mcpServer = new LocalStackMemoryMCP();
       toolsCallHandler = mockServer.setRequestHandler.mock.calls[1][1];
-      
+
       // Start a frame for task operations
       toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Task Frame', type: 'task' }
-        }
+          arguments: { name: 'Task Frame', type: 'task' },
+        },
       });
     });
 
@@ -443,9 +466,9 @@ describe('LocalStackMemoryMCP', () => {
             description: 'A test task',
             priority: 'high',
             estimatedEffort: 120,
-            tags: ['test', 'urgent']
-          }
-        }
+            tags: ['test', 'urgent'],
+          },
+        },
       });
 
       expect(result.content[0].text).toContain('Created task');
@@ -460,16 +483,16 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'close_frame',
-          arguments: { result: 'closed' }
-        }
+          arguments: { result: 'closed' },
+        },
       });
 
       const result = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'No Frame Task' }
-        }
+          arguments: { title: 'No Frame Task' },
+        },
       });
 
       expect(result.content[0].text).toContain('No active frame');
@@ -481,12 +504,14 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Update Test Task' }
-        }
+          arguments: { title: 'Update Test Task' },
+        },
       });
 
       // Extract task ID from response (simplified)
-      const taskIdMatch = createResult.content[0].text.match(/ID: (tsk-[a-f0-9]{8})/);
+      const taskIdMatch = createResult.content[0].text.match(
+        /ID: (tsk-[a-f0-9]{8})/
+      );
       expect(taskIdMatch).toBeTruthy();
       const taskId = taskIdMatch[1];
 
@@ -497,9 +522,9 @@ describe('LocalStackMemoryMCP', () => {
           arguments: {
             taskId,
             status: 'in_progress',
-            reason: 'Starting work'
-          }
-        }
+            reason: 'Starting work',
+          },
+        },
       });
 
       expect(result.content[0].text).toContain('Updated task');
@@ -514,9 +539,9 @@ describe('LocalStackMemoryMCP', () => {
           name: 'update_task_status',
           arguments: {
             taskId: 'invalid-task-id',
-            status: 'completed'
-          }
-        }
+            status: 'completed',
+          },
+        },
       });
 
       expect(result.content[0].text).toContain('Failed to update task');
@@ -528,24 +553,24 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Active Task 1', priority: 'high' }
-        }
+          arguments: { title: 'Active Task 1', priority: 'high' },
+        },
       });
 
       await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Active Task 2', priority: 'low' }
-        }
+          arguments: { title: 'Active Task 2', priority: 'low' },
+        },
       });
 
       const result = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'get_active_tasks',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(result.content[0].text).toContain('Active Tasks');
@@ -560,8 +585,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'get_active_tasks',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(result.content[0].text).toContain('No active tasks');
@@ -573,16 +598,16 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Metrics Task 1' }
-        }
+          arguments: { title: 'Metrics Task 1' },
+        },
       });
 
       const result = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'get_task_metrics',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(result.content[0].text).toContain('Task Metrics');
@@ -598,21 +623,25 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Dependency Task' }
-        }
+          arguments: { title: 'Dependency Task' },
+        },
       });
 
       const task2Result = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Dependent Task' }
-        }
+          arguments: { title: 'Dependent Task' },
+        },
       });
 
       // Extract task IDs
-      const task1Id = task1Result.content[0].text.match(/ID: (tsk-[a-f0-9]{8})/)[1];
-      const task2Id = task2Result.content[0].text.match(/ID: (tsk-[a-f0-9]{8})/)[1];
+      const task1Id = task1Result.content[0].text.match(
+        /ID: (tsk-[a-f0-9]{8})/
+      )[1];
+      const task2Id = task2Result.content[0].text.match(
+        /ID: (tsk-[a-f0-9]{8})/
+      )[1];
 
       const result = await toolsCallHandler({
         method: 'tools/call',
@@ -620,9 +649,9 @@ describe('LocalStackMemoryMCP', () => {
           name: 'add_task_dependency',
           arguments: {
             taskId: task2Id,
-            dependsOnId: task1Id
-          }
-        }
+            dependsOnId: task1Id,
+          },
+        },
       });
 
       expect(result.content[0].text).toContain('Added dependency');
@@ -644,11 +673,13 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'linear_status',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
-      expect(result.content[0].text).toContain('Linear integration not configured');
+      expect(result.content[0].text).toContain(
+        'Linear integration not configured'
+      );
       expect(result.content[0].text).toContain('stackmemory linear setup');
     });
 
@@ -657,8 +688,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'linear_sync',
-          arguments: { direction: 'bidirectional' }
-        }
+          arguments: { direction: 'bidirectional' },
+        },
       });
 
       expect(result.content[0].text).toContain('Linear not authenticated');
@@ -669,8 +700,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'linear_update_task',
-          arguments: { issueId: 'STA-123', status: 'done' }
-        }
+          arguments: { issueId: 'STA-123', status: 'done' },
+        },
       });
 
       expect(result.content[0].text).toContain('Linear not authenticated');
@@ -681,8 +712,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'linear_get_tasks',
-          arguments: { status: 'todo', limit: 10 }
-        }
+          arguments: { status: 'todo', limit: 10 },
+        },
       });
 
       expect(result.content[0].text).toContain('Linear not authenticated');
@@ -690,27 +721,32 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should handle linear integration errors gracefully', async () => {
       // Mock successful authentication but failed operation
-      const { LinearAuthManager } = await import('../../../integrations/linear/auth.js');
+      const { LinearAuthManager } =
+        await import('../../../integrations/linear/auth.js');
       const mockAuthManager = LinearAuthManager as Mock;
-      
+
       mockAuthManager.mockImplementation(() => ({
-        loadTokens: vi.fn(() => ({ accessToken: 'test-token', expiresAt: Date.now() + 3600000 })),
-        isConfigured: vi.fn(() => true)
+        loadTokens: vi.fn(() => ({
+          accessToken: 'test-token',
+          expiresAt: Date.now() + 3600000,
+        })),
+        isConfigured: vi.fn(() => true),
       }));
 
-      const { LinearClient } = await import('../../../integrations/linear/client.js');
+      const { LinearClient } =
+        await import('../../../integrations/linear/client.js');
       const mockClient = LinearClient as Mock;
-      
+
       mockClient.mockImplementation(() => ({
-        getViewer: vi.fn().mockRejectedValue(new Error('Network error'))
+        getViewer: vi.fn().mockRejectedValue(new Error('Network error')),
       }));
 
       const result = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'linear_status',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(result.content[0].text).toContain('connection failed');
@@ -726,13 +762,15 @@ describe('LocalStackMemoryMCP', () => {
     });
 
     it('should handle unknown tool calls', async () => {
-      await expect(toolsCallHandler({
-        method: 'tools/call',
-        params: {
-          name: 'unknown_tool',
-          arguments: {}
-        }
-      })).rejects.toThrow('Unknown tool: unknown_tool');
+      await expect(
+        toolsCallHandler({
+          method: 'tools/call',
+          params: {
+            name: 'unknown_tool',
+            arguments: {},
+          },
+        })
+      ).rejects.toThrow('Unknown tool: unknown_tool');
     });
 
     it('should handle malformed tool arguments gracefully', async () => {
@@ -740,8 +778,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Test' } // Missing required 'type'
-        }
+          arguments: { name: 'Test' }, // Missing required 'type'
+        },
       });
 
       // Should handle the missing type gracefully
@@ -755,9 +793,9 @@ describe('LocalStackMemoryMCP', () => {
           name: 'add_anchor',
           arguments: {
             type: 'FACT',
-            text: 'Test fact'
-          }
-        }
+            text: 'Test fact',
+          },
+        },
       });
 
       // Should fail because no active frame
@@ -769,14 +807,24 @@ describe('LocalStackMemoryMCP', () => {
     it('should detect git repository information', () => {
       // Mock git commands
       const { execSync } = require('child_process');
-      execSync.mockReturnValueOnce(Buffer.from('origin\thttps://github.com/user/repo.git'));
-      execSync.mockReturnValueOnce(Buffer.from('abc123 Initial commit\ndef456 Second commit'));
+      execSync.mockReturnValueOnce(
+        Buffer.from('origin\thttps://github.com/user/repo.git')
+      );
+      execSync.mockReturnValueOnce(
+        Buffer.from('abc123 Initial commit\ndef456 Second commit')
+      );
 
       mcpServer = new LocalStackMemoryMCP();
 
       // Should have called git commands for project detection
-      expect(execSync).toHaveBeenCalledWith('git config --get remote.origin.url', expect.any(Object));
-      expect(execSync).toHaveBeenCalledWith('git log --oneline -10', expect.any(Object));
+      expect(execSync).toHaveBeenCalledWith(
+        'git config --get remote.origin.url',
+        expect.any(Object)
+      );
+      expect(execSync).toHaveBeenCalledWith(
+        'git log --oneline -10',
+        expect.any(Object)
+      );
     });
 
     it('should handle missing git repository gracefully', () => {
@@ -792,7 +840,10 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should load README.md if present', () => {
       const readmePath = join(tempDir, 'README.md');
-      writeFileSync(readmePath, '# Test Project\n\nThis is a test project for MCP server testing.');
+      writeFileSync(
+        readmePath,
+        '# Test Project\n\nThis is a test project for MCP server testing.'
+      );
 
       mcpServer = new LocalStackMemoryMCP();
 
@@ -821,11 +872,15 @@ describe('LocalStackMemoryMCP', () => {
     it('should create required database tables', () => {
       const dbPath = join(tempDir, '.stackmemory', 'context.db');
       const db = new Database(dbPath);
-      
-      const tables = db.prepare(`
+
+      const tables = db
+        .prepare(
+          `
         SELECT name FROM sqlite_master 
         WHERE type='table' AND name IN ('contexts', 'frames', 'attention_log')
-      `).all();
+      `
+        )
+        .all();
 
       expect(tables).toHaveLength(3);
       db.close();
@@ -834,11 +889,11 @@ describe('LocalStackMemoryMCP', () => {
     it('should handle database initialization errors gracefully', () => {
       // Mock Database constructor to throw error
       const originalDatabase = Database;
-      
+
       vi.doMock('better-sqlite3', () => ({
         default: vi.fn(() => {
           throw new Error('Database error');
-        })
+        }),
       }));
 
       expect(() => {
@@ -851,10 +906,10 @@ describe('LocalStackMemoryMCP', () => {
   describe('Server Lifecycle', () => {
     it('should start server successfully', async () => {
       mcpServer = new LocalStackMemoryMCP();
-      
+
       const mockTransport = { connect: vi.fn() };
       vi.doMock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-        StdioServerTransport: vi.fn(() => mockTransport)
+        StdioServerTransport: vi.fn(() => mockTransport),
       }));
 
       mockServer.connect.mockResolvedValue(undefined);
@@ -865,7 +920,7 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should handle server start errors', async () => {
       mcpServer = new LocalStackMemoryMCP();
-      
+
       mockServer.connect.mockRejectedValue(new Error('Connection failed'));
 
       await expect(mcpServer.start()).rejects.toThrow('Connection failed');
@@ -879,14 +934,14 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should integrate frame manager operations', async () => {
       const toolsCallHandler = mockServer.setRequestHandler.mock.calls[1][1];
-      
+
       // Test frame lifecycle
       const startResult = await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Integration Test', type: 'task' }
-        }
+          arguments: { name: 'Integration Test', type: 'task' },
+        },
       });
 
       expect(startResult.content[0].text).toContain('Started task');
@@ -895,8 +950,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'get_hot_stack',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(hotStackResult.content[0].text).toContain('Integration Test');
@@ -905,8 +960,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'close_frame',
-          arguments: { result: 'Integration complete' }
-        }
+          arguments: { result: 'Integration complete' },
+        },
       });
 
       expect(closeResult.content[0].text).toContain('Closed frame');
@@ -914,14 +969,14 @@ describe('LocalStackMemoryMCP', () => {
 
     it('should integrate task store operations', async () => {
       const toolsCallHandler = mockServer.setRequestHandler.mock.calls[1][1];
-      
+
       // Start frame for task operations
       await toolsCallHandler({
         method: 'tools/call',
         params: {
           name: 'start_frame',
-          arguments: { name: 'Task Integration', type: 'task' }
-        }
+          arguments: { name: 'Task Integration', type: 'task' },
+        },
       });
 
       // Create task
@@ -929,8 +984,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'create_task',
-          arguments: { title: 'Integration Task' }
-        }
+          arguments: { title: 'Integration Task' },
+        },
       });
 
       expect(createResult.content[0].text).toContain('Created task');
@@ -940,8 +995,8 @@ describe('LocalStackMemoryMCP', () => {
         method: 'tools/call',
         params: {
           name: 'get_active_tasks',
-          arguments: {}
-        }
+          arguments: {},
+        },
       });
 
       expect(activeResult.content[0].text).toContain('Integration Task');

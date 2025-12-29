@@ -119,7 +119,10 @@ export const PRESET_PROFILES: Record<string, ProfileConfig> = {
     },
     retention: {
       local: {
+        young: '7d',
+        mature: '30d',
         old: '90d', // Keep security decisions longer
+        max_size: '100MB',
       },
     },
   },
