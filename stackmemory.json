@@ -22,18 +22,18 @@
     "Event and anchor management",
     "Hot stack context assembly",
     "Comprehensive SPEC.md (776 lines)",
-    "Query language parser with NLP support",
+    "Query language parser with NLP support (STA-94)",
+    "Configurable weight profiles system (STA-97)",
     "Linear integration (10 implementation tasks)",
     "Documentation updates (README, AGENTS.md)",
-    "Test coverage for query parser"
+    "Test coverage for query parser and config system"
   ],
   "in_progress": [
     "LLM-driven context retrieval (STA-95)",
     "Hybrid digest generation system (STA-96)",
-    "Configurable weight profiles (STA-97)"
+    "Trace detection and bundling (STA-98)"
   ],
   "todo": [
-    "Trace detection and bundling (STA-98)",
     "Dual stack architecture (STA-99)",
     "Frame handoff mechanism (STA-100)",
     "Stack merge conflict resolution (STA-101)",
