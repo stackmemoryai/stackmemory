@@ -113,6 +113,8 @@ class LocalStackMemoryMCP {
   }
 
   private initDB() {
+    // Note: Don't create frames table here - FrameManager handles the schema
+    // with the full run_id, project_id, parent_frame_id columns
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS contexts (
         id TEXT PRIMARY KEY,
@@ -122,13 +124,6 @@ class LocalStackMemoryMCP {
         created_at INTEGER DEFAULT (unixepoch()),
         last_accessed INTEGER DEFAULT (unixepoch()),
         access_count INTEGER DEFAULT 1
-      );
-
-      CREATE TABLE IF NOT EXISTS frames (
-        frame_id TEXT PRIMARY KEY,
-        task TEXT NOT NULL,
-        status TEXT DEFAULT 'active',
-        created_at INTEGER DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS attention_log (
@@ -580,7 +575,7 @@ class LocalStackMemoryMCP {
       }),
       async (request) => {
         const { name, arguments: args } = request.params;
-        
+
         // Log tool call event before execution
         const currentFrameId = this.frameManager.getCurrentFrameId();
         if (currentFrameId) {
@@ -593,7 +588,7 @@ class LocalStackMemoryMCP {
 
         let result;
         let error;
-        
+
         try {
           switch (name) {
             case 'get_context':
@@ -668,7 +663,7 @@ class LocalStackMemoryMCP {
             this.frameManager.addEvent('tool_result', {
               tool_name: name,
               success: !error,
-              result: error ? { error: error.message } : result,
+              result: error ? { error: (error as Error).message } : result,
               timestamp: Date.now(),
             });
           }
@@ -1266,7 +1261,11 @@ class LocalStackMemoryMCP {
       const updatedIssue = await client.updateIssue(issue.id, updates);
 
       // Auto-sync to local tasks after update
-      this.linearSync.updateConfig({ ...DEFAULT_SYNC_CONFIG, enabled: true, direction: 'from_linear' });
+      this.linearSync.updateConfig({
+        ...DEFAULT_SYNC_CONFIG,
+        enabled: true,
+        direction: 'from_linear',
+      });
       const syncResult = await this.linearSync.sync();
 
       let response = `✅ Updated ${updatedIssue.identifier}: ${updatedIssue.title}\n`;

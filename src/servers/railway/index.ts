@@ -41,8 +41,8 @@ class RailwayMCPServer {
   private app: express.Application;
   private httpServer: any;
   private wss?: WebSocketServer;
-  private mcpServer: Server;
-  private db: Database.Database;
+  private mcpServer!: Server;
+  private db!: Database.Database;
   private connections: Map<string, any> = new Map();
   private browserMCP: BrowserMCPIntegration;
 
