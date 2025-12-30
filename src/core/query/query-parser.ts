@@ -3,6 +3,8 @@
  * Handles both natural language and structured queries
  */
 
+import { QueryTemplates, InlineModifierParser } from './query-templates.js';
+
 export interface TimeFilter {
   last?: string; // "1d", "3h", "1w", "2m"
   since?: Date;
@@ -16,6 +18,8 @@ export interface ContentFilter {
   files?: string[];
   errors?: string[];
   tools?: string[];
+  keywords?: string[];
+  excludeKeywords?: string[];
 }
 
 export interface FrameFilter {
@@ -42,6 +46,7 @@ export interface OutputControl {
   sort?: 'time' | 'score' | 'relevance';
   include?: ('digests' | 'events' | 'anchors')[];
   format?: 'full' | 'summary' | 'ids';
+  groupBy?: 'frame' | 'time' | 'owner' | 'topic';
 }
 
 export interface StackMemoryQuery {
@@ -76,6 +81,8 @@ export enum FrameStatus {
 }
 
 export class QueryParser {
+  private templates = new QueryTemplates();
+  private inlineParser = new InlineModifierParser();
   private shortcuts: Map<string, Partial<StackMemoryQuery>> = new Map([
     ['today', { time: { last: '24h' } }],
     [
@@ -83,18 +90,43 @@ export class QueryParser {
       { time: { last: '48h', since: new Date(Date.now() - 48 * 3600000) } },
     ],
     ['this week', { time: { last: '7d' } }],
+    ['last week', { time: { last: '1w' } }],
+    ['this month', { time: { last: '30d' } }],
     ['bugs', { frame: { type: [FrameType.BUG, FrameType.DEBUG] } }],
     ['features', { frame: { type: [FrameType.FEATURE] } }],
+    ['architecture', { frame: { type: [FrameType.ARCHITECTURE] } }],
+    ['refactoring', { frame: { type: [FrameType.REFACTOR] } }],
     ['critical', { frame: { score: { min: 0.8 } } }],
     ['recent', { time: { last: '4h' } }],
+    ['stalled', { frame: { status: [FrameStatus.STALLED] } }],
+    ['my work', { people: { owner: ['$current_user'] } }],
+    ['team work', { people: { team: '$current_team' } }],
   ]);
 
   /**
    * Parse natural language query into structured format
    */
   parseNaturalLanguage(query: string): StackMemoryQuery {
+    // First check for query templates
+    const templateResult = this.templates.matchTemplate(query);
+    if (templateResult) {
+      // Ensure template results have proper defaults
+      const structured = templateResult as StackMemoryQuery;
+      if (!structured.output) {
+        structured.output = {
+          limit: 50,
+          sort: 'time',
+          format: 'summary',
+        };
+      }
+      return this.parseStructured(structured);
+    }
+
+    // Check for inline modifiers
+    const { cleanQuery, modifiers } = this.inlineParser.parse(query);
+
     const result: StackMemoryQuery = {};
-    const lowerQuery = query.toLowerCase();
+    const lowerQuery = cleanQuery.toLowerCase();
 
     // Time-based patterns
     this.parseTimePatterns(lowerQuery, result);
@@ -108,16 +140,24 @@ export class QueryParser {
     // Shortcut expansion
     this.expandShortcuts(lowerQuery, result);
 
+    // Merge inline modifiers
+    const merged = this.mergeQueries(result, modifiers);
+
     // Default output settings if not specified
-    if (!result.output) {
-      result.output = {
+    if (!merged.output) {
+      merged.output = {
         limit: 50,
         sort: 'time',
         format: 'summary',
       };
+    } else {
+      // Ensure all output fields have defaults
+      if (!merged.output.limit) merged.output.limit = 50;
+      if (!merged.output.sort) merged.output.sort = 'time';
+      if (!merged.output.format) merged.output.format = 'summary';
     }
 
-    return result;
+    return merged;
   }
 
   /**
@@ -197,7 +237,7 @@ export class QueryParser {
   }
 
   private parseTopicPatterns(query: string, result: StackMemoryQuery): void {
-    // Common topics
+    // Common topics - match word boundaries for most, but be flexible for compound words
     const topics = [
       'auth',
       'authentication',
@@ -208,9 +248,11 @@ export class QueryParser {
       'cache',
       'api',
       'bug',
+      'bugs',
       'error',
       'fix',
       'feature',
+      'features',
       'test',
       'security',
       'performance',
@@ -218,8 +260,15 @@ export class QueryParser {
 
     const foundTopics: string[] = [];
     for (const topic of topics) {
-      if (query.includes(topic)) {
-        foundTopics.push(topic);
+      // Always use word boundaries to avoid false positives like "test" in "latest"
+      const regex = new RegExp(`\\b${topic}\\b`, 'i');
+      if (regex.test(query)) {
+        // Normalize plurals
+        const normalized =
+          topic === 'bugs' ? 'bug' : topic === 'features' ? 'feature' : topic;
+        if (!foundTopics.includes(normalized)) {
+          foundTopics.push(normalized);
+        }
       }
     }
 
@@ -248,11 +297,13 @@ export class QueryParser {
     const possMatch = query.match(possessivePattern);
     if (possMatch) {
       const person = possMatch[1].toLowerCase();
+      if (!result.people) result.people = {};
       result.people = { ...result.people, owner: [person] };
     }
 
-    // "team work"
-    if (query.includes('team')) {
+    // "team work" - use word boundaries to avoid false positives
+    if (/\bteam\b/.test(query)) {
+      if (!result.people) result.people = {};
       result.people = { ...result.people, team: '$current_team' };
     }
   }
@@ -298,13 +349,26 @@ export class QueryParser {
     base: StackMemoryQuery,
     overlay: Partial<StackMemoryQuery>
   ): StackMemoryQuery {
-    return {
-      time: { ...base.time, ...overlay.time },
-      content: { ...base.content, ...overlay.content },
-      frame: { ...base.frame, ...overlay.frame },
-      people: { ...base.people, ...overlay.people },
-      output: { ...base.output, ...overlay.output },
-    };
+    const merged: StackMemoryQuery = {};
+
+    // Only add properties if they have values
+    if (base.time || overlay.time) {
+      merged.time = { ...base.time, ...overlay.time };
+    }
+    if (base.content || overlay.content) {
+      merged.content = { ...base.content, ...overlay.content };
+    }
+    if (base.frame || overlay.frame) {
+      merged.frame = { ...base.frame, ...overlay.frame };
+    }
+    if (base.people || overlay.people) {
+      merged.people = { ...base.people, ...overlay.people };
+    }
+    if (base.output || overlay.output) {
+      merged.output = { ...base.output, ...overlay.output };
+    }
+
+    return merged;
   }
 
   /**
@@ -313,6 +377,7 @@ export class QueryParser {
   expandQuery(query: StackMemoryQuery): StackMemoryQuery {
     const synonyms: Record<string, string[]> = {
       auth: ['authentication', 'oauth', 'login', 'session', 'jwt'],
+      authentication: ['auth', 'oauth', 'login', 'session', 'jwt'],
       bug: ['error', 'issue', 'problem', 'fix', 'defect'],
       database: ['db', 'sql', 'postgres', 'migration', 'schema'],
       test: ['testing', 'spec', 'unit', 'integration', 'e2e'],
@@ -431,12 +496,23 @@ export class QueryParser {
     const suggestions: string[] = [];
 
     // If no time filter, suggest adding one
-    if (!query.time) {
+    if (
+      !query.time ||
+      (!query.time.last &&
+        !query.time.since &&
+        !query.time.between &&
+        !query.time.specific)
+    ) {
       suggestions.push('Try adding a time filter like "last 24h" or "today"');
     }
 
     // If very broad query, suggest refinement
-    if (!query.content?.topic && !query.frame?.type && !query.people) {
+    if (
+      !query.content?.topic &&
+      !query.frame?.type &&
+      !query.people &&
+      !query.content?.keywords
+    ) {
       suggestions.push(
         'Consider filtering by topic, frame type, or people to narrow results'
       );
