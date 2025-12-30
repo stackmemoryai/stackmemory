@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "stackmemory": {
+      "command": "npx",
+      "args": [
+        "@stackmemoryai/stackmemory",
+        "mcp-server",
+        "--project",
+        "${PROJECT_ROOT}"
+      ],
+      "env": {
+        "PROJECT_ROOT": "/path/to/your/project",
+        "LINEAR_API_KEY": "${LINEAR_API_KEY}"
+      }
+    }
+  }
+}

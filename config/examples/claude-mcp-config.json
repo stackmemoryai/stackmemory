@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "stackmemory": {
+      "command": "node",
+      "args": [
+        "/Users/jwu/Dev/stackmemory/dist/mcp/stackmemory-mcp-server.js"
+      ],
+      "env": {
+        "STACKMEMORY_PROJECT": "/Users/jwu/Dev/stackmemory"
+      }
+    }
+  }
+}

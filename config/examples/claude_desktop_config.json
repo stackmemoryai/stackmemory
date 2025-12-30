@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "stackmemory-local": {
+      "command": "node",
+      "args": [
+        "/Users/jwu/Dev/stackmemory/dist/src/mcp/stackmemory-mcp-server.js"
+      ],
+      "env": {
+        "STACKMEMORY_LOG_LEVEL": "INFO"
+      }
+    },
+    "stackmemory-railway": {
+      "command": "node",
+      "args": ["/Users/jwu/Dev/stackmemory/scripts/mcp-proxy.js"],
+      "env": {
+        "RAILWAY_URL": "https://stackmemory-production.up.railway.app",
+        "API_KEY": "a232e4cfe79628a729ba3e9ce29476422ebefb78f1db46fb7e8a6f11bebf5e0a"
+      }
+    }
+  }
+}
