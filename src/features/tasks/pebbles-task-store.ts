@@ -5,7 +5,7 @@
 
 import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
-import { appendFile, existsSync, mkdirSync, readFileSync } from 'fs';
+import { appendFile, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../../core/monitoring/logger.js';
 import {
@@ -17,6 +17,8 @@ import {
   createErrorHandler,
 } from '../../core/errors/index.js';
 import { retry, withTimeout } from '../../core/errors/recovery.js';
+import { StreamingJSONLParser } from '../../core/performance/streaming-jsonl-parser.js';
+import { ContextCache } from '../../core/performance/context-cache.js';
 
 export type TaskStatus =
   | 'pending'
@@ -78,6 +80,8 @@ export class PebblesTaskStore {
   private projectRoot: string;
   private tasksFile: string;
   private cacheFile: string;
+  private jsonlParser: StreamingJSONLParser;
+  private taskCache: ContextCache<PebblesTask>;
 
   constructor(projectRoot: string, db: Database.Database) {
     this.projectRoot = projectRoot;
@@ -92,8 +96,19 @@ export class PebblesTaskStore {
     this.tasksFile = join(stackmemoryDir, 'tasks.jsonl');
     this.cacheFile = join(stackmemoryDir, 'cache.db');
 
+    // Initialize performance optimizations
+    this.jsonlParser = new StreamingJSONLParser();
+    this.taskCache = new ContextCache<PebblesTask>({
+      maxSize: 10 * 1024 * 1024, // 10MB for tasks
+      maxItems: 1000,
+      defaultTTL: 3600000, // 1 hour
+    });
+
     this.initializeCache();
-    this.loadFromJSONL();
+    // Load JSONL asynchronously after construction
+    this.loadFromJSONL().catch(error => {
+      logger.error('Failed to load tasks from JSONL', error);
+    });
   }
 
   private initializeCache() {
@@ -154,9 +169,9 @@ export class PebblesTaskStore {
   }
 
   /**
-   * Load existing tasks from JSONL into SQLite cache
+   * Load existing tasks from JSONL into SQLite cache (optimized)
    */
-  private loadFromJSONL() {
+  private async loadFromJSONL() {
     if (!existsSync(this.tasksFile)) return;
 
     const errorHandler = createErrorHandler({
@@ -165,25 +180,43 @@ export class PebblesTaskStore {
     });
 
     try {
-      const content = readFileSync(this.tasksFile, 'utf-8');
-      const lines = content.split('\n').filter((line) => line.trim());
-
       let loaded = 0;
-      for (const line of lines) {
-        try {
-          const task = JSON.parse(line) as PebblesTask;
-          this.upsertToCache(task);
-          loaded++;
-        } catch (error) {
-          logger.warn('Failed to parse task line', { 
-            line: line.substring(0, 100), 
-            error: error instanceof Error ? error.message : String(error),
-            lineNumber: loaded + 1
-          });
+      let errors = 0;
+
+      // Use streaming parser for memory efficiency
+      for await (const batch of this.jsonlParser.parseStream<PebblesTask>(this.tasksFile, {
+        batchSize: 100,
+        filter: (obj) => obj.type && obj.id && obj.title, // Basic validation
+        onProgress: (count) => {
+          if (count % 500 === 0) {
+            logger.debug('Loading tasks progress', { loaded: count });
+          }
+        },
+      })) {
+        for (const task of batch) {
+          try {
+            this.upsertToCache(task);
+            // Add to in-memory cache for fast access
+            this.taskCache.set(task.id, task, {
+              ttl: 3600000, // 1 hour cache
+            });
+            loaded++;
+          } catch (error) {
+            errors++;
+            logger.warn('Failed to cache task', {
+              taskId: task.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
       }
 
-      logger.info('Loaded tasks from JSONL', { loaded, file: this.tasksFile });
+      logger.info('Loaded tasks from JSONL', { 
+        loaded, 
+        errors,
+        file: this.tasksFile,
+        cacheStats: this.taskCache.getStats(),
+      });
     } catch (error) {
       const systemError = errorHandler(error, {
         operation: 'loadFromJSONL',
