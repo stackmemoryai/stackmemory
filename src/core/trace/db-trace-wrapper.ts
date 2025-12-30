@@ -38,10 +38,10 @@ export function wrapDatabase(
   // Wrap prepare method to trace all queries
   const originalPrepare = db.prepare.bind(db);
   
-  db.prepare = function<T extends any[] = any[]>(source: string): Database.Statement<T> {
-    const statement = originalPrepare<T>(source);
+  db.prepare = function(source: string) {
+    const statement = originalPrepare(source);
     return wrapStatement(statement, source, slowQueryThreshold);
-  };
+  } as typeof db.prepare;
   
   // Wrap exec for direct SQL execution
   const originalExec = db.exec.bind(db);
@@ -66,16 +66,13 @@ export function wrapDatabase(
   // Wrap transaction for transaction tracking
   const originalTransaction = db.transaction.bind(db);
   
-  db.transaction = function<T extends (...args: any[]) => any>(fn: T): T {
-    const wrappedFn = ((...args: any[]) => {
-      return trace.traceSync('query', 'TRANSACTION', { args }, () => {
-        const txFn = originalTransaction(fn);
-        return txFn(...args);
+  db.transaction = function(fn: any) {
+    return originalTransaction(function(this: any, ...args: any[]) {
+      return trace.traceSync('query', 'TRANSACTION', { args: args.length }, () => {
+        return fn.apply(this, args);
       });
-    }) as T;
-    
-    return wrappedFn;
-  };
+    });
+  } as typeof db.transaction;
   
   // Add query statistics tracking
   (db as any).__queryStats = {
@@ -310,7 +307,7 @@ export function createTracedTransaction<T>(
     
     try {
       const tx = db.transaction(fn);
-      const result = tx.deferred();
+      const result = (tx as any).deferred();
       
       const duration = performance.now() - startTime;
       logger.info(`Transaction completed: ${name}`, {

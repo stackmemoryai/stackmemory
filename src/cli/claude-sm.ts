@@ -12,6 +12,7 @@ import * as os from 'os';
 import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
+import { initializeTracing, trace } from '../core/trace/index.js';
 
 interface ClaudeConfig {
   instanceId: string;
@@ -22,6 +23,8 @@ interface ClaudeConfig {
   contextEnabled: boolean;
   branch?: string;
   task?: string;
+  tracingEnabled: boolean;
+  verboseTracing: boolean;
 }
 
 class ClaudeSM {
@@ -37,6 +40,8 @@ class ClaudeSM {
       useChrome: false,
       useWorktree: false,
       contextEnabled: true,
+      tracingEnabled: true, // Enable tracing by default for claude-sm
+      verboseTracing: false,
     };
 
     this.stackmemoryPath = this.findStackMemory();
@@ -277,6 +282,12 @@ class ClaudeSM {
         case '--no-context':
           this.config.contextEnabled = false;
           break;
+        case '--no-trace':
+          this.config.tracingEnabled = false;
+          break;
+        case '--verbose-trace':
+          this.config.verboseTracing = true;
+          break;
         case '--branch':
         case '-b':
           i++;
@@ -299,6 +310,39 @@ class ClaudeSM {
           claudeArgs.push(arg);
       }
       i++;
+    }
+
+    // Initialize tracing system if enabled
+    if (this.config.tracingEnabled) {
+      // Set up environment for tracing
+      process.env.DEBUG_TRACE = 'true';
+      process.env.STACKMEMORY_DEBUG = 'true';
+      process.env.TRACE_OUTPUT = 'file'; // Write to file to not clutter Claude output
+      process.env.TRACE_MASK_SENSITIVE = 'true'; // Always mask sensitive data
+      
+      if (this.config.verboseTracing) {
+        process.env.TRACE_VERBOSITY = 'full';
+        process.env.TRACE_PARAMS = 'true';
+        process.env.TRACE_RESULTS = 'true';
+        process.env.TRACE_MEMORY = 'true';
+      } else {
+        process.env.TRACE_VERBOSITY = 'summary';
+        process.env.TRACE_PARAMS = 'true';
+        process.env.TRACE_RESULTS = 'false';
+      }
+      
+      // Initialize the tracing system
+      initializeTracing();
+      
+      // Start tracing this Claude session
+      trace.command('claude-sm', {
+        instanceId: this.config.instanceId,
+        worktree: this.config.useWorktree,
+        sandbox: this.config.useSandbox,
+        task: this.config.task,
+      }, async () => {
+        // Session tracing will wrap the entire Claude execution
+      });
     }
 
     // Show header
@@ -351,6 +395,12 @@ class ClaudeSM {
     if (this.config.useChrome) {
       console.log(chalk.yellow('🌐 Chrome automation enabled'));
     }
+    if (this.config.tracingEnabled) {
+      console.log(chalk.gray(`🔍 Debug tracing enabled (logs to ~/.stackmemory/traces/)`));
+      if (this.config.verboseTracing) {
+        console.log(chalk.gray(`   Verbose mode: capturing all execution details`));
+      }
+    }
 
     console.log();
     console.log(chalk.gray('Starting Claude...'));
@@ -369,6 +419,15 @@ class ClaudeSM {
         action: 'session_end',
         exitCode: code,
       });
+
+      // End tracing and show summary if enabled
+      if (this.config.tracingEnabled) {
+        const summary = trace.getExecutionSummary();
+        console.log();
+        console.log(chalk.gray('─'.repeat(42)));
+        console.log(chalk.blue('Debug Trace Summary:'));
+        console.log(chalk.gray(summary));
+      }
 
       // Offer to clean up worktree
       if (this.config.worktreePath) {
@@ -413,6 +472,8 @@ program
   .option('-b, --branch <name>', 'Specify branch name for worktree')
   .option('-t, --task <desc>', 'Task description for context')
   .option('--no-context', 'Disable StackMemory context integration')
+  .option('--no-trace', 'Disable debug tracing (enabled by default)')
+  .option('--verbose-trace', 'Enable verbose debug tracing with full details')
   .helpOption('-h, --help', 'Display help')
   .allowUnknownOption(true)
   .action(async (_options) => {

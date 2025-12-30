@@ -15,7 +15,7 @@ import {
 import { logger } from '../monitoring/logger.js';
 
 // Example class with tracing
-@TraceClass()
+// @TraceClass() - decorators not enabled in tsconfig
 class ExampleService {
   private data: Map<string, any> = new Map();
 
@@ -49,9 +49,10 @@ class ExampleService {
     });
   }
 
-  @Trace('function')
   cacheData(key: string, value: any): void {
-    this.data.set(key, value);
+    trace.traceSync('function', 'cacheData', { key, value }, () => {
+      this.data.set(key, value);
+    });
   }
 
   private delay(ms: number): Promise<void> {

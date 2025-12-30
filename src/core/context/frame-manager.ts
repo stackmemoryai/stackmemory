@@ -6,6 +6,7 @@
 import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../monitoring/logger.js';
+import { trace } from '../trace/index.js';
 import {
   DatabaseError,
   FrameError,
@@ -322,6 +323,15 @@ export class FrameManager {
     inputs?: Record<string, any>;
     parentFrameId?: string;
   }): string {
+    return trace.traceSync('function', 'FrameManager.createFrame', options, () => this._createFrame(options));
+  }
+
+  private _createFrame(options: {
+    type: FrameType;
+    name: string;
+    inputs?: Record<string, any>;
+    parentFrameId?: string;
+  }): string {
     const frameId = uuidv4();
     const parentFrameId = options.parentFrameId || this.getCurrentFrameId();
     const depth = parentFrameId ? this.getFrameDepth(parentFrameId) + 1 : 0;
@@ -398,6 +408,10 @@ export class FrameManager {
    * Close the current frame and generate digest
    */
   public closeFrame(frameId?: string, outputs?: Record<string, any>): void {
+    trace.traceSync('function', 'FrameManager.closeFrame', { frameId, outputs }, () => this._closeFrame(frameId, outputs));
+  }
+
+  private _closeFrame(frameId?: string, outputs?: Record<string, any>): void {
     const targetFrameId = frameId || this.getCurrentFrameId();
     if (!targetFrameId) {
       throw new FrameError(

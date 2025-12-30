@@ -139,14 +139,14 @@ function extractAPIContext(methodName: string, args: any[]): Record<string, any>
  */
 export function createTracedFetch(baseFetch = fetch): typeof fetch {
   return async function tracedFetch(
-    input: RequestInfo | URL,
+    input: string | URL | Request,
     init?: RequestInit
   ): Promise<Response> {
     const url = typeof input === 'string' ? input : input.toString();
     const method = init?.method || 'GET';
     
     // Mask sensitive headers
-    const headers = init?.headers ? { ...init.headers } : {};
+    const headers: any = init?.headers ? { ...init.headers } : {};
     if (headers.Authorization) {
       headers.Authorization = headers.Authorization.substring(0, 20) + '...[MASKED]';
     }

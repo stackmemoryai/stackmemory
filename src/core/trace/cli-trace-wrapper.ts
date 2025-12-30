@@ -10,7 +10,7 @@ import { logger } from '../monitoring/logger.js';
 export function wrapCommand(command: Command): Command {
   const originalAction = command.action.bind(command);
   
-  command.action(function(...args: any[]) {
+  command.action(async function(...args: any[]): Promise<void> {
     // Extract command path and options
     const commandPath = getCommandPath(command);
     const options = args[args.length - 1];
@@ -34,22 +34,10 @@ export function wrapCommand(command: Command): Command {
     logger.info(`CLI Command: ${commandPath}`, context);
     
     // Wrap the actual action with tracing
-    return trace.command(commandPath, context, async () => {
+    await trace.command(commandPath, context, async () => {
       try {
-        // Call the original action
-        const actionFn = originalAction.call(command, async function(...actionArgs: any[]) {
-          const handler = actionArgs[actionArgs.length - 1];
-          if (typeof handler === 'function') {
-            // This is the actual command handler
-            return trace.step('Command Handler Execution', async () => {
-              return handler(...actionArgs.slice(0, -1));
-            });
-          }
-          return handler;
-        });
-        
-        // Execute the wrapped action
-        const result = await actionFn(...args);
+        // Call the original action with wrapped handler
+        const result = await originalAction.apply(null, args as any);
         
         // Log successful completion
         logger.info(`CLI Command Completed: ${commandPath}`, {
@@ -60,8 +48,6 @@ export function wrapCommand(command: Command): Command {
         if (process.env.DEBUG_TRACE === 'true') {
           console.log(trace.getExecutionSummary());
         }
-        
-        return result;
       } catch (error) {
         // Enhanced error logging for CLI commands
         logger.error(`CLI Command Failed: ${commandPath}`, error as Error, context);

@@ -3,6 +3,8 @@
  * Central export for all tracing functionality
  */
 
+import type { TraceConfig } from './debug-trace.js';
+
 export {
   trace,
   TraceContext,
