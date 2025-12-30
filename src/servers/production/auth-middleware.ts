@@ -388,7 +388,7 @@ export class AuthMiddleware {
         });
       }
 
-      next();
+      return next();
     };
   };
 
@@ -416,7 +416,7 @@ export class AuthMiddleware {
       });
     }
 
-    next();
+    return next();
   };
 
   private extractApiKey(req: Request): string | null {

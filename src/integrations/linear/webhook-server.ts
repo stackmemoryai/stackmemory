@@ -95,13 +95,13 @@ export class LinearWebhookServer {
         this.eventQueue.push(payload);
         this.processQueue();
 
-        res.status(200).json({
+        return res.status(200).json({
           status: 'accepted',
           queued: true,
         });
       } catch (error) {
         this.logger.error('Webhook processing error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
       }
     });
 

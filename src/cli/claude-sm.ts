@@ -319,7 +319,7 @@ class ClaudeSM {
       process.env.STACKMEMORY_DEBUG = 'true';
       process.env.TRACE_OUTPUT = 'file'; // Write to file to not clutter Claude output
       process.env.TRACE_MASK_SENSITIVE = 'true'; // Always mask sensitive data
-      
+
       if (this.config.verboseTracing) {
         process.env.TRACE_VERBOSITY = 'full';
         process.env.TRACE_PARAMS = 'true';
@@ -330,19 +330,23 @@ class ClaudeSM {
         process.env.TRACE_PARAMS = 'true';
         process.env.TRACE_RESULTS = 'false';
       }
-      
+
       // Initialize the tracing system
       initializeTracing();
-      
+
       // Start tracing this Claude session
-      trace.command('claude-sm', {
-        instanceId: this.config.instanceId,
-        worktree: this.config.useWorktree,
-        sandbox: this.config.useSandbox,
-        task: this.config.task,
-      }, async () => {
-        // Session tracing will wrap the entire Claude execution
-      });
+      trace.command(
+        'claude-sm',
+        {
+          instanceId: this.config.instanceId,
+          worktree: this.config.useWorktree,
+          sandbox: this.config.useSandbox,
+          task: this.config.task,
+        },
+        async () => {
+          // Session tracing will wrap the entire Claude execution
+        }
+      );
     }
 
     // Show header
@@ -396,9 +400,13 @@ class ClaudeSM {
       console.log(chalk.yellow('🌐 Chrome automation enabled'));
     }
     if (this.config.tracingEnabled) {
-      console.log(chalk.gray(`🔍 Debug tracing enabled (logs to ~/.stackmemory/traces/)`));
+      console.log(
+        chalk.gray(`🔍 Debug tracing enabled (logs to ~/.stackmemory/traces/)`)
+      );
       if (this.config.verboseTracing) {
-        console.log(chalk.gray(`   Verbose mode: capturing all execution details`));
+        console.log(
+          chalk.gray(`   Verbose mode: capturing all execution details`)
+        );
       }
     }
 
