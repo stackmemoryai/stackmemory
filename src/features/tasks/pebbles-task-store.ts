@@ -17,6 +17,8 @@ import {
   createErrorHandler,
 } from '../../core/errors/index.js';
 import { retry, withTimeout } from '../../core/errors/recovery.js';
+import { StreamingJSONLParser } from '../../core/performance/streaming-jsonl-parser.js';
+import { ContextCache } from '../../core/performance/context-cache.js';
 
 export type TaskStatus =
   | 'pending'
@@ -78,6 +80,8 @@ export class PebblesTaskStore {
   private projectRoot: string;
   private tasksFile: string;
   private cacheFile: string;
+  private jsonlParser: StreamingJSONLParser;
+  private taskCache: ContextCache<PebblesTask>;
 
   constructor(projectRoot: string, db: Database.Database) {
     this.projectRoot = projectRoot;
@@ -92,8 +96,17 @@ export class PebblesTaskStore {
     this.tasksFile = join(stackmemoryDir, 'tasks.jsonl');
     this.cacheFile = join(stackmemoryDir, 'cache.db');
 
+    // Initialize performance optimizations
+    this.jsonlParser = new StreamingJSONLParser();
+    this.taskCache = new ContextCache<PebblesTask>({
+      maxSize: 10 * 1024 * 1024, // 10MB for tasks
+      maxItems: 1000,
+      defaultTTL: 3600000, // 1 hour
+    });
+
     this.initializeCache();
-    this.loadFromJSONL();
+    // Load existing tasks from JSONL synchronously
+    this.loadFromJSONLSync();
   }
 
   private initializeCache() {
@@ -139,7 +152,7 @@ export class PebblesTaskStore {
         operation: 'initializeCache',
         schema: 'task_cache',
       });
-      
+
       throw new DatabaseError(
         'Failed to initialize task cache schema',
         ErrorCode.DB_MIGRATION_FAILED,
@@ -154,9 +167,9 @@ export class PebblesTaskStore {
   }
 
   /**
-   * Load existing tasks from JSONL into SQLite cache
+   * Load existing tasks from JSONL into SQLite cache (optimized)
    */
-  private loadFromJSONL() {
+  private async loadFromJSONL() {
     if (!existsSync(this.tasksFile)) return;
 
     const errorHandler = createErrorHandler({
@@ -165,31 +178,52 @@ export class PebblesTaskStore {
     });
 
     try {
-      const content = readFileSync(this.tasksFile, 'utf-8');
-      const lines = content.split('\n').filter((line) => line.trim());
-
       let loaded = 0;
-      for (const line of lines) {
-        try {
-          const task = JSON.parse(line) as PebblesTask;
-          this.upsertToCache(task);
-          loaded++;
-        } catch (error) {
-          logger.warn('Failed to parse task line', { 
-            line: line.substring(0, 100), 
-            error: error instanceof Error ? error.message : String(error),
-            lineNumber: loaded + 1
-          });
+      let errors = 0;
+
+      // Use streaming parser for memory efficiency
+      for await (const batch of this.jsonlParser.parseStream<PebblesTask>(
+        this.tasksFile,
+        {
+          batchSize: 100,
+          filter: (obj) => obj.type && obj.id && obj.title, // Basic validation
+          onProgress: (count) => {
+            if (count % 500 === 0) {
+              logger.debug('Loading tasks progress', { loaded: count });
+            }
+          },
+        }
+      )) {
+        for (const task of batch) {
+          try {
+            this.upsertToCache(task);
+            // Add to in-memory cache for fast access
+            this.taskCache.set(task.id, task, {
+              ttl: 3600000, // 1 hour cache
+            });
+            loaded++;
+          } catch (error) {
+            errors++;
+            logger.warn('Failed to cache task', {
+              taskId: task.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
       }
 
-      logger.info('Loaded tasks from JSONL', { loaded, file: this.tasksFile });
+      logger.info('Loaded tasks from JSONL', {
+        loaded,
+        errors,
+        file: this.tasksFile,
+        cacheStats: this.taskCache.getStats(),
+      });
     } catch (error) {
       const systemError = errorHandler(error, {
         operation: 'loadFromJSONL',
         file: this.tasksFile,
       });
-      
+
       throw new SystemError(
         'Failed to load tasks from JSONL file',
         ErrorCode.INTERNAL_ERROR,
@@ -199,6 +233,50 @@ export class PebblesTaskStore {
         },
         error instanceof Error ? error : undefined
       );
+    }
+  }
+
+  /**
+   * Load existing tasks from JSONL synchronously (for constructor)
+   */
+  private loadFromJSONLSync() {
+    if (!existsSync(this.tasksFile)) return;
+
+    try {
+      const content = readFileSync(this.tasksFile, 'utf-8');
+      const lines = content.split('\n').filter((line) => line.trim());
+
+      let loaded = 0;
+      let errors = 0;
+
+      for (const line of lines) {
+        try {
+          const task = JSON.parse(line) as PebblesTask;
+
+          // Basic validation
+          if (task.type && task.id && task.title) {
+            this.upsertToCache(task);
+            // Add to in-memory cache for fast access
+            this.taskCache.set(task.id, task, {
+              ttl: 3600000, // 1 hour cache
+            });
+            loaded++;
+          }
+        } catch (error) {
+          errors++;
+          logger.warn('Failed to parse JSONL line', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      logger.info('Loaded tasks from JSONL', {
+        loaded,
+        errors,
+        file: this.tasksFile,
+      });
+    } catch (error) {
+      logger.error('Failed to load tasks from JSONL', error as Error);
     }
   }
 
@@ -321,7 +399,7 @@ export class PebblesTaskStore {
         }
       );
     }
-    
+
     if (!dependsOnTask) {
       throw new TaskError(
         `Dependency task not found: ${dependsOnId}`,
@@ -586,22 +664,17 @@ export class PebblesTaskStore {
       });
 
       // Update SQLite cache (for fast queries) with retry logic
-      retry(
-        () => Promise.resolve(this.upsertToCache(task)),
-        {
-          maxAttempts: 3,
-          initialDelay: 100,
-          onRetry: (attempt, error) => {
-            logger.warn(
-              `Retrying task cache upsert (attempt ${attempt})`,
-              {
-                taskId: task.id,
-                errorMessage: error instanceof Error ? error.message : String(error),
-              }
-            );
-          },
-        }
-      ).catch((error) => {
+      retry(() => Promise.resolve(this.upsertToCache(task)), {
+        maxAttempts: 3,
+        initialDelay: 100,
+        onRetry: (attempt, error) => {
+          logger.warn(`Retrying task cache upsert (attempt ${attempt})`, {
+            taskId: task.id,
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          });
+        },
+      }).catch((error) => {
         logger.error(
           'Failed to upsert task to cache after retries',
           error instanceof Error ? error : new Error(String(error)),
@@ -717,23 +790,26 @@ export class PebblesTaskStore {
   /**
    * Check if adding a dependency would create a circular dependency
    */
-  private wouldCreateCircularDependency(taskId: string, dependsOnId: string): boolean {
+  private wouldCreateCircularDependency(
+    taskId: string,
+    dependsOnId: string
+  ): boolean {
     const visited = new Set<string>();
     const stack = [dependsOnId];
 
     while (stack.length > 0) {
       const currentId = stack.pop()!;
-      
+
       if (currentId === taskId) {
         return true; // Found circular dependency
       }
-      
+
       if (visited.has(currentId)) {
         continue;
       }
-      
+
       visited.add(currentId);
-      
+
       // Get dependencies of current task
       const currentTask = this.getTask(currentId);
       if (currentTask) {

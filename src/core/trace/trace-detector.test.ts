@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TraceDetector } from './trace-detector';
-import { ToolCall, TraceType } from './types';
+import { TraceDetector } from './trace-detector.js';
+import { ToolCall, TraceType } from './types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 describe('TraceDetector', () => {
@@ -408,7 +408,7 @@ describe('TraceDetector', () => {
       // Search trace score is ~0.38, error recovery with causal chain is ~0.26
       const highImportance = detector.getHighImportanceTraces(0.25);
       expect(highImportance.length).toBeGreaterThan(0);
-      highImportance.forEach(trace => {
+      highImportance.forEach((trace) => {
         expect(trace.score).toBeGreaterThanOrEqual(0.25);
       });
     });

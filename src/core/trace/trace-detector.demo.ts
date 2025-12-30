@@ -2,8 +2,8 @@
  * Demo script to showcase Trace Detection functionality
  */
 
-import { TraceDetector } from './trace-detector';
-import { ToolCall } from './types';
+import { TraceDetector } from './trace-detector.js';
+import { ToolCall } from './types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Create a new trace detector

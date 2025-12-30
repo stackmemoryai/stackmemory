@@ -2,7 +2,9 @@
   "mcpServers": {
     "stackmemory-local": {
       "command": "node",
-      "args": ["/Users/jwu/Dev/stackmemory/dist/src/mcp/mcp-server.js"],
+      "args": [
+        "/Users/jwu/Dev/stackmemory/dist/src/mcp/stackmemory-mcp-server.js"
+      ],
       "env": {
         "STACKMEMORY_LOG_LEVEL": "INFO"
       }

@@ -25,6 +25,8 @@ import {
   RetrievalMetadata,
 } from './types.js';
 import { logger } from '../monitoring/logger.js';
+import { LazyContextLoader } from '../performance/lazy-context-loader.js';
+import { ContextCache } from '../performance/context-cache.js';
 
 /**
  * LLM provider interface for context analysis
@@ -255,6 +257,8 @@ export class LLMContextRetrieval {
   private llmProvider?: LLMProvider;
   private config: RetrievalConfig;
   private projectId: string;
+  private lazyLoader: LazyContextLoader;
+  private contextCache: ContextCache<RetrievedContext>;
 
   constructor(
     db: Database.Database,
@@ -276,10 +280,21 @@ export class LLMContextRetrieval {
     );
     this.queryParser = new QueryParser();
     this.heuristicAnalyzer = new HeuristicAnalyzer();
+    
+    // Initialize performance optimizations
+    this.lazyLoader = new LazyContextLoader(db, projectId);
+    this.contextCache = new ContextCache<RetrievedContext>({
+      maxSize: 50 * 1024 * 1024, // 50MB for context cache
+      maxItems: 100,
+      defaultTTL: 600000, // 10 minutes
+    });
+    
+    // Start cache cleanup
+    this.contextCache.startCleanup(60000);
   }
 
   /**
-   * Retrieve context based on query using LLM analysis
+   * Retrieve context based on query using LLM analysis (with caching)
    */
   public async retrieveContext(
     query: string,
@@ -291,6 +306,19 @@ export class LLMContextRetrieval {
   ): Promise<RetrievedContext> {
     const startTime = Date.now();
     const tokenBudget = options.tokenBudget || this.config.defaultTokenBudget;
+    
+    // Check cache first unless force refresh
+    if (!options.forceRefresh) {
+      const cacheKey = `${query}:${tokenBudget}:${JSON.stringify(options.hints || {})}`;
+      const cached = this.contextCache.get(cacheKey);
+      if (cached) {
+        logger.debug('Context cache hit', {
+          query: query.substring(0, 50),
+          cacheStats: this.contextCache.getStats(),
+        });
+        return cached;
+      }
+    }
 
     logger.info('Starting context retrieval', {
       projectId: this.projectId,
@@ -316,7 +344,7 @@ export class LLMContextRetrieval {
     });
 
     // 4. Retrieve frames based on analysis
-    const { frames, anchors, events, tokensUsed } = this.retrieveFrames(
+    const { frames, anchors, events, tokensUsed } = await this.retrieveFrames(
       analysis,
       tokenBudget
     );
@@ -340,7 +368,7 @@ export class LLMContextRetrieval {
       confidence: analysis.confidenceScore,
     });
 
-    return {
+    const result: RetrievedContext = {
       context,
       frames,
       anchors,
@@ -353,6 +381,16 @@ export class LLMContextRetrieval {
       },
       metadata,
     };
+    
+    // Cache the result
+    if (!options.forceRefresh) {
+      const cacheKey = `${query}:${tokenBudget}:${JSON.stringify(options.hints || {})}`;
+      this.contextCache.set(cacheKey, result, {
+        ttl: 600000, // 10 minutes
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -548,21 +586,28 @@ Respond with only the JSON object, no other text.`;
   }
 
   /**
-   * Retrieve frames based on analysis
+   * Retrieve frames based on analysis (with lazy loading)
    */
-  private retrieveFrames(
+  private async retrieveFrames(
     analysis: LLMAnalysisResponse,
     tokenBudget: number
-  ): {
+  ): Promise<{
     frames: Frame[];
     anchors: Anchor[];
     events: Event[];
     tokensUsed: number;
-  } {
+  }> {
     const frames: Frame[] = [];
     const anchors: Anchor[] = [];
     const events: Event[] = [];
     let tokensUsed = 0;
+
+    // Preload frames for better performance
+    const frameIds = analysis.framesToRetrieve.map(p => p.frameId);
+    await this.lazyLoader.preloadContext(frameIds, {
+      parallel: true,
+      depth: 2, // Load frames, anchors, and events
+    });
 
     // Retrieve frames in priority order within budget
     for (const plan of analysis.framesToRetrieve) {
@@ -574,24 +619,30 @@ Respond with only the JSON object, no other text.`;
         break;
       }
 
-      const frame = this.frameManager.getFrame(plan.frameId);
-      if (!frame) continue;
+      // Use lazy loader for efficient retrieval
+      try {
+        const frame = await this.lazyLoader.lazyFrame(plan.frameId).get();
+        frames.push(frame);
+        tokensUsed += 50; // Base frame tokens
 
-      frames.push(frame);
-      tokensUsed += 50; // Base frame tokens
+        // Include anchors if requested
+        if (plan.includeAnchors) {
+          const frameAnchors = await this.lazyLoader.lazyAnchors(plan.frameId).get();
+          anchors.push(...frameAnchors);
+          tokensUsed += frameAnchors.length * 40;
+        }
 
-      // Include anchors if requested
-      if (plan.includeAnchors) {
-        const frameAnchors = this.getFrameAnchors(plan.frameId);
-        anchors.push(...frameAnchors);
-        tokensUsed += frameAnchors.length * 40;
-      }
-
-      // Include events if requested
-      if (plan.includeEvents) {
-        const frameEvents = this.frameManager.getFrameEvents(plan.frameId, 10);
-        events.push(...frameEvents);
-        tokensUsed += frameEvents.length * 30;
+        // Include events if requested
+        if (plan.includeEvents) {
+          const frameEvents = await this.lazyLoader.lazyEvents(plan.frameId, 10).get();
+          events.push(...frameEvents);
+          tokensUsed += frameEvents.length * 30;
+        }
+      } catch (error) {
+        logger.warn('Failed to retrieve frame', {
+          frameId: plan.frameId,
+          error,
+        });
       }
     }
 
@@ -725,9 +776,15 @@ Respond with only the JSON object, no other text.`;
   }
 
   /**
-   * Clear caches
+   * Clear all caches
    */
   public clearCache(): void {
     this.summaryGenerator.clearCache();
+    this.lazyLoader.clearCache();
+    this.contextCache.clear();
+    logger.info('Cleared all caches', {
+      projectId: this.projectId,
+      cacheStats: this.contextCache.getStats(),
+    });
   }
 }

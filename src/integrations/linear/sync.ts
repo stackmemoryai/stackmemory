@@ -26,6 +26,8 @@ export interface SyncConfig {
     | 'manual'
     | 'newest_wins';
   syncInterval?: number; // minutes
+  maxBatchSize?: number; // max tasks to sync per batch
+  rateLimitDelay?: number; // ms delay between API calls
 }
 
 export interface SyncResult {
@@ -177,6 +179,13 @@ export class LinearSyncEngine {
   }
 
   /**
+   * Delay helper for rate limiting
+   */
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
    * Sync tasks from StackMemory to Linear
    */
   private async syncToLinear(): Promise<{
@@ -185,11 +194,22 @@ export class LinearSyncEngine {
     errors: string[];
   }> {
     const result = { created: 0, updated: 0, errors: [] as string[] };
+    const maxBatchSize = this.config.maxBatchSize || 10;
+    const rateLimitDelay = this.config.rateLimitDelay || 500;
 
     // Get unsynced tasks from StackMemory
     const unsyncedTasks = this.getUnsyncedTasks();
 
-    for (const task of unsyncedTasks) {
+    // Limit batch size to avoid rate limits
+    const tasksToSync = unsyncedTasks.slice(0, maxBatchSize);
+
+    if (unsyncedTasks.length > maxBatchSize) {
+      logger.info(
+        `Syncing ${tasksToSync.length} of ${unsyncedTasks.length} unsynced tasks (batch limit)`
+      );
+    }
+
+    for (const task of tasksToSync) {
       try {
         const linearIssue = await this.createLinearIssueFromTask(task);
 
@@ -212,8 +232,21 @@ export class LinearSyncEngine {
         logger.info(
           `Synced task to Linear: ${task.title} → ${linearIssue.identifier}`
         );
+
+        // Rate limit delay between creates
+        await this.delay(rateLimitDelay);
       } catch (error) {
-        result.errors.push(`Failed to sync task ${task.id}: ${String(error)}`);
+        const errorMsg = String(error);
+        // Stop syncing on rate limit errors
+        if (
+          errorMsg.includes('rate limit') ||
+          errorMsg.includes('usage limit')
+        ) {
+          logger.warn('Rate limit hit, stopping sync batch');
+          result.errors.push('Rate limit reached - sync paused');
+          break;
+        }
+        result.errors.push(`Failed to sync task ${task.id}: ${errorMsg}`);
         logger.error(
           `Failed to sync task ${task.id} to Linear:`,
           error as Error
@@ -751,4 +784,6 @@ export const DEFAULT_SYNC_CONFIG: SyncConfig = {
   autoSync: true,
   conflictResolution: 'newest_wins',
   syncInterval: 15, // minutes
+  maxBatchSize: 10, // max tasks per sync batch
+  rateLimitDelay: 500, // 500ms between API calls
 };

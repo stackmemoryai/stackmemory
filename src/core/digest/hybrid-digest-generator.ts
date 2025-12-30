@@ -27,9 +27,9 @@ import { logger } from '../monitoring/logger.js';
  * Generates 80% deterministic + 20% AI review for frames
  */
 export class HybridDigestGenerator {
-  private db: Database.Database;
-  private config: DigestConfig;
-  private llmProvider?: DigestLLMProvider;
+  protected db: Database.Database;
+  protected config: DigestConfig;
+  protected llmProvider?: DigestLLMProvider;
   private queue: DigestGenerationRequest[] = [];
   private processing: boolean = false;
   private idleTimer?: NodeJS.Timeout;

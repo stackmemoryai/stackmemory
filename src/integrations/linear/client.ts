@@ -47,9 +47,24 @@ export interface LinearCreateIssueInput {
   labelIds?: string[];
 }
 
+interface RateLimitState {
+  remaining: number;
+  resetAt: number;
+  retryAfter: number;
+}
+
 export class LinearClient {
   private config: LinearConfig;
   private baseUrl: string;
+  private rateLimitState: RateLimitState = {
+    remaining: 1500, // Linear's default limit
+    resetAt: Date.now() + 3600000,
+    retryAfter: 0,
+  };
+  private requestQueue: Array<() => Promise<void>> = [];
+  private isProcessingQueue = false;
+  private minRequestInterval = 100; // Minimum ms between requests
+  private lastRequestTime = 0;
 
   constructor(config: LinearConfig) {
     this.config = config;
@@ -61,12 +76,73 @@ export class LinearClient {
   }
 
   /**
-   * Execute GraphQL query against Linear API
+   * Wait for rate limit to reset if needed
+   */
+  private async waitForRateLimit(): Promise<void> {
+    const now = Date.now();
+
+    // Check if we're in a retry-after period
+    if (this.rateLimitState.retryAfter > now) {
+      const waitTime = this.rateLimitState.retryAfter - now;
+      logger.warn(`Rate limited, waiting ${Math.ceil(waitTime / 1000)}s`);
+      await this.sleep(waitTime);
+    }
+
+    // Check if we've exhausted our rate limit
+    if (this.rateLimitState.remaining <= 5) {
+      if (this.rateLimitState.resetAt > now) {
+        const waitTime = this.rateLimitState.resetAt - now;
+        logger.warn(
+          `Rate limit nearly exhausted, waiting ${Math.ceil(waitTime / 1000)}s for reset`
+        );
+        await this.sleep(Math.min(waitTime, 60000)); // Max 60s wait
+      }
+    }
+
+    // Ensure minimum interval between requests
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    if (timeSinceLastRequest < this.minRequestInterval) {
+      await this.sleep(this.minRequestInterval - timeSinceLastRequest);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Update rate limit state from response headers
+   */
+  private updateRateLimitState(response: Response): void {
+    const remaining = response.headers.get('x-ratelimit-remaining');
+    const reset = response.headers.get('x-ratelimit-reset');
+    const retryAfter = response.headers.get('retry-after');
+
+    if (remaining !== null) {
+      this.rateLimitState.remaining = parseInt(remaining, 10);
+    }
+    if (reset !== null) {
+      this.rateLimitState.resetAt = parseInt(reset, 10) * 1000;
+    }
+    if (retryAfter !== null) {
+      this.rateLimitState.retryAfter =
+        Date.now() + parseInt(retryAfter, 10) * 1000;
+    }
+  }
+
+  /**
+   * Execute GraphQL query against Linear API with rate limiting
    */
   private async graphql<T>(
     query: string,
-    variables?: Record<string, unknown>
+    variables?: Record<string, unknown>,
+    retries = 3
   ): Promise<T> {
+    // Wait for rate limit before making request
+    await this.waitForRateLimit();
+
+    this.lastRequestTime = Date.now();
+
     const response = await fetch(`${this.baseUrl}/graphql`, {
       method: 'POST',
       headers: {
@@ -78,6 +154,24 @@ export class LinearClient {
         variables,
       }),
     });
+
+    // Update rate limit state from response
+    this.updateRateLimitState(response);
+
+    // Handle rate limiting with exponential backoff
+    if (response.status === 429) {
+      if (retries > 0) {
+        const retryAfter = response.headers.get('retry-after');
+        const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
+        logger.warn(
+          `Rate limited (429), retrying in ${waitTime / 1000}s (${retries} retries left)`
+        );
+        this.rateLimitState.retryAfter = Date.now() + waitTime;
+        await this.sleep(waitTime);
+        return this.graphql<T>(query, variables, retries - 1);
+      }
+      throw new Error('Linear API rate limit exceeded after retries');
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -96,6 +190,23 @@ export class LinearClient {
     };
 
     if (result.errors) {
+      // Check for rate limit errors in GraphQL response
+      const rateLimitError = result.errors.find(
+        (e) =>
+          e.message.toLowerCase().includes('rate limit') ||
+          e.message.toLowerCase().includes('usage limit')
+      );
+
+      if (rateLimitError && retries > 0) {
+        const waitTime = 60000; // Default 60s wait for GraphQL rate limit errors
+        logger.warn(
+          `GraphQL rate limit error, retrying in ${waitTime / 1000}s (${retries} retries left)`
+        );
+        this.rateLimitState.retryAfter = Date.now() + waitTime;
+        await this.sleep(waitTime);
+        return this.graphql<T>(query, variables, retries - 1);
+      }
+
       logger.error('Linear GraphQL errors:', { errors: result.errors });
       throw new Error(`Linear GraphQL error: ${result.errors[0].message}`);
     }

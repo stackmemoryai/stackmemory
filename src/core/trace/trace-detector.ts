@@ -15,9 +15,9 @@ import {
   TraceScoringFactors,
   CompressedTrace,
   CompressionStrategy,
-} from './types';
-import { ConfigManager } from '../config/config-manager';
-import { TraceStore } from './trace-store';
+} from './types.js';
+import { ConfigManager } from '../config/config-manager.js';
+import { TraceStore } from './trace-store.js';
 import Database from 'better-sqlite3';
 
 export class TraceDetector {
