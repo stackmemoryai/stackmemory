@@ -21,6 +21,10 @@ import { LinearAuthManager, LinearOAuthSetup } from '../linear/auth.js';
 import { LinearSyncEngine, DEFAULT_SYNC_CONFIG } from '../linear/sync.js';
 import { logger } from '../../core/monitoring/logger.js';
 import { BrowserMCPIntegration } from '../../features/browser/browser-mcp.js';
+import { TraceDetector } from '../../core/trace/trace-detector.js';
+import { ToolCall, Trace } from '../../core/trace/types.js';
+import { LLMContextRetrieval } from '../../core/retrieval/index.js';
+import { v4 as uuidv4 } from 'uuid';
 
 // ============================================
 // Simple Local MCP Server
@@ -37,6 +41,8 @@ class LocalStackMemoryMCP {
   private projectId: string;
   private contexts: Map<string, any> = new Map();
   private browserMCP: BrowserMCPIntegration;
+  private traceDetector: TraceDetector;
+  private contextRetrieval: LLMContextRetrieval;
 
   constructor() {
     // Find project root (where .git is)
@@ -86,6 +92,16 @@ class LocalStackMemoryMCP {
       headless: process.env.BROWSER_HEADLESS !== 'false',
       defaultViewport: { width: 1280, height: 720 },
     });
+
+    // Initialize Trace Detector with database persistence
+    this.traceDetector = new TraceDetector({}, undefined, this.db);
+
+    // Initialize LLM Context Retrieval
+    this.contextRetrieval = new LLMContextRetrieval(
+      this.db,
+      this.frameManager,
+      this.projectId
+    );
 
     this.setupHandlers();
     this.loadInitialContext();
@@ -559,6 +575,107 @@ class LocalStackMemoryMCP {
                 properties: {},
               },
             },
+            {
+              name: 'get_traces',
+              description: 'Get detected traces (bundled tool call sequences)',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  type: {
+                    type: 'string',
+                    enum: [
+                      'search_driven',
+                      'error_recovery',
+                      'feature_implementation',
+                      'refactoring',
+                      'testing',
+                      'exploration',
+                      'debugging',
+                      'documentation',
+                      'build_deploy',
+                      'unknown',
+                    ],
+                    description: 'Filter by trace type',
+                  },
+                  minScore: {
+                    type: 'number',
+                    description: 'Minimum importance score (0-1)',
+                  },
+                  limit: {
+                    type: 'number',
+                    description: 'Maximum number of traces to return',
+                  },
+                },
+              },
+            },
+            {
+              name: 'get_trace_statistics',
+              description: 'Get statistics about detected traces',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+              },
+            },
+            {
+              name: 'flush_traces',
+              description: 'Flush any pending trace and finalize detection',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+              },
+            },
+            {
+              name: 'compress_old_traces',
+              description: 'Compress traces older than specified hours',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  ageHours: {
+                    type: 'number',
+                    description: 'Age threshold in hours (default: 24)',
+                  },
+                },
+              },
+            },
+            {
+              name: 'smart_context',
+              description:
+                'LLM-driven context retrieval - intelligently selects relevant frames based on query',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: {
+                    type: 'string',
+                    description:
+                      'Natural language query describing what context you need',
+                  },
+                  tokenBudget: {
+                    type: 'number',
+                    description:
+                      'Maximum tokens to use for context (default: 4000)',
+                  },
+                  forceRefresh: {
+                    type: 'boolean',
+                    description: 'Force refresh of cached summaries',
+                  },
+                },
+                required: ['query'],
+              },
+            },
+            {
+              name: 'get_summary',
+              description:
+                'Get compressed summary of project memory for analysis',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  forceRefresh: {
+                    type: 'boolean',
+                    description: 'Force refresh of cached summary',
+                  },
+                },
+              },
+            },
           ],
         };
       }
@@ -575,6 +692,8 @@ class LocalStackMemoryMCP {
       }),
       async (request) => {
         const { name, arguments: args } = request.params;
+        const callId = uuidv4();
+        const startTime = Date.now();
 
         // Log tool call event before execution
         const currentFrameId = this.frameManager.getCurrentFrameId();
@@ -582,9 +701,17 @@ class LocalStackMemoryMCP {
           this.frameManager.addEvent('tool_call', {
             tool_name: name,
             arguments: args,
-            timestamp: Date.now(),
+            timestamp: startTime,
           });
         }
+
+        // Create ToolCall for trace detection
+        const toolCall: ToolCall = {
+          id: callId,
+          tool: name,
+          arguments: args,
+          timestamp: startTime,
+        };
 
         let result;
         let error;
@@ -651,22 +778,71 @@ class LocalStackMemoryMCP {
               result = await this.handleLinearStatus(args);
               break;
 
+            case 'get_traces':
+              result = await this.handleGetTraces(args);
+              break;
+
+            case 'get_trace_statistics':
+              result = await this.handleGetTraceStatistics(args);
+              break;
+
+            case 'flush_traces':
+              result = await this.handleFlushTraces(args);
+              break;
+
+            case 'compress_old_traces':
+              result = await this.handleCompressOldTraces(args);
+              break;
+
+            case 'smart_context':
+              result = await this.handleSmartContext(args);
+              break;
+
+            case 'get_summary':
+              result = await this.handleGetSummary(args);
+              break;
+
             default:
               throw new Error(`Unknown tool: ${name}`);
           }
         } catch (err) {
-          error = err;
+          error = err instanceof Error ? err : new Error(String(err));
+          toolCall.error = error.message;
           throw err;
         } finally {
+          const endTime = Date.now();
+
           // Log tool result event after execution (success or failure)
-          if (currentFrameId) {
-            this.frameManager.addEvent('tool_result', {
-              tool_name: name,
-              success: !error,
-              result: error ? { error: (error as Error).message } : result,
-              timestamp: Date.now(),
-            });
+          // Skip for close_frame since the frame no longer exists after closing
+          if (currentFrameId && name !== 'close_frame') {
+            try {
+              this.frameManager.addEvent('tool_result', {
+                tool_name: name,
+                success: !error,
+                result: error ? { error: error.message } : result,
+                timestamp: endTime,
+              });
+            } catch {
+              // Frame may have been closed, ignore logging error
+            }
           }
+
+          // Update tool call with results and add to trace detector
+          toolCall.result = error ? undefined : result;
+          toolCall.duration = endTime - startTime;
+
+          // Extract files affected if available from result or args
+          if (args.file_path || args.path) {
+            toolCall.filesAffected = [args.file_path || args.path].filter(
+              Boolean
+            ) as string[];
+          } else if ((result as any)?.files) {
+            const files = (result as any).files;
+            toolCall.filesAffected = Array.isArray(files) ? files : [files];
+          }
+
+          // Add to trace detector
+          this.traceDetector.addToolCall(toolCall);
         }
 
         return result;
@@ -1422,6 +1598,240 @@ class LocalStackMemoryMCP {
           {
             type: 'text',
             text: `❌ Linear status check failed: ${error.message}`,
+          },
+        ],
+      };
+    }
+  }
+
+  private async handleGetTraces(args: any) {
+    const { type, minScore, limit = 20 } = args;
+
+    // Flush pending traces first
+    this.traceDetector.flush();
+
+    let traces = this.traceDetector.getTraces();
+
+    // Apply filters
+    if (type) {
+      traces = traces.filter((t) => t.type === type);
+    }
+
+    if (minScore !== undefined) {
+      traces = traces.filter((t) => t.score >= minScore);
+    }
+
+    // Sort by score and limit
+    traces = traces.sort((a, b) => b.score - a.score).slice(0, limit);
+
+    // Format traces for display
+    const formattedTraces = traces.map((trace) => ({
+      id: trace.id,
+      type: trace.type,
+      score: trace.score.toFixed(2),
+      summary: trace.summary,
+      toolCount: trace.tools.length,
+      duration: `${((trace.metadata.endTime - trace.metadata.startTime) / 1000).toFixed(1)}s`,
+      filesModified: trace.metadata.filesModified.length,
+      hasErrors: trace.metadata.errorsEncountered.length > 0,
+      compressed: !!trace.compressed,
+    }));
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Found ${formattedTraces.length} traces:\n\n${formattedTraces
+            .map(
+              (t) =>
+                `[${t.type}] Score: ${t.score} | Tools: ${t.toolCount} | Duration: ${t.duration}\n  ${t.summary}`
+            )
+            .join('\n\n')}`,
+        },
+      ],
+    };
+  }
+
+  private async handleGetTraceStatistics(args: any) {
+    this.traceDetector.flush();
+    const stats = this.traceDetector.getStatistics();
+
+    const typeBreakdown = Object.entries(stats.tracesByType)
+      .map(([type, count]) => `  ${type}: ${count}`)
+      .join('\n');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `**Trace Statistics**\n\nTotal Traces: ${stats.totalTraces}
+Average Score: ${stats.averageScore.toFixed(2)}
+Average Length: ${stats.averageLength.toFixed(1)} tools
+High Importance (>0.7): ${stats.highImportanceCount}
+Compressed: ${stats.compressedCount}
+
+**Trace Types:**
+${typeBreakdown}`,
+        },
+      ],
+    };
+  }
+
+  private async handleFlushTraces(args: any) {
+    this.traceDetector.flush();
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Pending traces have been flushed and finalized.',
+        },
+      ],
+    };
+  }
+
+  private async handleCompressOldTraces(args: any) {
+    const { ageHours = 24 } = args;
+
+    const compressedCount = this.traceDetector.compressOldTraces(ageHours);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Compressed ${compressedCount} traces older than ${ageHours} hours.`,
+        },
+      ],
+    };
+  }
+
+  private async handleSmartContext(args: any) {
+    const { query, tokenBudget = 4000, forceRefresh = false } = args;
+
+    try {
+      const result = await this.contextRetrieval.retrieveContext(query, {
+        tokenBudget,
+        forceRefresh,
+      });
+
+      // Log the retrieval
+      const currentFrameId = this.frameManager.getCurrentFrameId();
+      if (currentFrameId) {
+        this.frameManager.addEvent('observation', {
+          action: 'smart_context',
+          query,
+          framesRetrieved: result.frames.length,
+          tokenUsage: result.tokenUsage,
+          confidence: result.analysis.confidenceScore,
+        });
+      }
+
+      // Build response with metadata
+      let response = result.context;
+      response += `\n\n---\n📊 **Retrieval Stats**\n`;
+      response += `- Frames included: ${result.frames.length}\n`;
+      response += `- Tokens used: ${result.tokenUsage.used}/${result.tokenUsage.budget}\n`;
+      response += `- Confidence: ${(result.analysis.confidenceScore * 100).toFixed(0)}%\n`;
+      response += `- Time: ${result.metadata.retrievalTimeMs}ms`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: response,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Context retrieval failed: ${error.message}`,
+          },
+        ],
+      };
+    }
+  }
+
+  private async handleGetSummary(args: any) {
+    const { forceRefresh = false } = args;
+
+    try {
+      const summary = this.contextRetrieval.getSummary(forceRefresh);
+
+      // Format the summary for display
+      let response = '📋 **Compressed Memory Summary**\n\n';
+
+      // Recent session
+      response += '## Recent Session\n';
+      response += `- Frames: ${summary.recentSession.frames.length}\n`;
+      response += `- Time range: ${new Date(summary.recentSession.timeRange.start).toLocaleString()} - ${new Date(summary.recentSession.timeRange.end).toLocaleString()}\n`;
+
+      if (summary.recentSession.dominantOperations.length > 0) {
+        response += `- Dominant ops: ${summary.recentSession.dominantOperations
+          .slice(0, 5)
+          .map((o) => `${o.operation}(${o.count})`)
+          .join(', ')}\n`;
+      }
+
+      if (summary.recentSession.filesTouched.length > 0) {
+        response += `- Files touched: ${summary.recentSession.filesTouched
+          .slice(0, 5)
+          .map((f) => f.path)
+          .join(', ')}\n`;
+      }
+
+      if (summary.recentSession.errorsEncountered.length > 0) {
+        response += `- Errors: ${summary.recentSession.errorsEncountered.length}\n`;
+      }
+
+      // Historical patterns
+      response += '\n## Historical Patterns\n';
+      response += `- Topic counts: ${Object.keys(summary.historicalPatterns.topicFrameCounts).length} topics\n`;
+
+      if (summary.historicalPatterns.keyDecisions.length > 0) {
+        response += `\n### Key Decisions (${summary.historicalPatterns.keyDecisions.length})\n`;
+        summary.historicalPatterns.keyDecisions.slice(0, 5).forEach((d) => {
+          response += `- ${d.text.substring(0, 80)}${d.text.length > 80 ? '...' : ''}\n`;
+        });
+      }
+
+      if (summary.historicalPatterns.recurringIssues.length > 0) {
+        response += `\n### Recurring Issues (${summary.historicalPatterns.recurringIssues.length})\n`;
+        summary.historicalPatterns.recurringIssues.slice(0, 3).forEach((i) => {
+          response += `- ${i.issueType} (${i.occurrenceCount} times)\n`;
+        });
+      }
+
+      // Queryable indices
+      response += '\n## Available Indices\n';
+      response += `- By time: ${Object.keys(summary.queryableIndices.byTimeframe).length} periods\n`;
+      response += `- By file: ${Object.keys(summary.queryableIndices.byFile).length} files\n`;
+      response += `- By topic: ${Object.keys(summary.queryableIndices.byTopic).length} topics\n`;
+      response += `- By error: ${Object.keys(summary.queryableIndices.byErrorType).length} error types\n`;
+
+      // Stats
+      response += `\n## Stats\n`;
+      response += `- Total frames: ${summary.stats.totalFrames}\n`;
+      response += `- Total anchors: ${summary.stats.totalAnchors}\n`;
+      response += `- Total events: ${summary.stats.totalEvents}\n`;
+      response += `- Generated: ${new Date(summary.generatedAt).toLocaleString()}`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: response,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Failed to get summary: ${error.message}`,
           },
         ],
       };

@@ -1,9 +1,22 @@
-import { LinearClient } from './client.js';
+import { LinearClient, LinearIssue, LinearCreateIssueInput } from './client.js';
 import { ContextService } from '../../services/context-service.js';
 import { ConfigService } from '../../services/config-service.js';
 import { Logger } from '../../utils/logger.js';
 import { Task, TaskStatus, TaskPriority } from '../../types/task.js';
-import chalk from 'chalk';
+
+// Minimal issue data needed for sync (webhook payloads may have fewer fields)
+export interface LinearIssueData {
+  id: string;
+  identifier: string;
+  title: string;
+  description?: string;
+  state: { id?: string; name?: string; type: string };
+  priority?: number;
+  assignee?: { id: string; name: string };
+  labels?: Array<{ name: string }>;
+  url?: string;
+  updatedAt: string;
+}
 
 export interface SyncResult {
   created: number;
@@ -23,12 +36,12 @@ export class LinearSyncService {
     this.logger = new Logger('LinearSync');
     this.configService = new ConfigService();
     this.contextService = new ContextService();
-    
+
     const apiKey = process.env.LINEAR_API_KEY;
     if (!apiKey) {
       throw new Error('LINEAR_API_KEY environment variable not set');
     }
-    
+
     this.linearClient = new LinearClient({ apiKey });
   }
 
@@ -44,37 +57,46 @@ export class LinearSyncService {
     try {
       const config = await this.configService.getConfig();
       const teamId = config.integrations?.linear?.teamId;
-      
+
       if (!teamId) {
         throw new Error('Linear team ID not configured');
       }
 
       const issues = await this.linearClient.getIssues({ teamId });
-      
+
       for (const issue of issues) {
         try {
           const synced = await this.syncIssueToLocal(issue);
           if (synced === 'created') result.created++;
           else if (synced === 'updated') result.updated++;
-        } catch (error: any) {
-          result.errors.push(`Failed to sync ${issue.identifier}: ${error.message}`);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          result.errors.push(`Failed to sync ${issue.identifier}: ${message}`);
         }
       }
 
-      this.logger.info(`Sync complete: ${result.created} created, ${result.updated} updated`);
-    } catch (error: any) {
+      this.logger.info(
+        `Sync complete: ${result.created} created, ${result.updated} updated`
+      );
+    } catch (error) {
       this.logger.error('Sync failed:', error);
-      result.errors.push(error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      result.errors.push(message);
     }
 
     return result;
   }
 
-  public async syncIssueToLocal(issue: any): Promise<'created' | 'updated' | 'skipped'> {
+  public async syncIssueToLocal(
+    issue: LinearIssueData
+  ): Promise<'created' | 'updated' | 'skipped'> {
     try {
       const task = this.convertIssueToTask(issue);
-      const existingTask = await this.contextService.getTaskByExternalId(issue.id);
-      
+      const existingTask = await this.contextService.getTaskByExternalId(
+        issue.id
+      );
+
       if (existingTask) {
         if (this.hasChanges(existingTask, task)) {
           await this.contextService.updateTask(existingTask.id, task);
@@ -100,15 +122,30 @@ export class LinearSyncService {
         throw new Error(`Task ${taskId} not found`);
       }
 
-      const issueData = this.convertTaskToIssueData(task);
-      
       if (task.externalId) {
-        const updated = await this.linearClient.updateIssue(task.externalId, issueData);
+        const updateData = this.convertTaskToUpdateData(task);
+        const updated = await this.linearClient.updateIssue(
+          task.externalId,
+          updateData
+        );
         this.logger.debug(`Updated Linear issue: ${updated.identifier}`);
         return updated;
       } else {
-        const created = await this.linearClient.createIssue(issueData);
-        await this.contextService.updateTask(taskId, { externalId: created.id });
+        const config = await this.configService.getConfig();
+        const teamId = config.integrations?.linear?.teamId;
+        if (!teamId) {
+          throw new Error('Linear team ID not configured');
+        }
+        const createData: LinearCreateIssueInput = {
+          title: task.title,
+          description: task.description,
+          teamId,
+          priority: this.mapTaskPriorityToLinearPriority(task.priority),
+        };
+        const created = await this.linearClient.createIssue(createData);
+        await this.contextService.updateTask(taskId, {
+          externalId: created.id,
+        });
         this.logger.debug(`Created Linear issue: ${created.identifier}`);
         return created;
       }
@@ -121,8 +158,8 @@ export class LinearSyncService {
   public async removeLocalIssue(identifier: string): Promise<void> {
     try {
       const tasks = await this.contextService.getAllTasks();
-      const task = tasks.find(t => t.externalIdentifier === identifier);
-      
+      const task = tasks.find((t) => t.externalIdentifier === identifier);
+
       if (task) {
         await this.contextService.deleteTask(task.id);
         this.logger.debug(`Removed local task: ${identifier}`);
@@ -133,7 +170,7 @@ export class LinearSyncService {
     }
   }
 
-  private convertIssueToTask(issue: any): Partial<Task> {
+  private convertIssueToTask(issue: LinearIssueData): Partial<Task> {
     return {
       title: issue.title,
       description: issue.description || '',
@@ -142,31 +179,27 @@ export class LinearSyncService {
       externalId: issue.id,
       externalIdentifier: issue.identifier,
       externalUrl: issue.url,
-      tags: issue.labels?.map((l: any) => l.name) || [],
+      tags: issue.labels?.map((l) => l.name) || [],
       metadata: {
         linear: {
-          teamId: issue.team.id,
-          teamKey: issue.team.key,
           stateId: issue.state.id,
           stateName: issue.state.name,
-          projectId: issue.project?.id,
-          projectName: issue.project?.name,
           assigneeId: issue.assignee?.id,
           assigneeName: issue.assignee?.name,
-        }
+        },
       },
       updatedAt: new Date(issue.updatedAt),
     };
   }
 
-  private convertTaskToIssueData(task: Task): any {
+  private convertTaskToUpdateData(
+    task: Task
+  ): Partial<LinearCreateIssueInput> & { stateId?: string } {
     return {
       title: task.title,
       description: task.description,
       priority: this.mapTaskPriorityToLinearPriority(task.priority),
-      stateId: task.metadata?.linear?.stateId,
-      projectId: task.metadata?.linear?.projectId,
-      assigneeId: task.metadata?.linear?.assigneeId,
+      stateId: task.metadata?.linear?.stateId as string | undefined,
     };
   }
 
@@ -194,21 +227,33 @@ export class LinearSyncService {
 
   private mapTaskPriorityToLinearPriority(priority?: TaskPriority): number {
     switch (priority) {
-      case 'urgent': return 1;
-      case 'high': return 2;
-      case 'medium': return 3;
-      case 'low': return 4;
-      default: return 0;
+      case 'urgent':
+        return 1;
+      case 'high':
+        return 2;
+      case 'medium':
+        return 3;
+      case 'low':
+        return 4;
+      default:
+        return 0;
     }
   }
 
-  private mapLinearPriorityToTaskPriority(priority?: number): TaskPriority | undefined {
+  private mapLinearPriorityToTaskPriority(
+    priority?: number
+  ): TaskPriority | undefined {
     switch (priority) {
-      case 1: return 'urgent';
-      case 2: return 'high';
-      case 3: return 'medium';
-      case 4: return 'low';
-      default: return undefined;
+      case 1:
+        return 'urgent';
+      case 2:
+        return 'high';
+      case 3:
+        return 'medium';
+      case 4:
+        return 'low';
+      default:
+        return undefined;
     }
   }
 

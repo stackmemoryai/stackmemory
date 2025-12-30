@@ -3,18 +3,11 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "node",
-    "lib": [
-      "ES2022"
-    ],
-    "types": [
-      "vitest/globals"
-    ],
+    "lib": ["ES2022"],
+    "types": ["vitest/globals"],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": false,
@@ -29,10 +22,7 @@
     "sourceMap": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": [
-    "src/**/*",
-    "scripts/**/*"
-  ],
+  "include": ["src/**/*", "scripts/**/*"],
   "exclude": [
     "node_modules",
     "dist",

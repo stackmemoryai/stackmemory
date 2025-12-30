@@ -1,0 +1,29 @@
+# Claude-SM Pre-commit Configuration
+# Edit these settings to customize behavior
+
+# Enable/disable features
+CLAUDE_REVIEW_ENABLED=true      # Code review for security/bugs
+CLAUDE_REFACTOR_ENABLED=true    # Refactoring suggestions
+CLAUDE_TEST_ENABLED=true        # Edge case test generation
+CLAUDE_AUTO_FIX=false           # Auto-apply fixes (dangerous!)
+
+# Size limits
+MAX_FILE_SIZE=100000            # Max size per file (100KB)
+MAX_TOTAL_SIZE=500000           # Max total size (500KB)
+
+# Claude CLI settings
+CLAUDE_MODEL=claude-3-opus      # Model to use
+CLAUDE_MAX_TOKENS=4000          # Max tokens per request
+
+# File patterns to check (regex)
+INCLUDE_PATTERNS='\\.(js|ts|jsx|tsx|py|go|rs|java)$'
+EXCLUDE_PATTERNS='(node_modules|dist|build|vendor)/'
+
+# Severity thresholds
+BLOCK_ON_CRITICAL=true          # Block commit on critical issues
+WARN_ON_MEDIUM=true             # Show warnings for medium issues
+SUGGEST_IMPROVEMENTS=true        # Show improvement suggestions
+
+# StackMemory integration
+USE_STACKMEMORY=true            # Use SM for context
+SAVE_REVIEW_HISTORY=true        # Save reviews to SM

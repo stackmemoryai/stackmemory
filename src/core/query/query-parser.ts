@@ -52,6 +52,14 @@ export interface StackMemoryQuery {
   output?: OutputControl;
 }
 
+export interface QueryResponse {
+  original: string;
+  interpreted: StackMemoryQuery;
+  expanded: StackMemoryQuery;
+  suggestions?: string[];
+  validationErrors?: string[];
+}
+
 export enum FrameType {
   TASK = 'task',
   DEBUG = 'debug',
@@ -322,5 +330,155 @@ export class QueryParser {
     }
 
     return query;
+  }
+
+  /**
+   * Main parse method that returns a complete QueryResponse
+   */
+  parse(query: string | StackMemoryQuery): QueryResponse {
+    const original = typeof query === 'string' ? query : JSON.stringify(query);
+
+    // Parse based on input type (clone to avoid mutation)
+    const interpreted =
+      typeof query === 'string'
+        ? this.parseNaturalLanguage(query)
+        : this.parseStructured(JSON.parse(JSON.stringify(query)));
+
+    // Validate the query
+    const validationErrors = this.validateQuery(interpreted);
+
+    // Expand with synonyms
+    const expanded = this.expandQuery(JSON.parse(JSON.stringify(interpreted)));
+
+    // Generate suggestions
+    const suggestions = this.generateSuggestions(interpreted, validationErrors);
+
+    return {
+      original,
+      interpreted,
+      expanded,
+      suggestions,
+      validationErrors:
+        validationErrors.length > 0 ? validationErrors : undefined,
+    };
+  }
+
+  /**
+   * Validate query for errors and inconsistencies
+   */
+  private validateQuery(query: StackMemoryQuery): string[] {
+    const errors: string[] = [];
+
+    // Validate time filters
+    if (query.time) {
+      if (query.time.since && query.time.until) {
+        if (query.time.since > query.time.until) {
+          errors.push('Time filter: "since" date is after "until" date');
+        }
+      }
+      if (query.time.between) {
+        if (query.time.between[0] > query.time.between[1]) {
+          errors.push('Time filter: Invalid date range in "between"');
+        }
+      }
+    }
+
+    // Validate score ranges
+    if (query.frame?.score) {
+      if (
+        query.frame.score.min !== undefined &&
+        query.frame.score.max !== undefined
+      ) {
+        if (query.frame.score.min > query.frame.score.max) {
+          errors.push(
+            'Frame filter: Minimum score is greater than maximum score'
+          );
+        }
+      }
+    }
+
+    // Validate depth ranges
+    if (query.frame?.depth) {
+      if (
+        query.frame.depth.min !== undefined &&
+        query.frame.depth.max !== undefined
+      ) {
+        if (query.frame.depth.min > query.frame.depth.max) {
+          errors.push(
+            'Frame filter: Minimum depth is greater than maximum depth'
+          );
+        }
+      }
+    }
+
+    // Validate output limit
+    if (query.output?.limit !== undefined) {
+      if (query.output.limit < 1 || query.output.limit > 1000) {
+        errors.push('Output limit must be between 1 and 1000');
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Generate query suggestions based on the interpreted query
+   */
+  private generateSuggestions(
+    query: StackMemoryQuery,
+    errors: string[]
+  ): string[] {
+    const suggestions: string[] = [];
+
+    // If no time filter, suggest adding one
+    if (!query.time) {
+      suggestions.push('Try adding a time filter like "last 24h" or "today"');
+    }
+
+    // If very broad query, suggest refinement
+    if (!query.content?.topic && !query.frame?.type && !query.people) {
+      suggestions.push(
+        'Consider filtering by topic, frame type, or people to narrow results'
+      );
+    }
+
+    // If searching for bugs/errors without time limit
+    if (query.frame?.type?.includes(FrameType.BUG) && !query.time) {
+      suggestions.push('Add a time filter to focus on recent bugs');
+    }
+
+    // If high score threshold without type filter
+    if (
+      query.frame?.score?.min &&
+      query.frame.score.min >= 0.8 &&
+      !query.frame?.type
+    ) {
+      suggestions.push(
+        'Consider adding frame type filter with high score threshold'
+      );
+    }
+
+    // Suggest shortcuts if applicable
+    if (query.time?.last === '24h') {
+      suggestions.push('You can use "today" as a shortcut for last 24 hours');
+    }
+
+    if (
+      query.frame?.type?.includes(FrameType.BUG) &&
+      query.frame?.type?.includes(FrameType.DEBUG)
+    ) {
+      suggestions.push(
+        'You can use "bugs" as a shortcut for bug and debug frames'
+      );
+    }
+
+    // If there are errors, suggest corrections
+    if (errors.length > 0) {
+      suggestions.push(
+        'Please correct the validation errors before running the query'
+      );
+    }
+
+    return suggestions;
   }
 }

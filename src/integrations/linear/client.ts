@@ -63,7 +63,10 @@ export class LinearClient {
   /**
    * Execute GraphQL query against Linear API
    */
-  private async graphql<T>(query: string, variables?: any): Promise<T> {
+  private async graphql<T>(
+    query: string,
+    variables?: Record<string, unknown>
+  ): Promise<T> {
     const response = await fetch(`${this.baseUrl}/graphql`, {
       method: 'POST',
       headers: {
@@ -93,7 +96,7 @@ export class LinearClient {
     };
 
     if (result.errors) {
-      logger.error('Linear GraphQL errors:', result.errors as any);
+      logger.error('Linear GraphQL errors:', { errors: result.errors });
       throw new Error(`Linear GraphQL error: ${result.errors[0].message}`);
     }
 
@@ -510,7 +513,7 @@ export class LinearClient {
       }
     `;
 
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
 
     if (options?.teamId) {
       filter.team = { id: { eq: options.teamId } };

@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryParser, FrameType, FrameStatus } from '../query-parser';
+import {
+  QueryParser,
+  FrameType,
+  FrameStatus,
+  QueryResponse,
+} from '../query-parser';
 
 describe('QueryParser', () => {
   let parser: QueryParser;
@@ -199,6 +204,160 @@ describe('QueryParser', () => {
 
       expect(query.content?.topic).toContain('custom-topic');
       expect(query.content?.topic?.length).toBe(1);
+    });
+  });
+
+  describe('parse (QueryResponse)', () => {
+    it('should return complete QueryResponse for natural language query', () => {
+      const response = parser.parse('find authentication bugs from last week');
+
+      expect(response.original).toBe('find authentication bugs from last week');
+      expect(response.interpreted).toBeDefined();
+      expect(response.interpreted.time?.last).toBe('1w');
+      expect(response.interpreted.content?.topic).toContain('authentication');
+      expect(response.interpreted.content?.topic).toContain('bug');
+
+      expect(response.expanded).toBeDefined();
+      expect(response.expanded.content?.topic).toContain('authentication');
+      expect(response.expanded.content?.topic).toContain('auth');
+      expect(response.expanded.content?.topic).toContain('oauth');
+      expect(response.expanded.content?.topic).toContain('login');
+
+      expect(response.suggestions).toBeDefined();
+      expect(response.validationErrors).toBeUndefined();
+    });
+
+    it('should return QueryResponse for structured query', () => {
+      const structuredQuery = {
+        time: { last: '24h' },
+        content: { topic: ['database'] },
+        output: { limit: 10 },
+      };
+
+      const response = parser.parse(structuredQuery);
+
+      expect(response.original).toBe(JSON.stringify(structuredQuery));
+      expect(response.interpreted).toMatchObject(structuredQuery);
+      expect(response.expanded.content?.topic).toContain('database');
+      expect(response.expanded.content?.topic).toContain('db');
+      expect(response.expanded.content?.topic).toContain('sql');
+
+      expect(response.suggestions).toBeDefined();
+      expect(response.suggestions?.length).toBeGreaterThan(0);
+    });
+
+    it('should detect and return validation errors', () => {
+      const invalidQuery = {
+        time: {
+          since: new Date('2024-12-25'),
+          until: new Date('2024-12-20'),
+        },
+        frame: {
+          score: { min: 0.9, max: 0.5 },
+        },
+        output: { limit: 5000 },
+      };
+
+      const response = parser.parse(invalidQuery);
+
+      expect(response.validationErrors).toBeDefined();
+      expect(response.validationErrors).toContain(
+        'Time filter: "since" date is after "until" date'
+      );
+      expect(response.validationErrors).toContain(
+        'Frame filter: Minimum score is greater than maximum score'
+      );
+      expect(response.validationErrors).toContain(
+        'Output limit must be between 1 and 1000'
+      );
+
+      expect(response.suggestions).toContain(
+        'Please correct the validation errors before running the query'
+      );
+    });
+
+    it('should provide helpful suggestions for broad queries', () => {
+      const response = parser.parse('show me everything');
+
+      expect(response.suggestions).toBeDefined();
+      expect(response.suggestions).toContain(
+        'Try adding a time filter like "last 24h" or "today"'
+      );
+      expect(response.suggestions).toContain(
+        'Consider filtering by topic, frame type, or people to narrow results'
+      );
+    });
+
+    it('should suggest shortcuts when applicable', () => {
+      const response1 = parser.parse({ time: { last: '24h' } });
+      expect(response1.suggestions).toContain(
+        'You can use "today" as a shortcut for last 24 hours'
+      );
+
+      const response2 = parser.parse({
+        frame: { type: [FrameType.BUG, FrameType.DEBUG] },
+      });
+      expect(response2.suggestions).toContain(
+        'You can use "bugs" as a shortcut for bug and debug frames'
+      );
+    });
+
+    it('should handle complex natural language queries', () => {
+      const response = parser.parse(
+        "@alice's critical authentication work from yesterday"
+      );
+
+      expect(response.interpreted.people?.owner).toContain('alice');
+      expect(response.interpreted.frame?.score?.min).toBe(0.8);
+      expect(response.interpreted.content?.topic).toContain('authentication');
+      expect(response.interpreted.time?.last).toBe('48h');
+
+      expect(response.expanded.content?.topic).toContain('auth');
+      expect(response.expanded.content?.topic).toContain('oauth');
+      expect(response.expanded.content?.topic).toContain('login');
+    });
+
+    it('should preserve original query in response', () => {
+      const nlQuery = 'find all bugs today';
+      const response1 = parser.parse(nlQuery);
+      expect(response1.original).toBe(nlQuery);
+
+      const structQuery = {
+        time: { last: '1d' },
+        frame: { type: [FrameType.BUG] },
+      };
+      const response2 = parser.parse(structQuery);
+      // Original should be the input as provided, before any processing
+      expect(response2.original).toBe(JSON.stringify(structQuery));
+      // Interpreted should have defaults added
+      expect(response2.interpreted.output).toBeDefined();
+      expect(response2.interpreted.output?.limit).toBe(50);
+    });
+
+    it('should handle queries with file patterns', () => {
+      const response = parser.parse(
+        'show changes to *.ts and auth.js files today'
+      );
+
+      expect(response.interpreted.content?.files).toContain('*.ts');
+      expect(response.interpreted.content?.files).toContain('auth.js');
+      expect(response.interpreted.time?.last).toBe('24h');
+    });
+
+    it('should suggest time filter for bug searches without time limit', () => {
+      const response = parser.parse({ frame: { type: [FrameType.BUG] } });
+
+      expect(response.suggestions).toContain(
+        'Add a time filter to focus on recent bugs'
+      );
+    });
+
+    it('should suggest frame type with high score threshold', () => {
+      const response = parser.parse({ frame: { score: { min: 0.85 } } });
+
+      expect(response.suggestions).toContain(
+        'Consider adding frame type filter with high score threshold'
+      );
     });
   });
 });

@@ -1,49 +1,80 @@
-# Release Notes - v0.2.6
+# Release Notes - v0.2.8
 
-## 📁 Major Folder Reorganization
+## LLM-Driven Context Retrieval System (STA-95)
 
-### New Structure
-- **`src/core/`** - Core business logic (context, projects, monitoring, utils)
-- **`src/features/`** - Feature modules (analytics, tasks, browser)
-- **`src/integrations/`** - External integrations (Linear, MCP)
-- **`src/cli/`** - CLI application with organized commands
-- **`src/servers/`** - Server implementations (Railway, production)
+This release introduces intelligent context retrieval that uses LLM analysis to select the most relevant frames for any query.
 
-### Key Improvements
-- ✅ Clearer separation of concerns
-- ✅ Better code organization and maintainability
-- ✅ Consistent structure throughout codebase
-- ✅ Easier navigation and discovery
+### New Features
 
-### Migration
-- All imports have been updated automatically
-- No breaking changes for API consumers
-- Backward compatibility maintained
+#### Smart Context Retrieval (`smart_context` MCP tool)
 
-### New Dependencies
-- Added production-ready auth dependencies:
-  - `jwks-rsa` - JWT key verification
-  - `rate-limiter-flexible` - Rate limiting
-  - `ioredis` - Redis client for caching
+- **Natural language queries**: Ask for context in plain English
+- **LLM-driven analysis**: Intelligently selects relevant frames based on query semantics
+- **Token budget management**: Stays within specified token limits
+- **Auditable reasoning**: Every retrieval decision is explained
+- **Heuristic fallback**: Works even without LLM provider
 
-## 🚀 What's Next
-This reorganization sets the foundation for:
-- Better testing structure
-- Easier feature additions
-- Cleaner plugin architecture
-- Improved developer experience
+#### Compressed Memory Summary (`get_summary` MCP tool)
 
-## 📦 Installation
-```bash
-npm install -g @stackmemoryai/stackmemory@0.2.6
+- **Recent session summary**: Frames, operations, files touched, errors
+- **Historical patterns**: Topic counts, key decisions, recurring issues
+- **Queryable indices**: By error, time, contributor, topic, file
+- **Summary statistics**: Frame counts, event counts, anchor totals
+
+### Architecture
+
+```
+context_retrieval:
+  compressed_summary:
+    recent_session: frames, operations, files, errors
+    historical_patterns: topic counts, key decisions, recurring issues
+    queryable_indices: by error, timeframe, contributor
+
+  llm_analysis:
+    inputs: current_query, compressed_summary, token_budget
+    output: reasoning (auditable), frames_to_retrieve, confidence_score
 ```
 
-## 🔧 For Developers
-If you have local modifications, run:
+### New MCP Tools
+
+| Tool            | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| `smart_context` | LLM-driven context retrieval with natural language query |
+| `get_summary`   | Compressed summary of project memory                     |
+
+### Other Changes
+
+- **Trace Detection**: Improved persistence and bundling
+- **Model-Aware Compaction**: Handlers for context window management
+- **Linear Sync**: Enhanced sync manager for Linear integration
+- **Query Parser**: Extended natural language query parsing
+
+### Files Added
+
+- `src/core/retrieval/` - Complete retrieval system
+  - `types.ts` - Type definitions
+  - `summary-generator.ts` - Compressed summary generation
+  - `llm-context-retrieval.ts` - Main retrieval orchestrator
+  - `index.ts` - Module exports
+- `src/core/context/compaction-handler.ts` - Autocompaction detection
+- `src/core/context/model-aware-compaction.ts` - Model-specific handling
+- `src/core/trace/trace-store.ts` - Trace persistence
+- `src/integrations/linear/sync-manager.ts` - Enhanced Linear sync
+
+## Installation
+
 ```bash
-npm run build
-npm install -g . --force
+npm install -g @stackmemoryai/stackmemory@0.2.8
+```
+
+## Usage
+
+```bash
+# In Claude Desktop or MCP client:
+smart_context "What did we work on related to authentication?"
+get_summary
 ```
 
 ---
-*Built with reorganized architecture for better maintainability*
+
+_Built with LLM-driven intelligent context retrieval_

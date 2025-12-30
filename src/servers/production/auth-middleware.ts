@@ -8,8 +8,10 @@ import jwksRsa from 'jwks-rsa';
 import { Request, Response, NextFunction } from 'express';
 import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import Redis from 'ioredis';
+import BetterSqlite3 from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
 import { metrics } from '../../core/monitoring/metrics.js';
+import { getUserModel, UserModel, User } from '../../models/user.model.js';
 
 export interface AuthUser {
   id: string;
@@ -33,6 +35,10 @@ export class AuthMiddleware {
   private redis: Redis;
   private rateLimiters!: Map<string, RateLimiterRedis>;
   private blacklistedTokens: Set<string> = new Set();
+  private userModel: UserModel;
+  private db: BetterSqlite3.Database;
+  private mockUser?: AuthUser;
+  private mockUserInitializing = false;
 
   constructor(
     private config: {
@@ -41,9 +47,17 @@ export class AuthMiddleware {
       redisUrl: string;
       jwtSecret?: string;
       bypassAuth?: boolean; // For testing
+      dbPath?: string; // Path to SQLite database
     }
   ) {
     this.redis = new Redis(config.redisUrl);
+
+    // Initialize database
+    const dbPath =
+      config.dbPath || process.env.STACKMEMORY_DB || '.stackmemory/auth.db';
+    this.db = new BetterSqlite3(dbPath);
+    this.userModel = getUserModel(this.db);
+
     this.jwksClient = jwksRsa({
       jwksUri: `https://${config.auth0Domain}/.well-known/jwks.json`,
       cache: true,
@@ -159,22 +173,62 @@ export class AuthMiddleware {
         return next();
       }
 
-      // Extract token
+      // Extract token or API key
       const token = this.extractToken(req);
-      if (!token) {
-        metrics.increment('auth.missing_token');
+      const apiKey = this.extractApiKey(req);
+
+      if (!token && !apiKey) {
+        metrics.increment('auth.missing_credentials');
         return res.status(401).json({
           error: 'Authentication required',
-          code: 'MISSING_TOKEN',
+          code: 'MISSING_CREDENTIALS',
         });
       }
 
-      // Check blacklist
-      if (this.blacklistedTokens.has(token)) {
+      // API Key authentication
+      if (apiKey) {
+        const user = await this.userModel.validateApiKey(apiKey);
+        if (!user) {
+          metrics.increment('auth.invalid_api_key');
+          return res.status(401).json({
+            error: 'Invalid API key',
+            code: 'INVALID_API_KEY',
+          });
+        }
+
+        // Convert to AuthUser format
+        req.user = {
+          id: user.id,
+          sub: user.sub,
+          email: user.email,
+          name: user.name,
+          picture: user.avatar,
+          tier: user.tier,
+          permissions: user.permissions,
+          organizations: user.organizations.map((org) => org.id),
+          metadata: { ...user.metadata, authMethod: 'api_key' },
+        };
+
+        metrics.increment('auth.api_key_success');
+        await metrics.timing('auth.api_key_duration', Date.now() - startTime);
+        return next();
+      }
+
+      // Check blacklist for JWT tokens
+      if (token && this.blacklistedTokens.has(token)) {
         metrics.increment('auth.blacklisted_token');
         return res.status(401).json({
           error: 'Token has been revoked',
           code: 'TOKEN_REVOKED',
+        });
+      }
+
+      // Ensure token exists for JWT processing
+      if (!token) {
+        // This should not happen as we checked earlier, but TypeScript needs this
+        return res.status(401).json({
+          error: 'No token provided',
+          code: 'NO_TOKEN',
         });
       }
 
@@ -197,7 +251,7 @@ export class AuthMiddleware {
       }) as any;
 
       // Load user from database or cache
-      const user = await this.loadUser(verified.sub);
+      const user = await this.loadUser(verified.sub, verified);
       if (!user) {
         metrics.increment('auth.user_not_found');
         return res.status(403).json({
@@ -303,7 +357,7 @@ export class AuthMiddleware {
         issuer: `https://${this.config.auth0Domain}/`,
       }) as any;
 
-      return await this.loadUser(verified.sub);
+      return await this.loadUser(verified.sub, verified);
     } catch (error) {
       logger.error(
         'WebSocket authentication failed',
@@ -365,9 +419,34 @@ export class AuthMiddleware {
     next();
   };
 
+  private extractApiKey(req: Request): string | null {
+    // Check Authorization header for API key
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer sk-')) {
+      return authHeader.substring(7);
+    }
+
+    // Check X-API-Key header
+    const apiKeyHeader = req.headers['x-api-key'] as string;
+    if (apiKeyHeader?.startsWith('sk-')) {
+      return apiKeyHeader;
+    }
+
+    // Query parameter support removed for security reasons
+    // API keys should only be sent via headers to prevent:
+    // - URL logging exposure
+    // - Browser history leakage
+    // - Referer header transmission
+
+    return null;
+  }
+
   private extractToken(req: Request): string | null {
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
+    if (
+      authHeader?.startsWith('Bearer ') &&
+      !authHeader.startsWith('Bearer sk-')
+    ) {
       return authHeader.substring(7);
     }
 
@@ -375,22 +454,64 @@ export class AuthMiddleware {
     return req.cookies?.access_token || null;
   }
 
-  private async loadUser(sub: string): Promise<AuthUser | null> {
+  private async loadUser(
+    sub: string,
+    tokenPayload?: any
+  ): Promise<AuthUser | null> {
     // Try cache first
     const cached = await this.redis.get(`user:${sub}`);
     if (cached) {
-      return JSON.parse(cached);
+      const cachedUser = JSON.parse(cached);
+      // Update last login time in background
+      this.userModel
+        .updateLastLogin(cachedUser.id)
+        .catch((err) => logger.error('Failed to update last login', err));
+      return cachedUser;
     }
 
-    // Load from database (implement your database logic)
-    // This is a placeholder - implement actual database loading
+    // Load from database
+    let dbUser = await this.userModel.findUserBySub(sub);
+
+    // If user doesn't exist, create from token payload
+    if (!dbUser && tokenPayload) {
+      dbUser = await this.userModel.createUser({
+        sub,
+        email: tokenPayload.email || `${sub}@auth.local`,
+        name: tokenPayload.name,
+        avatar: tokenPayload.picture,
+        tier: this.determineTier(tokenPayload),
+        permissions: this.determinePermissions(tokenPayload),
+        organizations: this.extractOrganizations(tokenPayload),
+        metadata: {
+          auth0: tokenPayload,
+          signupSource: 'auth0',
+          createdVia: 'auth-middleware',
+        },
+      });
+      logger.info('Auto-created user from auth token', {
+        sub,
+        email: dbUser.email,
+      });
+    }
+
+    if (!dbUser) {
+      return null;
+    }
+
+    // Update last login
+    await this.userModel.updateLastLogin(dbUser.id);
+
+    // Convert to AuthUser format
     const user: AuthUser = {
-      id: sub,
-      sub,
-      email: `${sub}@example.com`,
-      tier: 'free',
-      permissions: ['read', 'write'],
-      organizations: [],
+      id: dbUser.id,
+      sub: dbUser.sub,
+      email: dbUser.email,
+      name: dbUser.name,
+      picture: dbUser.avatar,
+      tier: dbUser.tier,
+      permissions: dbUser.permissions,
+      organizations: dbUser.organizations.map((org) => org.id),
+      metadata: dbUser.metadata,
     };
 
     // Cache for 5 minutes
@@ -399,15 +520,147 @@ export class AuthMiddleware {
     return user;
   }
 
-  private getMockUser(): AuthUser {
+  private determineTier(tokenPayload: any): 'free' | 'pro' | 'enterprise' {
+    // Check custom claims or metadata
+    if (tokenPayload['https://stackmemory.ai/tier']) {
+      return tokenPayload['https://stackmemory.ai/tier'];
+    }
+
+    // Check for subscription info
+    if (tokenPayload.subscription?.plan) {
+      const plan = tokenPayload.subscription.plan.toLowerCase();
+      if (plan.includes('enterprise')) return 'enterprise';
+      if (plan.includes('pro') || plan.includes('premium')) return 'pro';
+    }
+
+    // Default to free
+    return 'free';
+  }
+
+  private determinePermissions(tokenPayload: any): string[] {
+    const permissions: string[] = ['read', 'write'];
+
+    // Check custom permissions claim
+    if (tokenPayload['https://stackmemory.ai/permissions']) {
+      return tokenPayload['https://stackmemory.ai/permissions'];
+    }
+
+    // Check standard permissions
+    if (tokenPayload.permissions && Array.isArray(tokenPayload.permissions)) {
+      return tokenPayload.permissions;
+    }
+
+    // Check roles
+    if (tokenPayload.roles && Array.isArray(tokenPayload.roles)) {
+      if (tokenPayload.roles.includes('admin')) {
+        permissions.push('admin', 'delete');
+      }
+      if (tokenPayload.roles.includes('moderator')) {
+        permissions.push('moderate');
+      }
+    }
+
+    return permissions;
+  }
+
+  private extractOrganizations(
+    tokenPayload: any
+  ): Array<{ id: string; name: string; role: string }> {
+    const orgs: Array<{ id: string; name: string; role: string }> = [];
+
+    // Check custom organization claim
+    if (tokenPayload['https://stackmemory.ai/organizations']) {
+      return tokenPayload['https://stackmemory.ai/organizations'];
+    }
+
+    // Check Auth0 organizations
+    if (tokenPayload.org_id) {
+      orgs.push({
+        id: tokenPayload.org_id,
+        name: tokenPayload.org_name || tokenPayload.org_id,
+        role: tokenPayload.org_role || 'member',
+      });
+    }
+
+    return orgs;
+  }
+
+  private async initializeMockUser(): Promise<AuthUser> {
+    const mockSub = 'dev-sub';
+
+    // Check if user exists in database
+    let dbUser = await this.userModel.findUserBySub(mockSub);
+
+    if (!dbUser) {
+      // Create mock user in database
+      dbUser = await this.userModel.createUser({
+        sub: mockSub,
+        email: 'dev@stackmemory.local',
+        name: 'Development User',
+        tier: 'enterprise',
+        permissions: ['read', 'write', 'admin', 'delete'],
+        organizations: [
+          {
+            id: 'dev-org',
+            name: 'Development Organization',
+            role: 'admin',
+          },
+        ],
+        metadata: {
+          isDevelopmentUser: true,
+          createdAt: new Date().toISOString(),
+        },
+      });
+      logger.info('Created development mock user');
+    }
+
     return {
-      id: 'mock-user-id',
-      sub: 'mock-sub',
-      email: 'test@example.com',
-      name: 'Test User',
-      tier: 'pro',
-      permissions: ['read', 'write', 'admin'],
-      organizations: ['test-org'],
+      id: dbUser.id,
+      sub: dbUser.sub,
+      email: dbUser.email,
+      name: dbUser.name,
+      picture: dbUser.avatar,
+      tier: dbUser.tier,
+      permissions: dbUser.permissions,
+      organizations: dbUser.organizations.map((org) => org.id),
+      metadata: dbUser.metadata,
+    };
+  }
+
+  private getMockUser(): AuthUser {
+    // Return cached mock user if available
+    if (this.mockUser) {
+      return this.mockUser;
+    }
+
+    // Initialize mock user synchronously to prevent race conditions
+    // This runs during constructor or first use
+    if (!this.mockUserInitializing) {
+      this.mockUserInitializing = true;
+
+      // Initialize asynchronously but return a temporary user immediately
+      this.initializeMockUser()
+        .then((user) => {
+          this.mockUser = user;
+          this.mockUserInitializing = false;
+          logger.info('Mock user initialized and cached');
+        })
+        .catch((err) => {
+          logger.error('Failed to initialize mock user', err);
+          this.mockUserInitializing = false;
+        });
+    }
+
+    // Return temporary mock user while initialization is in progress
+    return {
+      id: 'temp-dev-user-id',
+      sub: 'dev-sub',
+      email: 'dev@stackmemory.local',
+      name: 'Development User',
+      tier: 'enterprise',
+      permissions: ['read', 'write', 'admin', 'delete'],
+      organizations: ['dev-org'],
+      metadata: { temporary: true },
     };
   }
 

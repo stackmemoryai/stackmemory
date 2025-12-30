@@ -36,6 +36,8 @@ import { createTaskCommands } from './commands/tasks.js';
 import { createSearchCommand } from './commands/search.js';
 import { createLogCommand } from './commands/log.js';
 import { createContextCommands } from './commands/context.js';
+import { createConfigCommand } from './commands/config.js';
+import { createAgentCommand } from './commands/agent.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
@@ -121,6 +123,37 @@ program
       const activeFrames = frameManager.getActiveFramePath();
       const stackDepth = frameManager.getStackDepth();
 
+      // Always get total counts across all sessions
+      const totalStats = db
+        .prepare(
+          `
+        SELECT 
+          COUNT(*) as total_frames,
+          SUM(CASE WHEN state = 'active' THEN 1 ELSE 0 END) as active_frames,
+          SUM(CASE WHEN state = 'closed' THEN 1 ELSE 0 END) as closed_frames,
+          COUNT(DISTINCT run_id) as total_sessions
+        FROM frames
+        WHERE project_id = ?
+      `
+        )
+        .get(session.projectId) as any;
+
+      const contextCount = db
+        .prepare(
+          `
+        SELECT COUNT(*) as count FROM contexts
+      `
+        )
+        .get() as any;
+
+      const eventCount = db
+        .prepare(
+          `
+        SELECT COUNT(*) as count FROM events
+      `
+        )
+        .get() as any;
+
       console.log('📊 StackMemory Status:');
       console.log(
         `   Session: ${session.sessionId.slice(0, 8)} (${session.state}, ${Math.round((Date.now() - session.startedAt) / 1000 / 60)}min old)`
@@ -129,6 +162,37 @@ program
       if (session.branch) {
         console.log(`   Branch: ${session.branch}`);
       }
+
+      // Show total database statistics
+      console.log(`\n   Database Statistics:`);
+      console.log(`     Total contexts: ${contextCount.count}`);
+      console.log(
+        `     Total frames: ${totalStats.total_frames} (${totalStats.active_frames} active, ${totalStats.closed_frames} closed)`
+      );
+      console.log(`     Total events: ${eventCount.count}`);
+      console.log(`     Total sessions: ${totalStats.total_sessions}`);
+
+      // Show recent activity
+      const recentFrames = db
+        .prepare(
+          `
+        SELECT name, type, state, datetime(created_at, 'unixepoch') as created
+        FROM frames
+        WHERE project_id = ?
+        ORDER BY created_at DESC
+        LIMIT 3
+      `
+        )
+        .all(session.projectId) as any[];
+
+      if (recentFrames.length > 0) {
+        console.log(`\n   Recent Activity:`);
+        recentFrames.forEach((f: any) => {
+          const stateIcon = f.state === 'active' ? '🟢' : '⚫';
+          console.log(`     ${stateIcon} ${f.name} [${f.type}] - ${f.created}`);
+        });
+      }
+
       console.log(`\n   Current Session:`);
       console.log(`     Stack depth: ${stackDepth}`);
       console.log(`     Active frames: ${activeFrames.length}`);
@@ -1168,6 +1232,8 @@ program.addCommand(createTaskCommands());
 program.addCommand(createSearchCommand());
 program.addCommand(createLogCommand());
 program.addCommand(createContextCommands());
+program.addCommand(createConfigCommand());
+program.addCommand(createAgentCommand());
 
 // Auto-detect current project on startup
 if (process.argv.length > 2) {

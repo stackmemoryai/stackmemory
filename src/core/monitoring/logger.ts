@@ -101,24 +101,32 @@ export class Logger {
 
   error(
     message: string,
-    error?: Error,
+    errorOrContext?: Error | Record<string, unknown>,
     context?: Record<string, unknown>
   ): void {
+    const isError = errorOrContext instanceof Error;
     this.writeLog({
       timestamp: new Date().toISOString(),
       level: LogLevel.ERROR,
       message,
-      context,
-      error,
+      context: isError ? context : (errorOrContext as Record<string, unknown>),
+      error: isError ? errorOrContext : undefined,
     });
   }
 
-  warn(message: string, context?: Record<string, unknown>): void {
+  warn(
+    message: string,
+    errorOrContext?: Error | Record<string, unknown>
+  ): void {
+    const isError = errorOrContext instanceof Error;
     this.writeLog({
       timestamp: new Date().toISOString(),
       level: LogLevel.WARN,
       message,
-      context,
+      context: isError
+        ? undefined
+        : (errorOrContext as Record<string, unknown>),
+      error: isError ? errorOrContext : undefined,
     });
   }
 

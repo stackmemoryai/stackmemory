@@ -1,11 +1,12 @@
 {
   "project": "StackMemory - Lossless Call-Stack Memory Runtime",
-  "version": "0.1.0",
-  "status": "development",
+  "version": "0.2.7",
+  "status": "Phase 2 - Intelligence Layer",
+  "last_updated": "2024-12-29T02:00:00Z",
   "progress": {
-    "phase": "MVP Implementation", 
-    "completion": "65%",
-    "current_sprint": "Frame Management & Context Assembly"
+    "phase": "Phase 2 - Intelligence Layer Implementation", 
+    "completion": "75%",
+    "current_sprint": "Query Language & LLM-Driven Retrieval"
   },
   "completed": [
     "Project structure consolidation",
@@ -19,42 +20,86 @@
     "Frame manager with call-stack implementation",
     "Frame lifecycle (create, close, digest generation)",
     "Event and anchor management",
-    "Hot stack context assembly"
+    "Hot stack context assembly",
+    "Comprehensive SPEC.md (776 lines)",
+    "Query language parser with NLP support (STA-94)",
+    "Configurable weight profiles system (STA-97)",
+    "Linear integration (10 implementation tasks)",
+    "Documentation updates (README, AGENTS.md)",
+    "Test coverage for query parser and config system"
   ],
   "in_progress": [
-    "Context assembly algorithm refinement",
-    "Integration testing"
+    "LLM-driven context retrieval (STA-95)",
+    "Hybrid digest generation system (STA-96)",
+    "Trace detection and bundling (STA-98)"
   ],
   "todo": [
-    "Complete MCP server core functionality",
-    "Implement frame management system",
-    "Add context assembly algorithm",
-    "Build event ingestion pipeline",
-    "Create digest generation",
-    "Add SQLite persistence layer",
-    "Write comprehensive tests",
-    "Build installation scripts",
-    "Create CLI interface",
-    "Add performance monitoring"
+    "Dual stack architecture (STA-99)",
+    "Frame handoff mechanism (STA-100)",
+    "Stack merge conflict resolution (STA-101)",
+    "Two-tier storage system (STA-102)",
+    "Incremental garbage collection (STA-103)",
+    "Performance optimization",
+    "Enterprise security features"
   ],
   "architecture": {
-    "core_files": {
-      "mcp_server": "src/mcp-server.ts",
-      "logger": "src/logger.ts", 
-      "error_handler": "src/error-handler.ts",
-      "database": "src/database.ts",
-      "context_assembler": "src/context-assembler.ts",
-      "frame_manager": "src/frame-manager.ts"
+    "core_concepts": {
+      "frame_stack": "Call stack with 10,000 max depth",
+      "storage": "Two-tier: Local SQLite (30d) + Infinite remote",
+      "retrieval": "LLM-driven with compressed summaries",
+      "digests": "60% deterministic, 40% AI-generated",
+      "scoring": "Configurable weights with tool importance",
+      "collaboration": "Dual stacks (individual + shared)"
     },
-    "database": "SQLite (.stackmemory/local-context.db)",
-    "integration": "MCP tool for Claude Code"
+    "core_files": {
+      "mcp_server": "src/integrations/mcp/server.ts",
+      "query_parser": "src/core/query/query-parser.ts",
+      "frame_manager": "src/core/context/frame-manager.ts",
+      "context_service": "src/services/context-service.ts",
+      "config_service": "src/services/config-service.ts",
+      "linear_sync": "src/integrations/linear/sync-service.ts"
+    },
+    "database": "SQLite (.stackmemory/memory.db) + Remote S3/TimeSeries",
+    "integration": "MCP server for Claude Code, Linear API",
+    "query_language": {
+      "natural": "provide context from the last day",
+      "structured": "TypeScript interfaces with filters",
+      "hybrid": "command-line style with modifiers"
+    }
   },
-  "next_milestone": "Working MCP server with basic frame/event storage",
+  "performance_targets": {
+    "retrieval_latency": "p50 < 50ms, p99 < 500ms",
+    "max_stack_depth": 10000,
+    "max_events_per_frame": 5000,
+    "storage": "2GB local, infinite remote",
+    "gc_strategy": "Incremental, 100 frames/cycle"
+  },
+  "linear_tasks": {
+    "phase_2": ["STA-94", "STA-95", "STA-96", "STA-97", "STA-98"],
+    "phase_3": ["STA-99", "STA-100", "STA-101"],
+    "phase_4": ["STA-102", "STA-103"]
+  },
+  "next_milestone": "Complete Phase 2 Intelligence Layer with LLM retrieval",
   "blockers": [],
   "decisions": [
     "Use SQLite for local-first approach",
     "Implement as MCP server for Claude Code integration", 
     "Call-stack memory model over linear chat",
-    "Lossless event storage with digest summaries"
+    "Lossless event storage with digest summaries",
+    "Frame-based architecture with 10,000 max depth",
+    "Two-tier storage: local (30d) + infinite remote",
+    "LLM-driven retrieval analyzing compressed summaries",
+    "60/40 hybrid digest generation during idle time",
+    "Configurable scoring weights for different workflows",
+    "Dual stack architecture for team collaboration",
+    "Incremental GC to avoid UI freezes",
+    "Deterministic scoring over ML for predictability"
+  ],
+  "key_insights": [
+    "Frame stack provides natural boundaries vs linear chat",
+    "Intelligent retrieval more efficient than full context",
+    "Different workflows need different importance weights",
+    "Individual + shared stacks enable true collaboration",
+    "Deterministic approaches more debuggable than ML"
   ]
 }
