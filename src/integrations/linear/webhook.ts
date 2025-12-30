@@ -87,14 +87,50 @@ export class LinearWebhookHandler {
   }
 
   /**
+   * Validate webhook payload structure
+   */
+  private validateWebhookPayload(
+    payload: unknown
+  ): LinearWebhookPayload | null {
+    if (!payload || typeof payload !== 'object') return null;
+
+    const p = payload as any;
+
+    // Validate required fields
+    if (!p.action || typeof p.action !== 'string') return null;
+    if (!p.type || typeof p.type !== 'string') return null;
+    if (!p.data || typeof p.data !== 'object') return null;
+    if (!p.data.id || typeof p.data.id !== 'string') return null;
+
+    // Sanitize string fields to prevent injection
+    if (p.data.title && typeof p.data.title === 'string') {
+      p.data.title = p.data.title.substring(0, 500); // Limit length
+    }
+    if (p.data.description && typeof p.data.description === 'string') {
+      p.data.description = p.data.description.substring(0, 5000); // Limit length
+    }
+
+    return p as LinearWebhookPayload;
+  }
+
+  /**
    * Process incoming webhook
    */
   async processWebhook(payload: LinearWebhookPayload): Promise<void> {
+    // Validate payload first
+    const validatedPayload = this.validateWebhookPayload(payload);
+    if (!validatedPayload) {
+      logger.error('Invalid webhook payload received');
+      throw new Error('Invalid webhook payload');
+    }
+
     logger.info('Processing Linear webhook', {
-      action: payload.action,
-      type: payload.type,
-      id: payload.data.id,
+      action: validatedPayload.action,
+      type: validatedPayload.type,
+      id: validatedPayload.data.id,
     });
+
+    payload = validatedPayload;
 
     // Only process Issue webhooks for now
     if (payload.type !== 'Issue') {
@@ -138,8 +174,31 @@ export class LinearWebhookHandler {
       title: payload.data.title,
     });
 
-    // TODO: Implement task creation with proper frame context
-    // This would require access to the current FrameManager context
+    // Create a StackMemory task from Linear issue
+    if (this.taskStore) {
+      try {
+        const taskId = this.taskStore.createTask({
+          frameId: 'linear-import', // Special frame for Linear imports
+          title: payload.data.title || 'Untitled Linear Issue',
+          description: payload.data.description || '',
+          priority: this.mapLinearPriorityToStackMemory(payload.data.priority),
+          assignee: payload.data.assignee?.email,
+          tags: payload.data.labels?.map((l: any) => l.name) || [],
+        });
+
+        // Store mapping for future syncing
+        this.storeMapping(taskId, payload.data.id);
+
+        logger.info('Created StackMemory task from Linear issue', {
+          stackmemoryId: taskId,
+          linearId: payload.data.id,
+        });
+      } catch (error) {
+        logger.error('Failed to create task from Linear issue', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   /**
@@ -275,9 +334,37 @@ export class LinearWebhookHandler {
   private findMappingByLinearId(
     linearId: string
   ): { stackmemoryId: string; linearId: string } | null {
-    // TODO: Implement proper mapping lookup from database
-    // For now, return null
+    // Use in-memory mapping for now
+    // In production, this would query a database
+    const mapping = this.taskMappings.get(linearId);
+    if (mapping) {
+      return { stackmemoryId: mapping, linearId };
+    }
     return null;
+  }
+
+  // In-memory task mappings (Linear ID -> StackMemory ID)
+  private taskMappings = new Map<string, string>();
+
+  /**
+   * Store mapping between Linear and StackMemory IDs
+   */
+  private storeMapping(stackmemoryId: string, linearId: string): void {
+    this.taskMappings.set(linearId, stackmemoryId);
+    // In production, persist to database
+  }
+
+  /**
+   * Map Linear priority to StackMemory priority
+   */
+  private mapLinearPriorityToStackMemory(
+    priority: number | undefined
+  ): 'low' | 'medium' | 'high' | 'urgent' {
+    if (!priority) return 'medium';
+    if (priority <= 1) return 'urgent';
+    if (priority === 2) return 'high';
+    if (priority === 3) return 'medium';
+    return 'low';
   }
 
   /**

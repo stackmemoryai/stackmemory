@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
 import { appendFile, existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { EventEmitter } from 'events';
 import { logger } from '../../core/monitoring/logger.js';
 import {
   DatabaseError,
@@ -46,6 +47,7 @@ export interface PebblesTask {
   created_at: number;
   started_at?: number;
   completed_at?: number;
+  due_date?: number; // Unix timestamp for due date
   estimated_effort?: number; // Minutes
   actual_effort?: number;
 
@@ -75,15 +77,27 @@ export interface TaskMetrics {
   overdue_tasks: number;
 }
 
-export class PebblesTaskStore {
+export interface TaskStoreEvents {
+  'task:created': (task: PebblesTask) => void;
+  'task:updated': (task: PebblesTask) => void;
+  'task:completed': (task: PebblesTask) => void;
+  'task:blocked': (task: PebblesTask) => void;
+  'task:cancelled': (task: PebblesTask) => void;
+  'sync:needed': (changeType: string) => void;
+}
+
+export class PebblesTaskStore extends EventEmitter {
   private db: Database.Database;
   private projectRoot: string;
   private tasksFile: string;
   private cacheFile: string;
   private jsonlParser: StreamingJSONLParser;
   private taskCache: ContextCache<PebblesTask>;
+  private maxListeners: number = 10; // Prevent memory leaks
 
   constructor(projectRoot: string, db: Database.Database) {
+    super();
+    this.setMaxListeners(10); // Prevent memory leaks
     this.projectRoot = projectRoot;
     this.db = db;
 
@@ -293,6 +307,7 @@ export class PebblesTaskStore {
     tags?: string[];
     estimatedEffort?: number;
     assignee?: string;
+    dueDate?: Date;
   }): string {
     const now = Math.floor(Date.now() / 1000);
 
@@ -312,6 +327,9 @@ export class PebblesTaskStore {
       priority: options.priority || 'medium',
       assignee: options.assignee,
       created_at: now,
+      due_date: options.dueDate
+        ? Math.floor(options.dueDate.getTime() / 1000)
+        : undefined,
       estimated_effort: options.estimatedEffort,
       depends_on: options.dependsOn || [],
       blocks: [],
@@ -443,6 +461,11 @@ export class PebblesTaskStore {
 
     this.appendTask(updatedTask);
     this.appendTask(updatedBlockingTask);
+
+    // Emit update events for dependency changes
+    this.emit('task:updated', updatedTask);
+    this.emit('task:updated', updatedBlockingTask);
+    this.emit('sync:needed', 'task_dependency_added');
   }
 
   /**
@@ -611,6 +634,30 @@ export class PebblesTaskStore {
         },
         error instanceof Error ? error : undefined
       );
+    }
+  }
+
+  /**
+   * Get overdue tasks
+   */
+  public getOverdueTasks(): PebblesTask[] {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const stmt = this.db.prepare(`
+        SELECT * FROM task_cache 
+        WHERE due_date IS NOT NULL 
+        AND due_date < ? 
+        AND status NOT IN ('completed', 'cancelled')
+        ORDER BY due_date ASC
+      `);
+      const rows = stmt.all(now) as any[];
+
+      return rows.map((row) => row as PebblesTask);
+    } catch (error) {
+      logger.error('Failed to get overdue tasks', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
     }
   }
 
@@ -818,5 +865,23 @@ export class PebblesTaskStore {
     }
 
     return false;
+  }
+
+  /**
+   * Cleanup resources and prevent memory leaks
+   */
+  public cleanup(): void {
+    // Remove all event listeners
+    this.removeAllListeners();
+
+    // Clear cache
+    if (this.taskCache) {
+      this.taskCache.clear();
+    }
+
+    // Close database connections if needed
+    // Note: Database is managed externally, so we don't close it here
+
+    logger.info('PebblesTaskStore cleanup completed');
   }
 }
