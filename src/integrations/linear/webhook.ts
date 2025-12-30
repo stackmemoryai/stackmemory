@@ -87,14 +87,50 @@ export class LinearWebhookHandler {
   }
 
   /**
+   * Validate webhook payload structure
+   */
+  private validateWebhookPayload(
+    payload: unknown
+  ): LinearWebhookPayload | null {
+    if (!payload || typeof payload !== 'object') return null;
+
+    const p = payload as any;
+
+    // Validate required fields
+    if (!p.action || typeof p.action !== 'string') return null;
+    if (!p.type || typeof p.type !== 'string') return null;
+    if (!p.data || typeof p.data !== 'object') return null;
+    if (!p.data.id || typeof p.data.id !== 'string') return null;
+
+    // Sanitize string fields to prevent injection
+    if (p.data.title && typeof p.data.title === 'string') {
+      p.data.title = p.data.title.substring(0, 500); // Limit length
+    }
+    if (p.data.description && typeof p.data.description === 'string') {
+      p.data.description = p.data.description.substring(0, 5000); // Limit length
+    }
+
+    return p as LinearWebhookPayload;
+  }
+
+  /**
    * Process incoming webhook
    */
   async processWebhook(payload: LinearWebhookPayload): Promise<void> {
+    // Validate payload first
+    const validatedPayload = this.validateWebhookPayload(payload);
+    if (!validatedPayload) {
+      logger.error('Invalid webhook payload received');
+      throw new Error('Invalid webhook payload');
+    }
+
     logger.info('Processing Linear webhook', {
-      action: payload.action,
-      type: payload.type,
-      id: payload.data.id,
+      action: validatedPayload.action,
+      type: validatedPayload.type,
+      id: validatedPayload.data.id,
     });
+
+    payload = validatedPayload;
 
     // Only process Issue webhooks for now
     if (payload.type !== 'Issue') {

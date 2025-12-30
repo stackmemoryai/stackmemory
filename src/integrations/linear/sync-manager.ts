@@ -24,6 +24,8 @@ export class LinearSyncManager extends EventEmitter {
   private config: SyncManagerConfig;
   private lastSyncTime: number = 0;
   private syncInProgress: boolean = false;
+  private syncLockAcquired: number = 0; // Timestamp when lock was acquired
+  private readonly SYNC_LOCK_TIMEOUT = 300000; // 5 minutes max sync time
   private taskStore: PebblesTaskStore;
 
   constructor(

@@ -93,9 +93,11 @@ export class PebblesTaskStore extends EventEmitter {
   private cacheFile: string;
   private jsonlParser: StreamingJSONLParser;
   private taskCache: ContextCache<PebblesTask>;
+  private maxListeners: number = 10; // Prevent memory leaks
 
   constructor(projectRoot: string, db: Database.Database) {
     super();
+    this.setMaxListeners(10); // Prevent memory leaks
     this.projectRoot = projectRoot;
     this.db = db;
 
@@ -863,5 +865,23 @@ export class PebblesTaskStore extends EventEmitter {
     }
 
     return false;
+  }
+
+  /**
+   * Cleanup resources and prevent memory leaks
+   */
+  public cleanup(): void {
+    // Remove all event listeners
+    this.removeAllListeners();
+
+    // Clear cache
+    if (this.taskCache) {
+      this.taskCache.clear();
+    }
+
+    // Close database connections if needed
+    // Note: Database is managed externally, so we don't close it here
+
+    logger.info('PebblesTaskStore cleanup completed');
   }
 }
