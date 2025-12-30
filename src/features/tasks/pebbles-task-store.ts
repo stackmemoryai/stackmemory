@@ -5,7 +5,7 @@
 
 import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
-import { appendFile, existsSync, mkdirSync } from 'fs';
+import { appendFile, existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../../core/monitoring/logger.js';
 import {
@@ -105,10 +105,8 @@ export class PebblesTaskStore {
     });
 
     this.initializeCache();
-    // Load JSONL asynchronously after construction
-    this.loadFromJSONL().catch(error => {
-      logger.error('Failed to load tasks from JSONL', error);
-    });
+    // Load existing tasks from JSONL synchronously
+    this.loadFromJSONLSync();
   }
 
   private initializeCache() {
@@ -154,7 +152,7 @@ export class PebblesTaskStore {
         operation: 'initializeCache',
         schema: 'task_cache',
       });
-      
+
       throw new DatabaseError(
         'Failed to initialize task cache schema',
         ErrorCode.DB_MIGRATION_FAILED,
@@ -184,15 +182,18 @@ export class PebblesTaskStore {
       let errors = 0;
 
       // Use streaming parser for memory efficiency
-      for await (const batch of this.jsonlParser.parseStream<PebblesTask>(this.tasksFile, {
-        batchSize: 100,
-        filter: (obj) => obj.type && obj.id && obj.title, // Basic validation
-        onProgress: (count) => {
-          if (count % 500 === 0) {
-            logger.debug('Loading tasks progress', { loaded: count });
-          }
-        },
-      })) {
+      for await (const batch of this.jsonlParser.parseStream<PebblesTask>(
+        this.tasksFile,
+        {
+          batchSize: 100,
+          filter: (obj) => obj.type && obj.id && obj.title, // Basic validation
+          onProgress: (count) => {
+            if (count % 500 === 0) {
+              logger.debug('Loading tasks progress', { loaded: count });
+            }
+          },
+        }
+      )) {
         for (const task of batch) {
           try {
             this.upsertToCache(task);
@@ -211,8 +212,8 @@ export class PebblesTaskStore {
         }
       }
 
-      logger.info('Loaded tasks from JSONL', { 
-        loaded, 
+      logger.info('Loaded tasks from JSONL', {
+        loaded,
         errors,
         file: this.tasksFile,
         cacheStats: this.taskCache.getStats(),
@@ -222,7 +223,7 @@ export class PebblesTaskStore {
         operation: 'loadFromJSONL',
         file: this.tasksFile,
       });
-      
+
       throw new SystemError(
         'Failed to load tasks from JSONL file',
         ErrorCode.INTERNAL_ERROR,
@@ -232,6 +233,50 @@ export class PebblesTaskStore {
         },
         error instanceof Error ? error : undefined
       );
+    }
+  }
+
+  /**
+   * Load existing tasks from JSONL synchronously (for constructor)
+   */
+  private loadFromJSONLSync() {
+    if (!existsSync(this.tasksFile)) return;
+
+    try {
+      const content = readFileSync(this.tasksFile, 'utf-8');
+      const lines = content.split('\n').filter((line) => line.trim());
+
+      let loaded = 0;
+      let errors = 0;
+
+      for (const line of lines) {
+        try {
+          const task = JSON.parse(line) as PebblesTask;
+
+          // Basic validation
+          if (task.type && task.id && task.title) {
+            this.upsertToCache(task);
+            // Add to in-memory cache for fast access
+            this.taskCache.set(task.id, task, {
+              ttl: 3600000, // 1 hour cache
+            });
+            loaded++;
+          }
+        } catch (error) {
+          errors++;
+          logger.warn('Failed to parse JSONL line', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      logger.info('Loaded tasks from JSONL', {
+        loaded,
+        errors,
+        file: this.tasksFile,
+      });
+    } catch (error) {
+      logger.error('Failed to load tasks from JSONL', error as Error);
     }
   }
 
@@ -354,7 +399,7 @@ export class PebblesTaskStore {
         }
       );
     }
-    
+
     if (!dependsOnTask) {
       throw new TaskError(
         `Dependency task not found: ${dependsOnId}`,
@@ -619,22 +664,17 @@ export class PebblesTaskStore {
       });
 
       // Update SQLite cache (for fast queries) with retry logic
-      retry(
-        () => Promise.resolve(this.upsertToCache(task)),
-        {
-          maxAttempts: 3,
-          initialDelay: 100,
-          onRetry: (attempt, error) => {
-            logger.warn(
-              `Retrying task cache upsert (attempt ${attempt})`,
-              {
-                taskId: task.id,
-                errorMessage: error instanceof Error ? error.message : String(error),
-              }
-            );
-          },
-        }
-      ).catch((error) => {
+      retry(() => Promise.resolve(this.upsertToCache(task)), {
+        maxAttempts: 3,
+        initialDelay: 100,
+        onRetry: (attempt, error) => {
+          logger.warn(`Retrying task cache upsert (attempt ${attempt})`, {
+            taskId: task.id,
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          });
+        },
+      }).catch((error) => {
         logger.error(
           'Failed to upsert task to cache after retries',
           error instanceof Error ? error : new Error(String(error)),
@@ -750,23 +790,26 @@ export class PebblesTaskStore {
   /**
    * Check if adding a dependency would create a circular dependency
    */
-  private wouldCreateCircularDependency(taskId: string, dependsOnId: string): boolean {
+  private wouldCreateCircularDependency(
+    taskId: string,
+    dependsOnId: string
+  ): boolean {
     const visited = new Set<string>();
     const stack = [dependsOnId];
 
     while (stack.length > 0) {
       const currentId = stack.pop()!;
-      
+
       if (currentId === taskId) {
         return true; // Found circular dependency
       }
-      
+
       if (visited.has(currentId)) {
         continue;
       }
-      
+
       visited.add(currentId);
-      
+
       // Get dependencies of current task
       const currentTask = this.getTask(currentId);
       if (currentTask) {
