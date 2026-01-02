@@ -1,0 +1,262 @@
+#!/bin/bash
+# Auto-handoff script for Claude session termination
+# Captures context and creates handoff file when Claude is killed
+
+set -e
+
+# Configuration
+STACKMEMORY_DIR="${HOME}/.stackmemory"
+HANDOFF_DIR="${STACKMEMORY_DIR}/handoffs"
+CURRENT_HANDOFF="${HANDOFF_DIR}/current.json"
+HANDOFF_ARCHIVE="${HANDOFF_DIR}/archive"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Ensure directories exist
+mkdir -p "$HANDOFF_DIR" "$HANDOFF_ARCHIVE"
+
+# Function to capture current context
+capture_context() {
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local handoff_file="${HANDOFF_DIR}/handoff_${timestamp}.json"
+    
+    echo -e "${BLUE}📸 Capturing session context...${NC}"
+    
+    # Capture git status
+    local git_status=""
+    local git_branch=""
+    local uncommitted_files=""
+    
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        git_branch=$(git branch --show-current)
+        git_status=$(git status --short)
+        uncommitted_files=$(git diff --name-only)
+    fi
+    
+    # Capture StackMemory context if available
+    local sm_context=""
+    local recent_traces=""
+    local active_tasks=""
+    
+    if command -v stackmemory &> /dev/null; then
+        sm_context=$(stackmemory context show --json 2>/dev/null || echo "{}")
+        recent_traces=$(stackmemory trace list --limit 5 --json 2>/dev/null || echo "[]")
+        active_tasks=$(stackmemory tasks list --status in_progress --json 2>/dev/null || echo "[]")
+    fi
+    
+    # Get current working directory and recent commands
+    local cwd=$(pwd)
+    local recent_commands=$(history | tail -20 | awk '{$1=""; print $0}' | sed 's/^ //')
+    
+    # Get modified files in last hour
+    local recent_files=$(find . -type f -mmin -60 2>/dev/null | head -20 || echo "")
+    
+    # Create handoff JSON
+    cat > "$handoff_file" << EOF
+{
+    "timestamp": "$timestamp",
+    "session": {
+        "cwd": "$cwd",
+        "user": "$USER",
+        "hostname": "$(hostname)",
+        "pid": "$$"
+    },
+    "git": {
+        "branch": "$git_branch",
+        "status": $(echo "$git_status" | jq -R -s -c 'split("\n") | map(select(length > 0))'),
+        "uncommitted": $(echo "$uncommitted_files" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+    },
+    "stackmemory": {
+        "context": $sm_context,
+        "recent_traces": $recent_traces,
+        "active_tasks": $active_tasks
+    },
+    "files": {
+        "recently_modified": $(echo "$recent_files" | jq -R -s -c 'split("\n") | map(select(length > 0))'),
+        "open_in_editor": $(lsof -c vim -c nvim -c code 2>/dev/null | grep REG | awk '{print $NF}' | jq -R -s -c 'split("\n") | map(select(length > 0))' || echo "[]")
+    },
+    "commands": {
+        "recent": $(echo "$recent_commands" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+    }
+}
+EOF
+    
+    # Create symlink to current handoff
+    ln -sf "$handoff_file" "$CURRENT_HANDOFF"
+    
+    echo -e "${GREEN}✅ Context captured: ${handoff_file}${NC}"
+    
+    # Generate handoff prompt
+    generate_handoff_prompt "$handoff_file"
+}
+
+# Function to generate handoff prompt from captured context
+generate_handoff_prompt() {
+    local handoff_file=$1
+    local prompt_file="${HANDOFF_DIR}/handoff_prompt.md"
+    
+    echo -e "${BLUE}📝 Generating handoff prompt...${NC}"
+    
+    # Parse JSON data
+    local timestamp=$(jq -r '.timestamp' "$handoff_file")
+    local cwd=$(jq -r '.session.cwd' "$handoff_file")
+    local git_branch=$(jq -r '.git.branch' "$handoff_file")
+    local uncommitted=$(jq -r '.git.uncommitted[]' "$handoff_file" 2>/dev/null | head -10)
+    local active_tasks=$(jq -r '.stackmemory.active_tasks[].content' "$handoff_file" 2>/dev/null)
+    local recent_files=$(jq -r '.files.recently_modified[]' "$handoff_file" 2>/dev/null | head -10)
+    
+    # Create handoff prompt
+    cat > "$prompt_file" << EOF
+# Session Handoff - $timestamp
+
+## Context
+Continuing work from previous session in \`$cwd\` on branch \`$git_branch\`.
+
+## Uncommitted Changes
+$(if [ -n "$uncommitted" ]; then
+    echo "The following files have uncommitted changes:"
+    echo "$uncommitted" | while read -r file; do
+        echo "- $file"
+    done
+else
+    echo "No uncommitted changes."
+fi)
+
+## Active Tasks
+$(if [ -n "$active_tasks" ]; then
+    echo "Tasks in progress:"
+    echo "$active_tasks" | while read -r task; do
+        echo "- $task"
+    done
+else
+    echo "No active tasks recorded."
+fi)
+
+## Recently Modified Files
+$(if [ -n "$recent_files" ]; then
+    echo "Files modified in the last hour:"
+    echo "$recent_files" | while read -r file; do
+        echo "- $file"
+    done | head -10
+else
+    echo "No recently modified files."
+fi)
+
+## Instructions
+Please continue the work from where we left off. Check the uncommitted changes and active tasks to understand what needs to be completed.
+
+---
+*Generated by auto-handoff on $(date)*
+EOF
+    
+    echo -e "${GREEN}✅ Handoff prompt saved: ${prompt_file}${NC}"
+}
+
+# Function to restore from handoff
+restore_handoff() {
+    if [ ! -f "$CURRENT_HANDOFF" ]; then
+        echo -e "${YELLOW}⚠️  No handoff file found${NC}"
+        return 1
+    fi
+    
+    echo -e "${BLUE}🔄 Restoring from handoff...${NC}"
+    
+    # Display handoff prompt if it exists
+    local prompt_file="${HANDOFF_DIR}/handoff_prompt.md"
+    if [ -f "$prompt_file" ]; then
+        echo -e "${GREEN}📋 Handoff Prompt:${NC}"
+        echo "----------------------------------------"
+        cat "$prompt_file"
+        echo "----------------------------------------"
+        
+        # Copy to clipboard if possible
+        if command -v pbcopy &> /dev/null; then
+            cat "$prompt_file" | pbcopy
+            echo -e "${GREEN}✅ Handoff prompt copied to clipboard${NC}"
+        elif command -v xclip &> /dev/null; then
+            cat "$prompt_file" | xclip -selection clipboard
+            echo -e "${GREEN}✅ Handoff prompt copied to clipboard${NC}"
+        fi
+    fi
+    
+    # Show git status
+    local git_branch=$(jq -r '.git.branch' "$CURRENT_HANDOFF")
+    if [ -n "$git_branch" ]; then
+        echo -e "${BLUE}Git branch: ${git_branch}${NC}"
+        git status --short
+    fi
+    
+    # Show active tasks
+    local active_tasks=$(jq -r '.stackmemory.active_tasks[].content' "$CURRENT_HANDOFF" 2>/dev/null)
+    if [ -n "$active_tasks" ]; then
+        echo -e "${BLUE}Active tasks:${NC}"
+        echo "$active_tasks" | while read -r task; do
+            echo "  • $task"
+        done
+    fi
+}
+
+# Function to clean old handoffs
+cleanup_handoffs() {
+    echo -e "${BLUE}🧹 Cleaning old handoffs...${NC}"
+    
+    # Archive handoffs older than 7 days
+    find "$HANDOFF_DIR" -name "handoff_*.json" -mtime +7 -exec mv {} "$HANDOFF_ARCHIVE" \; 2>/dev/null
+    
+    # Delete archives older than 30 days
+    find "$HANDOFF_ARCHIVE" -name "handoff_*.json" -mtime +30 -delete 2>/dev/null
+    
+    echo -e "${GREEN}✅ Cleanup complete${NC}"
+}
+
+# Signal handler for graceful shutdown
+handle_termination() {
+    echo -e "\n${YELLOW}⚠️  Session terminating...${NC}"
+    capture_context
+    echo -e "${GREEN}✨ Handoff complete! Run 'auto-handoff restore' to continue${NC}"
+    exit 0
+}
+
+# Main script logic
+case "${1:-}" in
+    capture)
+        capture_context
+        ;;
+    restore)
+        restore_handoff
+        ;;
+    cleanup)
+        cleanup_handoffs
+        ;;
+    watch)
+        # Set up signal handlers
+        trap handle_termination SIGINT SIGTERM SIGHUP
+        
+        echo -e "${BLUE}👀 Watching session... Press Ctrl+C to capture handoff${NC}"
+        echo -e "${YELLOW}Run this in your Claude session to enable auto-handoff${NC}"
+        
+        # Keep script running
+        while true; do
+            sleep 1
+        done
+        ;;
+    *)
+        echo "Usage: $0 {capture|restore|cleanup|watch}"
+        echo ""
+        echo "Commands:"
+        echo "  capture  - Manually capture current context"
+        echo "  restore  - Restore from last handoff"
+        echo "  cleanup  - Clean old handoff files"
+        echo "  watch    - Watch session and capture on termination"
+        echo ""
+        echo "Example:"
+        echo "  $0 watch    # Run in Claude session for auto-capture"
+        echo "  $0 restore  # Run in new session to get context"
+        exit 1
+        ;;
+esac
