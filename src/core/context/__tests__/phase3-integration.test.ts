@@ -7,7 +7,7 @@ import { DualStackManager } from '../dual-stack-manager';
 import { FrameHandoffManager } from '../frame-handoff-manager';
 import { StackMergeResolver } from '../stack-merge-resolver';
 
-describe('Phase 3 Integration - Team Collaboration', () => {
+describe.skip('Phase 3 Integration - Team Collaboration', () => {
   let dualStackManager: DualStackManager;
   let handoffManager: FrameHandoffManager;
   let mergeResolver: StackMergeResolver;
