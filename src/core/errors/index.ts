@@ -63,6 +63,23 @@ export enum ErrorCode {
   RESOURCE_EXHAUSTED = 'SYS_006',
   SERVICE_UNAVAILABLE = 'SYS_007',
   SYSTEM_INIT_FAILED = 'SYS_008',
+
+  // Collaboration errors (9000-9999)
+  STACK_CONTEXT_NOT_FOUND = 'COLLAB_001',
+  HANDOFF_REQUEST_EXPIRED = 'COLLAB_002',
+  MERGE_CONFLICT_UNRESOLVABLE = 'COLLAB_003',
+  PERMISSION_VIOLATION = 'COLLAB_004',
+  OPERATION_FAILED = 'COLLAB_005',
+  OPERATION_EXPIRED = 'COLLAB_006',
+  INVALID_STATE = 'COLLAB_007',
+  RESOURCE_NOT_FOUND = 'COLLAB_008',
+  HANDOFF_ALREADY_EXISTS = 'COLLAB_009',
+  MERGE_SESSION_INVALID = 'COLLAB_010',
+  STACK_SWITCH_FAILED = 'COLLAB_011',
+  APPROVAL_TIMEOUT = 'COLLAB_012',
+  CONFLICT_RESOLUTION_FAILED = 'COLLAB_013',
+  TEAM_ACCESS_DENIED = 'COLLAB_014',
+  STACK_LIMIT_EXCEEDED = 'COLLAB_015',
 }
 
 export interface ErrorContext {
@@ -346,7 +363,7 @@ export function isStackMemoryError(error: unknown): error is StackMemoryError {
 export function createErrorHandler(defaultContext: ErrorContext) {
   return (error: unknown, additionalContext?: ErrorContext) => {
     const context = { ...defaultContext, ...additionalContext };
-    
+
     if (error instanceof StackMemoryError) {
       // Create a new error with merged context since context is readonly
       return new StackMemoryError({
@@ -359,6 +376,11 @@ export function createErrorHandler(defaultContext: ErrorContext) {
       });
     }
 
-    return wrapError(error, getErrorMessage(error), ErrorCode.INTERNAL_ERROR, context);
+    return wrapError(
+      error,
+      getErrorMessage(error),
+      ErrorCode.INTERNAL_ERROR,
+      context
+    );
   };
 }

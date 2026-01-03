@@ -1,0 +1,164 @@
+{
+  "mcpServers": {
+    "stackmemory-review": {
+      "command": "node",
+      "args": [
+        "/Users/jwu/Dev/stackmemory/dist/src/mcp/server.js"
+      ],
+      "env": {
+        "NODE_ENV": "development",
+        "STACKMEMORY_MODE": "review",
+        "STACKMEMORY_PROJECT": "stackmemory",
+        "STACKMEMORY_DB": "/Users/jwu/Dev/stackmemory/.stackmemory/stackmemory.db"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "context7-mcp"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "sequential-thinking": {
+      "command": "node",
+      "args": [
+        "/Users/jwu/Dev/stackmemory/dist/src/mcp/sequential-thinking.js"
+      ],
+      "env": {
+        "MAX_THINKING_DEPTH": "10",
+        "THINKING_TOKEN_BUDGET": "4000"
+      }
+    }
+  },
+  "tools": {
+    "frame_analysis": {
+      "description": "Analyze frame stack patterns and call depth",
+      "endpoints": [
+        "get_frame_stack",
+        "analyze_frame_patterns",
+        "get_frame_statistics"
+      ]
+    },
+    "retrieval_comparison": {
+      "description": "Compare different retrieval strategies",
+      "endpoints": [
+        "benchmark_hierarchical",
+        "benchmark_graph",
+        "benchmark_embedding",
+        "compare_semantic_collapse"
+      ]
+    },
+    "digest_review": {
+      "description": "Review digest generation strategies",
+      "endpoints": [
+        "get_digest_samples",
+        "analyze_digest_quality",
+        "compare_hybrid_ratios"
+      ]
+    },
+    "storage_analysis": {
+      "description": "Analyze storage patterns and efficiency",
+      "endpoints": [
+        "get_storage_metrics",
+        "analyze_tier_distribution",
+        "project_storage_growth"
+      ]
+    },
+    "query_testing": {
+      "description": "Test query language and retrieval",
+      "endpoints": [
+        "test_natural_language_query",
+        "test_structured_query",
+        "test_hybrid_query",
+        "measure_retrieval_latency"
+      ]
+    }
+  },
+  "review_approaches": {
+    "semantic_collapse_prevention": {
+      "strategies": [
+        "hierarchical_retrieval",
+        "graph_based_navigation",
+        "diversity_injection",
+        "explicit_relationship_modeling"
+      ],
+      "benchmarks": [
+        "50k_document_scale",
+        "embedding_diversity_score",
+        "retrieval_precision_recall"
+      ]
+    },
+    "frame_stack_architecture": {
+      "benefits": [
+        "natural_context_boundaries",
+        "automatic_scope_unwinding",
+        "10000_frame_depth",
+        "call_stack_metaphor"
+      ],
+      "comparison": {
+        "vs_linear_chat": "superior_organization",
+        "vs_ledger_based": "automatic_management",
+        "vs_vector_only": "structured_relationships"
+      }
+    },
+    "hybrid_digest_generation": {
+      "ratio": "60_40_deterministic_ai",
+      "deterministic": [
+        "tool_chains",
+        "decision_anchors",
+        "error_patterns"
+      ],
+      "ai_enhanced": [
+        "summary_generation",
+        "pattern_recognition",
+        "importance_scoring"
+      ]
+    },
+    "llm_driven_retrieval": {
+      "process": [
+        "analyze_compressed_summaries",
+        "determine_optimal_depth",
+        "selective_frame_loading",
+        "token_budget_optimization"
+      ],
+      "advantages": [
+        "efficient_context_usage",
+        "relevant_information_only",
+        "scalable_to_millions"
+      ]
+    },
+    "two_tier_storage": {
+      "local": {
+        "technology": "sqlite",
+        "retention": "30_days",
+        "gc_strategy": "generational",
+        "compression": "progressive"
+      },
+      "remote": {
+        "technology": "timeseries_plus_s3",
+        "retention": "infinite",
+        "migration": "hybrid_streaming_batch",
+        "optimization": "railway_buckets"
+      }
+    }
+  },
+  "integration_points": {
+    "claude_code": {
+      "mcp_server": true,
+      "session_hooks": true,
+      "auto_context": true
+    },
+    "linear": {
+      "bidirectional_sync": true,
+      "task_management": true,
+      "auto_update": true
+    },
+    "git": {
+      "project_detection": true,
+      "branch_awareness": true,
+      "commit_hooks": true
+    }
+  }
+}

@@ -20,7 +20,7 @@ All notable changes to StackMemory will be documented in this file.
 
 ### Changed
 - Renamed "Beads" architecture to "Pebbles" for task management
-- Enhanced MCP server with comprehensive task management capabilities
+- Enhanced MCP server with task management capabilities
 - Updated project structure with organized source directories
 
 ### Technical

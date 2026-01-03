@@ -1,6 +1,6 @@
 # Claude Worktree Setup for Multiple Instances
 
-A comprehensive Git worktree management system designed for running multiple Claude instances safely on the same repository without conflicts.
+A Git worktree management system for running multiple Claude instances safely on the same repository without conflicts.
 
 ## Features
 

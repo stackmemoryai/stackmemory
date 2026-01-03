@@ -24,6 +24,7 @@ export class Logger {
   private static instance: Logger;
   private logLevel: LogLevel = LogLevel.INFO;
   private logFile?: string;
+  private fileLoggingDisabledNotified = false;
 
   private constructor() {
     // Set log level from environment
@@ -59,10 +60,23 @@ export class Logger {
   }
 
   private ensureLogDirectory(): void {
-    if (this.logFile) {
-      const logDir = path.dirname(this.logFile);
+    if (!this.logFile) return;
+    const logDir = path.dirname(this.logFile);
+    try {
       if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
+      }
+    } catch (err) {
+      // Disable file logging if we cannot create the directory (e.g., ENOSPC)
+      this.logFile = undefined;
+      if (!this.fileLoggingDisabledNotified) {
+        this.fileLoggingDisabledNotified = true;
+        // Emit a single warning to console so we don't spam output
+        const msg =
+          '[Logger] File logging disabled (failed to create log directory). Falling back to console only.';
+        // Use console directly to avoid recursion
+        // eslint-disable-next-line no-console
+        console.warn(msg);
       }
     }
   }
@@ -74,8 +88,16 @@ export class Logger {
     if (this.logFile) {
       try {
         fs.appendFileSync(this.logFile, logLine);
-      } catch {
-        // Silent failure to prevent recursive logging
+      } catch (err) {
+        // Disable file logging on error (e.g., ENOSPC) to avoid repeated failures
+        this.logFile = undefined;
+        if (!this.fileLoggingDisabledNotified) {
+          this.fileLoggingDisabledNotified = true;
+          const msg =
+            '[Logger] File logging disabled (write failed). Falling back to console only.';
+          // eslint-disable-next-line no-console
+          console.warn(msg);
+        }
       }
     }
 

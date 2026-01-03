@@ -2,7 +2,7 @@
 
 ## 🎯 What's New: Pebbles Task Management
 
-StackMemory v0.2.0 introduces **Pebbles** - a git-native task management system that seamlessly integrates with the call-stack memory architecture.
+StackMemory v0.2.0 introduces **Pebbles** - a git-native task management system that integrates with the call-stack memory architecture.
 
 ## ✨ Key Features
 
@@ -124,4 +124,4 @@ The foundation is ready for Linear API integration:
 
 ---
 
-**StackMemory v0.2.0** transforms context management into comprehensive task + memory fusion, providing the foundation for AI-powered development workflow optimization.
+**StackMemory v0.2.0** transforms context management into task + memory fusion, providing the foundation for AI-powered development workflow optimization.

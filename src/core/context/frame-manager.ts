@@ -17,6 +17,7 @@ import {
 } from '../errors/index.js';
 import { retry, withTimeout } from '../errors/recovery.js';
 import { sessionManager, FrameQueryMode } from '../session/index.js';
+import { contextBridge } from './context-bridge.js';
 
 // Frame types based on architecture
 export type FrameType =
@@ -101,7 +102,7 @@ export class FrameManager {
   constructor(db: Database.Database, projectId: string, runId?: string) {
     this.db = db;
     this.projectId = projectId;
-    
+
     // Use session manager for run ID if available
     const session = sessionManager.getCurrentSession();
     if (session) {
@@ -111,9 +112,21 @@ export class FrameManager {
       this.currentRunId = runId || uuidv4();
       this.sessionId = this.currentRunId; // Fallback for legacy behavior
     }
-    
+
     this.initializeSchema();
     this.loadActiveStack();
+
+    // Initialize context bridge for automatic shared context
+    contextBridge
+      .initialize(this, {
+        autoSync: true,
+        syncInterval: 60000, // 1 minute
+        minFrameScore: 0.5, // Sync frames above 0.5 score
+        importantTags: ['decision', 'error', 'milestone', 'learning'],
+      })
+      .catch((error) => {
+        logger.warn('Failed to initialize context bridge', { error });
+      });
   }
 
   setQueryMode(mode: FrameQueryMode): void {
@@ -183,7 +196,7 @@ export class FrameManager {
         operation: 'initializeSchema',
         schema: 'frames',
       });
-      
+
       if (dbError instanceof DatabaseError) {
         throw new DatabaseError(
           'Failed to initialize frame database schema',
@@ -222,7 +235,7 @@ export class FrameManager {
           `;
           params = [];
           break;
-          
+
         case FrameQueryMode.PROJECT_ACTIVE:
           query = `
             SELECT frame_id, parent_frame_id, depth, run_id
@@ -232,7 +245,7 @@ export class FrameManager {
           `;
           params = [this.projectId];
           break;
-          
+
         case FrameQueryMode.HISTORICAL:
           query = `
             SELECT frame_id, parent_frame_id, depth
@@ -242,7 +255,7 @@ export class FrameManager {
           `;
           params = [this.projectId];
           break;
-          
+
         case FrameQueryMode.CURRENT_SESSION:
         default:
           query = `
@@ -272,7 +285,7 @@ export class FrameManager {
         runId: this.currentRunId,
         queryMode: this.queryMode,
       });
-      
+
       if (dbError instanceof DatabaseError) {
         throw new DatabaseError(
           'Failed to load active frame stack',
@@ -323,7 +336,7 @@ export class FrameManager {
     inputs?: Record<string, any>;
     parentFrameId?: string;
   }): string {
-    return trace.traceSync('function', 'FrameManager.createFrame', options, () => this._createFrame(options));
+    return this._createFrame(options);
   }
 
   private _createFrame(options: {
@@ -408,7 +421,7 @@ export class FrameManager {
    * Close the current frame and generate digest
    */
   public closeFrame(frameId?: string, outputs?: Record<string, any>): void {
-    trace.traceSync('function', 'FrameManager.closeFrame', { frameId, outputs }, () => this._closeFrame(frameId, outputs));
+    this._closeFrame(frameId, outputs);
   }
 
   private _closeFrame(frameId?: string, outputs?: Record<string, any>): void {
@@ -775,6 +788,112 @@ export class FrameManager {
 
   public getStackDepth(): number {
     return this.activeStack.length;
+  }
+
+  /**
+   * Get recent frames for context sharing
+   */
+  public async getRecentFrames(limit: number = 100): Promise<Frame[]> {
+    try {
+      const rows = this.db
+        .prepare(
+          `
+          SELECT * FROM frames 
+          WHERE project_id = ?
+          ORDER BY created_at DESC
+          LIMIT ?
+        `
+        )
+        .all(this.projectId, limit) as any[];
+
+      return rows.map((row) => ({
+        ...row,
+        frameId: row.frame_id,
+        runId: row.run_id,
+        projectId: row.project_id,
+        parentFrameId: row.parent_frame_id,
+        title: row.name,
+        timestamp: row.created_at,
+        metadata: {
+          tags: this.extractTagsFromFrame(row),
+          importance: this.calculateFrameImportance(row),
+        },
+        data: {
+          inputs: JSON.parse(row.inputs || '{}'),
+          outputs: JSON.parse(row.outputs || '{}'),
+          digest: JSON.parse(row.digest_json || '{}'),
+        },
+        inputs: JSON.parse(row.inputs || '{}'),
+        outputs: JSON.parse(row.outputs || '{}'),
+        digest_json: JSON.parse(row.digest_json || '{}'),
+      }));
+    } catch (error) {
+      logger.error('Failed to get recent frames', error as Error);
+      return [];
+    }
+  }
+
+  /**
+   * Add context metadata to the current frame
+   */
+  public async addContext(key: string, value: any): Promise<void> {
+    const currentFrameId = this.getCurrentFrameId();
+    if (!currentFrameId) return;
+
+    try {
+      const frame = this.getFrame(currentFrameId);
+      if (!frame) return;
+
+      const metadata = frame.outputs || {};
+      metadata[key] = value;
+
+      this.db
+        .prepare(`UPDATE frames SET outputs = ? WHERE frame_id = ?`)
+        .run(JSON.stringify(metadata), currentFrameId);
+    } catch (error) {
+      logger.warn('Failed to add context to frame', { error, key });
+    }
+  }
+
+  private extractTagsFromFrame(frame: any): string[] {
+    const tags: string[] = [];
+
+    // Add type as tag
+    if (frame.type) tags.push(frame.type);
+
+    // Extract tags from name
+    if (frame.name) {
+      if (frame.name.toLowerCase().includes('error')) tags.push('error');
+      if (frame.name.toLowerCase().includes('fix')) tags.push('resolution');
+      if (frame.name.toLowerCase().includes('decision')) tags.push('decision');
+      if (frame.name.toLowerCase().includes('milestone'))
+        tags.push('milestone');
+    }
+
+    // Extract from digest
+    try {
+      const digest = JSON.parse(frame.digest_json || '{}');
+      if (digest.tags) tags.push(...digest.tags);
+    } catch {}
+
+    return [...new Set(tags)];
+  }
+
+  private calculateFrameImportance(frame: any): 'high' | 'medium' | 'low' {
+    // Milestones and decisions are high importance
+    if (frame.type === 'milestone' || frame.name?.includes('decision'))
+      return 'high';
+
+    // Errors and resolutions are medium importance
+    if (frame.type === 'error' || frame.type === 'resolution') return 'medium';
+
+    // Long-running frames are potentially important
+    if (frame.closed_at && frame.created_at) {
+      const duration = frame.closed_at - frame.created_at;
+      if (duration > 300) return 'medium'; // More than 5 minutes
+    }
+
+    return 'low';
   }
 
   private getFrameDepth(frameId: string): number {

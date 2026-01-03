@@ -5,7 +5,7 @@
 ### 1. Complete Context Frame Manager Tests
 - **Status**: In Progress
 - **Files**: `src/core/context/__tests__/frame-manager.test.ts` (new)
-- **Description**: Finish implementing comprehensive test suite for the new frame manager functionality
+- **Description**: Finish implementing test suite for the new frame manager functionality
 - **Tags**: testing, core
 
 ### 2. Complete Linear MCP Integration Documentation
@@ -51,4 +51,4 @@
 2. Finalize and commit documentation
 3. Clean up and commit Linear integration changes
 4. Remove duplicate script files
-5. Create comprehensive commit with all related changes
+5. Create commit with all related changes

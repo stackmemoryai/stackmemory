@@ -83,7 +83,7 @@ npm run build
 
 ## 🧪 Test Suite
 
-Run the comprehensive test to verify context quality:
+Run the test to verify context quality:
 
 ```bash
 # In any project with StackMemory initialized

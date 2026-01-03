@@ -1,6 +1,6 @@
 # Automatic Trace & Tool Call Referencing with Claude Code
 
-This guide explains how StackMemory automatically captures and references all tool usage across Claude Code sessions, enabling seamless context continuity.
+This guide explains how StackMemory automatically captures and references all tool usage across Claude Code sessions, maintaining context continuity.
 
 ## How It Works
 
@@ -300,4 +300,4 @@ stackmemory status --all  # All projects
 stackmemory context:merge project1 project2  # Merge contexts
 ```
 
-This creates a seamless development experience where Claude Code automatically understands the full history and context of your project work.
+This creates a development experience where Claude Code automatically understands the full history and context of your project work.

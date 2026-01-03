@@ -8,6 +8,7 @@ import { program } from 'commander';
 import { logger } from '../core/monitoring/logger.js';
 import { FrameManager } from '../core/context/frame-manager.js';
 import { sessionManager, FrameQueryMode } from '../core/session/index.js';
+import { sharedContextLayer } from '../core/context/shared-context-layer.js';
 import { PebblesTaskStore } from '../features/tasks/pebbles-task-store.js';
 import {
   LinearAuthManager,
@@ -40,6 +41,10 @@ import { createConfigCommand } from './commands/config.js';
 import { createAgentCommand } from './commands/agent.js';
 import { createHandoffCommand } from './commands/handoff.js';
 import { createStorageCommand } from './commands/storage.js';
+// import clearCommand from './commands/clear.js';
+// import createWorkflowCommand from './commands/workflow.js';
+// import createMonitorCommand from './commands/monitor.js';
+// import createQualityCommand from './commands/quality.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
@@ -105,12 +110,43 @@ program
       // Check for updates and display if available
       await UpdateChecker.checkForUpdates(VERSION);
 
-      // Initialize session manager
+      // Initialize session manager and shared context
       await sessionManager.initialize();
+      await sharedContextLayer.initialize();
+
       const session = await sessionManager.getOrCreateSession({
         projectPath: projectRoot,
         sessionId: options.session,
       });
+
+      // Auto-discover shared context on startup
+      const contextDiscovery = await sharedContextLayer.autoDiscoverContext();
+
+      // Show context hints if available
+      if (
+        contextDiscovery.hasSharedContext &&
+        contextDiscovery.sessionCount > 1
+      ) {
+        console.log(`\n💡 Shared Context Available:`);
+        console.log(
+          `   ${contextDiscovery.sessionCount} sessions with shared context`
+        );
+
+        if (contextDiscovery.recentPatterns.length > 0) {
+          console.log(`   Recent patterns:`);
+          contextDiscovery.recentPatterns.slice(0, 3).forEach((p) => {
+            console.log(
+              `     • ${p.type}: ${p.pattern.slice(0, 50)} (${p.frequency}x)`
+            );
+          });
+        }
+
+        if (contextDiscovery.lastDecisions.length > 0) {
+          console.log(
+            `   Last decision: ${contextDiscovery.lastDecisions[0].decision.slice(0, 60)}`
+          );
+        }
+      }
 
       const db = new Database(dbPath);
       const frameManager = new FrameManager(db, session.projectId);
@@ -1250,6 +1286,10 @@ program.addCommand(createConfigCommand());
 program.addCommand(createAgentCommand());
 program.addCommand(createHandoffCommand());
 program.addCommand(createStorageCommand());
+// program.addCommand(clearCommand);
+// program.addCommand(createWorkflowCommand());
+// program.addCommand(createMonitorCommand());
+// program.addCommand(createQualityCommand());
 
 // Auto-detect current project on startup
 if (process.argv.length > 2) {

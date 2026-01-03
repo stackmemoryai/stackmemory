@@ -246,4 +246,4 @@ fi
 ~/.claude/hooks/stackmemory_init.sh "$@"
 ```
 
-This creates a seamless integration where Claude Code automatically captures all tool usage and maintains persistent context across sessions.
+This creates an integration where Claude Code automatically captures all tool usage and maintains persistent context across sessions.

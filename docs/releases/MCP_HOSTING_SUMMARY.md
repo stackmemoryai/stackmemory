@@ -27,7 +27,7 @@
 - Simulates Claude Desktop communication
 
 ### 5. Complete Documentation
-- `docs/MCP_SETUP.md` - Comprehensive setup guide
+- `docs/MCP_SETUP.md` - Complete setup guide
 - `docs/MCP_HOSTING_PLAN.md` - Architecture and roadmap
 - Multiple setup options (automated, manual, npx, Docker-ready)
 

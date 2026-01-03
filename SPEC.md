@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-StackMemory is a **lossless, project-scoped memory runtime** for AI coding and writing tools that preserves full project context across sessions using a call stack metaphor instead of linear chat logs. It organizes memory as nested frames with intelligent retrieval, enabling AI tools to maintain context across thread resets, model switches, and long-running projects.
+StackMemory is a **lossless, project-scoped memory runtime** for AI coding and writing tools that preserves full project context across sessions using a call stack metaphor instead of linear chat logs. It organizes memory as nested frames with smart retrieval, enabling AI tools to maintain context across thread resets, model switches, and long-running projects.
 
 ## Core Architecture
 
@@ -120,7 +120,7 @@ local_to_remote_migration:
       interval: 300s
       compression: true
       
-    intelligent_batching:
+    smart_batching:
       group_by: "frame"
       wait_for_frame_close: true
       max_wait: 1h
@@ -179,7 +179,7 @@ scoring:
       persistence: 0.3             # Permanent changes critical
 ```
 
-### 4. Intelligent Context Retrieval
+### 4. Smart Context Retrieval
 
 #### 4.1 LLM-Driven Retrieval
 ```yaml
@@ -429,7 +429,7 @@ garbage_collection:
 ```yaml
 digest_generation:
   deterministic: 60%               # Reliable extraction
-  ai_generated: 40%                # Intelligent summary
+  ai_generated: 40%                # AI-generated summary
   
   deterministic_fields:
     - files_modified
@@ -766,7 +766,7 @@ performance:
 ## Conclusion
 
 StackMemory provides a revolutionary approach to AI tool memory management through:
-- **Lossless storage** with intelligent retrieval
+- **Lossless storage** with smart retrieval
 - **Frame-based organization** replacing linear chat logs
 - **Two-tier storage** balancing performance and capacity
 - **LLM-driven context selection** for optimal relevance

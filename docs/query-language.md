@@ -239,7 +239,7 @@ interface QueryResponse {
 ## Best Practices
 
 1. **Start broad, then refine**: Begin with simple queries and add filters as needed
-2. **Use shortcuts**: Leverage pre-defined shortcuts for common queries
+2. **Use shortcuts**: Use pre-defined shortcuts for common queries
 3. **Combine approaches**: Mix natural language with inline modifiers for flexibility
 4. **Check suggestions**: The parser provides helpful suggestions for better queries
 5. **Use templates**: For recurring workflows, use query templates

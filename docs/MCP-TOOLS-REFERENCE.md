@@ -158,7 +158,7 @@ These tools implement key patterns from Spotify's background coding agents:
 - **Session Management**: Each agent session tracks turn count, verification results, and learned context
 - **Verification**: Every action goes through formatter, linter, and LLM judge verification
 - **Persistence**: All context is stored in SQLite database with frame-based organization
-- **Integration**: Seamlessly works with existing StackMemory CLI and frame architecture
+- **Integration**: Works with existing StackMemory CLI and frame architecture
 
 ## Troubleshooting
 

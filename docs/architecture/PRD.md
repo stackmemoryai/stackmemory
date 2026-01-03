@@ -312,7 +312,7 @@ Hosted version always leads by N versions.
 
 ## 17. One-Sentence Positioning
 
-> **A lossless, project-scoped memory runtime for AI tools — built to survive long-running work.**
+> **A lossless, project-scoped memory runtime for AI tools, built to survive long-running work.**
 
 ---
 

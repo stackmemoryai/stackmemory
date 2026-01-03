@@ -1,6 +1,6 @@
 # StackMemory Debug Trace System
 
-A comprehensive execution tracing system designed to help LLMs debug code by providing detailed execution logs with full context.
+An execution tracing system designed to help LLMs debug code by providing detailed execution logs with full context.
 
 ## Quick Start
 

@@ -1,6 +1,6 @@
 # Linear MCP Integration for Claude Code
 
-StackMemory now includes MCP (Model Context Protocol) tools that allow Claude Code to directly interact with Linear tasks. This enables seamless task management without leaving your conversation.
+StackMemory now includes MCP (Model Context Protocol) tools that allow Claude Code to directly interact with Linear tasks. This enables task management without leaving your conversation.
 
 ## Available MCP Tools
 

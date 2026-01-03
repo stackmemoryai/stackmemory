@@ -2,13 +2,13 @@
 
 ## System Architecture Overview
 
-StackMemory is a **lossless, project-scoped memory runtime** that revolutionizes how AI tools maintain context. Key architectural principles:
+StackMemory is a **lossless, project-scoped memory runtime** that changes how AI tools maintain context. Key architectural principles:
 
 ### Core Concepts
 - **Frame-based memory**: Call stack metaphor with up to 10,000 frames (not linear chat logs)
 - **Two-tier storage**: Local SQLite (30-day retention) + infinite remote storage (S3/TimeSeries DB)
-- **LLM-driven retrieval**: Intelligent context selection analyzing compressed summaries to determine optimal frame depth
-- **Hybrid digests**: 60% deterministic extraction, 40% AI-generated summaries processed during idle time
+- **LLM-driven retrieval**: Context selection using compressed summaries to find the right frame depth
+- **Hybrid digests**: 60% deterministic extraction, 40% AI-generated summaries created during idle time
 - **Configurable scoring**: Tool importance scores (search: 0.95, grep: 0.15) with customizable weight profiles
 - **Team collaboration**: Dual stack architecture supporting individual and shared frames with handoff
 
@@ -65,7 +65,7 @@ StackMemory is a **lossless, project-scoped memory runtime** that revolutionizes
    # If 2FA enabled, use: npm publish --otp=[code]
    ```
 
-### Common Issues & Solutions
+### Common Issues
 
 #### Token Expired Error
 ```
@@ -95,7 +95,7 @@ npm error This operation requires a one-time password
 ## Sandbox Environment
 
 ### Purpose
-The sandbox environment allows testing StackMemory in isolation before publishing.
+The sandbox environment lets you test StackMemory in isolation before publishing.
 
 ### Creating Sandbox
 ```bash
@@ -127,7 +127,7 @@ export LINEAR_API_KEY="your_key"
 /tmp/stackmemory-sandbox/[timestamp]/run-sandbox.sh clean
 ```
 
-## Feature Testing Requirements
+## Testing Requirements
 
 ### Linear Integration
 - Set `LINEAR_API_KEY` environment variable

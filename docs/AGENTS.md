@@ -2,12 +2,12 @@
 
 ## System Architecture Overview
 
-StackMemory is a **lossless, project-scoped memory runtime** that revolutionizes how AI tools maintain context. Key architectural principles:
+StackMemory is a **lossless, project-scoped memory runtime** that changes how AI tools maintain context. Key architectural principles:
 
 ### Core Concepts
 - **Frame-based memory**: Call stack metaphor with up to 10,000 frames (not linear chat logs)
 - **Two-tier storage**: Local SQLite (30-day retention) + infinite remote storage (S3/TimeSeries DB)
-- **LLM-driven retrieval**: Intelligent context selection analyzing compressed summaries to determine optimal frame depth
+- **LLM-driven retrieval**: Context selection analyzing compressed summaries to determine optimal frame depth
 - **Hybrid digests**: 60% deterministic extraction, 40% AI-generated summaries processed during idle time
 - **Configurable scoring**: Tool importance scores (search: 0.95, grep: 0.15) with customizable weight profiles
 - **Team collaboration**: Dual stack architecture supporting individual and shared frames with handoff
