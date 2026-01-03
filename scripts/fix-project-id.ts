@@ -44,7 +44,7 @@ function fixDatabase(projectId: string): void {
   // Check current project IDs in frames
   const projectIds = db
     .prepare('SELECT DISTINCT project_id FROM frames')
-    .all() as any[];
+    .all() as Array<{ project_id: string }>;
   console.log(chalk.blue('Current project IDs in database:'));
   projectIds.forEach((p) => console.log(`  - ${p.project_id}`));
 

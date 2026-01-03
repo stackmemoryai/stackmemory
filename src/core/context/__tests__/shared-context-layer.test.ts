@@ -50,6 +50,8 @@ describe('SharedContextLayer', () => {
       state: 'active',
     });
 
+    // Reset singleton instance
+    (SharedContextLayer as any).instance = undefined;
     contextLayer = SharedContextLayer.getInstance();
     await contextLayer.initialize();
   });
@@ -203,12 +205,10 @@ describe('SharedContextLayer', () => {
           name: 'Important Task',
           state: 'active',
           inputs: {},
-          outputs: {},
-          digest_json: {},
+          outputs: { result: 'completed successfully' },
+          digest_json: { decision: 'Use new architecture' },
           created_at: Date.now(),
-          metadata: { tags: ['important'], importance: 'high' },
-          data: { decision: 'Use new architecture' },
-        } as any,
+        },
       ];
 
       await contextLayer.addToSharedContext(mockFrames, { minScore: 0.5 });

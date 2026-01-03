@@ -159,11 +159,7 @@ export class SharedContextLayer {
     // Filter important frames
     const importantFrames = frames.filter((f) => {
       const score = this.calculateFrameScore(f);
-      return (
-        score >= minScore ||
-        (options?.tags &&
-          options.tags.some((tag) => f.metadata?.tags?.includes(tag)))
-      );
+      return score >= minScore;
     });
 
     // Create session context
@@ -438,15 +434,15 @@ export class SharedContextLayer {
     let score = 0.5;
 
     // Boost for certain types
-    if (frame.type === 'task' || frame.type === 'milestone') score += 0.2;
-    if (frame.type === 'error' || frame.type === 'resolution') score += 0.15;
+    if (frame.type === 'task' || frame.type === 'review') score += 0.2;
+    if (frame.type === 'debug' || frame.type === 'write') score += 0.15;
 
-    // Boost for metadata
-    if (frame.metadata?.importance === 'high') score += 0.2;
-    if (frame.metadata?.tags?.length > 0) score += 0.1;
+    // Boost for having outputs (indicates completion/results)
+    if (frame.outputs && Object.keys(frame.outputs).length > 0) score += 0.2;
+    if (frame.digest_text || (frame.digest_json && Object.keys(frame.digest_json).length > 0)) score += 0.1;
 
     // Time decay (reduce score for older frames)
-    const age = Date.now() - frame.timestamp;
+    const age = Date.now() - frame.created_at;
     const daysSinceCreation = age / (24 * 60 * 60 * 1000);
     score *= Math.max(0.3, 1 - daysSinceCreation / 30);
 
@@ -455,13 +451,13 @@ export class SharedContextLayer {
 
   private summarizeFrame(frame: Frame): FrameSummary {
     return {
-      frameId: frame.frameId,
-      title: frame.title,
+      frameId: frame.frame_id,
+      title: frame.name,
       type: frame.type,
       score: this.calculateFrameScore(frame),
-      tags: frame.metadata?.tags || [],
+      tags: [],
       summary: this.generateFrameSummary(frame),
-      createdAt: frame.timestamp,
+      createdAt: frame.created_at,
     };
   }
 
