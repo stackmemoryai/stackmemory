@@ -391,7 +391,7 @@ describe('HybridDigestGenerator', () => {
       const digest = generator.getDigest('test-frame-1');
       expect(digest).toBeTruthy();
       expect(digest!.status).toBe('complete');
-      expect(digest!.text).toContain('AI Review:');
+      expect(digest!.text).toContain('**AI Review**:');
       expect(digest!.text).toContain('AI-generated summary');
     });
 

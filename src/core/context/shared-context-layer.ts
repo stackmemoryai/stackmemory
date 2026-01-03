@@ -209,6 +209,9 @@ export class SharedContextLayer {
     // Collect all frames from all sessions
     for (const session of context.sessions) {
       if (query.sessionId && session.sessionId !== query.sessionId) continue;
+      
+      // Skip sessions without keyFrames
+      if (!session.keyFrames || !Array.isArray(session.keyFrames)) continue;
 
       const filtered = session.keyFrames.filter((f) => {
         if (query.tags && !query.tags.some((tag) => f.tags.includes(tag)))
@@ -245,10 +248,18 @@ export class SharedContextLayer {
 
     // Update recently accessed
     const index = context.referenceIndex;
-    index.recentlyAccessed = [
-      ...results.map((r) => r.frameId),
-      ...index.recentlyAccessed,
-    ].slice(0, 100);
+    if (!index.recentlyAccessed) {
+      index.recentlyAccessed = [];
+    }
+    
+    // Add frameIds to recently accessed, removing duplicates
+    if (results.length > 0) {
+      const frameIds = results.map((r) => r.frameId);
+      index.recentlyAccessed = [
+        ...frameIds,
+        ...index.recentlyAccessed.filter(id => !frameIds.includes(id))
+      ].slice(0, 100);
+    }
 
     return results;
   }
@@ -281,6 +292,7 @@ export class SharedContextLayer {
       id: uuidv4(),
       timestamp: Date.now(),
       sessionId: session.sessionId,
+      outcome: 'pending',
       ...decision,
     };
 
