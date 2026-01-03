@@ -129,14 +129,14 @@ export class ContextBridge {
       const session = sessionManager.getCurrentSession();
       if (!session) return;
 
-      // Get all active frames
-      const activeFrames = this.frameManager.getActiveFramePath();
+      // Get all active frames (filter out any nulls from missing frames)
+      const activeFrames = this.frameManager.getActiveFramePath().filter(Boolean);
 
       // Get recent closed frames (last 100)
       const recentFrames = await this.frameManager.getRecentFrames(100);
 
       // Combine and filter important frames
-      const allFrames = [...activeFrames, ...recentFrames];
+      const allFrames = [...activeFrames, ...recentFrames].filter(Boolean);
       const importantFrames = this.filterImportantFrames(allFrames);
 
       if (importantFrames.length === 0) {

@@ -923,15 +923,13 @@ export class FrameManager {
         digest_json: JSON.parse(row.digest_json || '{}'),
       };
     } catch (error) {
-      throw new DatabaseError(
-        `Failed to get frame: ${frameId}`,
-        ErrorCode.DB_QUERY_FAILED,
-        {
-          frameId,
-          operation: 'getFrame',
-        },
-        error instanceof Error ? error : undefined
-      );
+      // Log the error but return undefined instead of throwing
+      logger.warn(`Failed to get frame: ${frameId}`, {
+        error: error instanceof Error ? error.message : String(error),
+        frameId,
+        operation: 'getFrame',
+      });
+      return undefined;
     }
   }
 

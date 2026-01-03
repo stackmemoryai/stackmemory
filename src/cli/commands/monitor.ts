@@ -1,4 +1,7 @@
-#!/usr/bin/env node
+/**
+ * Monitor command for StackMemory
+ * Real-time monitoring of context and frame activity
+ */
 
 /**
  * Monitor command for StackMemory
@@ -8,10 +11,10 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { SessionMonitor } from '../../core/monitoring/session-monitor';
-import { FrameManager } from '../../core/frame/frame-manager';
-import { DatabaseManager } from '../../core/storage/database-manager';
-import { getProjectRoot } from '../utils/project-utils';
+import { SessionMonitor } from '../../core/monitoring/session-monitor.js';
+import { FrameManager } from '../../core/context/frame-manager.js';
+import Database from 'better-sqlite3';
+// getProjectRoot function will be defined below
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { spawn } from 'child_process';
@@ -82,7 +85,7 @@ export function createMonitorCommand(): Command {
 async function startMonitor(
   projectRoot: string,
   options: any,
-  spinner: ora.Ora
+  spinner: any
 ) {
   spinner.start('Starting monitor daemon...');
 
@@ -293,12 +296,11 @@ async function updateActivity(projectRoot: string) {
  */
 async function runDaemon(projectRoot: string, options: any) {
   const dbPath = path.join(projectRoot, '.stackmemory', 'db', 'stackmemory.db');
-  const dbManager = new DatabaseManager(dbPath);
-  await dbManager.initialize();
+  const db = new Database(dbPath);
 
-  const frameManager = new FrameManager(dbManager);
+  const frameManager = new FrameManager(db, 'current');
 
-  const monitor = new SessionMonitor(frameManager, dbManager, projectRoot, {
+  const monitor = new SessionMonitor(frameManager, db, projectRoot, {
     checkIntervalSeconds: parseInt(options.interval) || 30,
     idleTimeoutMinutes: parseInt(options.idle) || 5,
     autoSaveLedger: true,
@@ -363,12 +365,11 @@ async function runForeground(projectRoot: string, options: any) {
   console.log(chalk.bold('🔍 Running monitor in foreground...\n'));
 
   const dbPath = path.join(projectRoot, '.stackmemory', 'db', 'stackmemory.db');
-  const dbManager = new DatabaseManager(dbPath);
-  await dbManager.initialize();
+  const db = new Database(dbPath);
 
-  const frameManager = new FrameManager(dbManager);
+  const frameManager = new FrameManager(db, 'current');
 
-  const monitor = new SessionMonitor(frameManager, dbManager, projectRoot, {
+  const monitor = new SessionMonitor(frameManager, db, projectRoot, {
     checkIntervalSeconds: parseInt(options.interval) || 30,
     idleTimeoutMinutes: parseInt(options.idle) || 5,
     autoSaveLedger: true,
@@ -415,6 +416,10 @@ async function runForeground(projectRoot: string, options: any) {
 }
 
 // Helper functions
+
+async function getProjectRoot(): Promise<string> {
+  return process.cwd();
+}
 
 function getStatusEmoji(status: string): string {
   switch (status) {

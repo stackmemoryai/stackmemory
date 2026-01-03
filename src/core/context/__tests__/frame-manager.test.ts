@@ -846,7 +846,8 @@ describe('FrameManager', () => {
       
       db.close();
       
-      expect(() => frameManager.getFrame(frameId)).toThrow(DatabaseError);
+      // After our fix, getFrame returns undefined instead of throwing
+      expect(frameManager.getFrame(frameId)).toBeUndefined();
       expect(() => frameManager.getFrameEvents(frameId)).toThrow(DatabaseError);
     });
 

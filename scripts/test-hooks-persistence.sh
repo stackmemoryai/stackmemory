@@ -70,7 +70,7 @@ echo
 # Test on-clear hook
 echo -e "${BLUE}2. Testing on-clear hook (context preservation)...${NC}"
 echo "Creating test context..."
-echo "test-context-$(date +%s)" | ~/.stackmemory/bin/stackmemory context add --type task --tags test,hook
+~/.stackmemory/bin/stackmemory context add observation "test-context-$(date +%s)"
 FRAME_BEFORE=$(get_latest_frame)
 echo "Frame ID before clear: $FRAME_BEFORE"
 
@@ -178,7 +178,7 @@ echo "Simulating work session..."
 
 # Create some activity
 for i in {1..3}; do
-    echo "Activity $i" | ~/.stackmemory/bin/stackmemory context add --type activity --tags monitor,test
+    ~/.stackmemory/bin/stackmemory context add observation "Activity $i"
     sleep 0.5
 done
 

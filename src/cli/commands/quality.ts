@@ -13,10 +13,10 @@ import {
   PostTaskHooks,
   PostTaskConfig,
   QualityGateResult,
-} from '../../integrations/claude-code/post-task-hooks';
-import { FrameManager } from '../../core/context/frame-manager';
-import { DatabaseManager } from '../../core/storage/database-manager';
-import { getProjectRoot } from '../utils/project-utils';
+} from '../../integrations/claude-code/post-task-hooks.js';
+import { FrameManager } from '../../core/context/frame-manager.js';
+import Database from 'better-sqlite3';
+// getProjectRoot function will be defined below
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -51,32 +51,31 @@ export function createQualityCommand(): Command {
           process.exit(1);
         }
 
-        const dbManager = new DatabaseManager(dbPath);
-        await dbManager.initialize();
-        const frameManager = new FrameManager(dbManager);
+        const db = new Database(dbPath);
+        const frameManager = new FrameManager(db);
 
         if (options.enable) {
           await enableQualityGates(
             projectRoot,
             frameManager,
-            dbManager,
+            db,
             spinner
           );
         } else if (options.disable) {
           await disableQualityGates(projectRoot, spinner);
         } else if (options.status) {
-          await showStatus(projectRoot, frameManager, dbManager);
+          await showStatus(projectRoot, frameManager, db);
         } else if (options.config) {
           await configureQualityGates(projectRoot);
         } else if (options.run) {
-          await runQualityGates(projectRoot, frameManager, dbManager, spinner);
+          await runQualityGates(projectRoot, frameManager, db, spinner);
         } else if (options.history) {
           await showHistory(frameManager);
         } else if (options.setup) {
-          await setupWizard(projectRoot, frameManager, dbManager);
+          await setupWizard(projectRoot, frameManager, db);
         } else {
           // Default: show status
-          await showStatus(projectRoot, frameManager, dbManager);
+          await showStatus(projectRoot, frameManager, db);
         }
       } catch (error) {
         spinner.fail(chalk.red(`Error: ${error}`));
@@ -93,8 +92,8 @@ export function createQualityCommand(): Command {
 async function enableQualityGates(
   projectRoot: string,
   frameManager: FrameManager,
-  dbManager: DatabaseManager,
-  spinner: ora.Ora
+  db: any,
+  spinner: any
 ) {
   spinner.start('Enabling quality gates...');
 
@@ -109,7 +108,7 @@ async function enableQualityGates(
     };
 
     // Initialize hooks
-    const hooks = new PostTaskHooks(frameManager, dbManager, config);
+    const hooks = new PostTaskHooks(frameManager, db, config);
     await hooks.initialize();
 
     // Save config
@@ -173,7 +172,7 @@ async function disableQualityGates(projectRoot: string, spinner: ora.Ora) {
 async function showStatus(
   projectRoot: string,
   frameManager: FrameManager,
-  dbManager: DatabaseManager
+  db: Database
 ) {
   console.log(chalk.bold('\n📊 Quality Gates Status\n'));
 
@@ -312,14 +311,14 @@ async function configureQualityGates(projectRoot: string) {
 async function runQualityGates(
   projectRoot: string,
   frameManager: FrameManager,
-  dbManager: DatabaseManager,
-  spinner: ora.Ora
+  db: any,
+  spinner: any
 ) {
   spinner.start('Running quality gates...');
 
   try {
     const config = await loadConfig(projectRoot);
-    const hooks = new PostTaskHooks(frameManager, dbManager, config);
+    const hooks = new PostTaskHooks(frameManager, db, config);
 
     // Simulate a task completion event
     const mockEvent = {
@@ -417,7 +416,7 @@ async function showHistory(frameManager: FrameManager) {
 async function setupWizard(
   projectRoot: string,
   frameManager: FrameManager,
-  dbManager: DatabaseManager
+  db: Database
 ) {
   console.log(chalk.bold('🧙 Quality Gates Setup Wizard\n'));
 
@@ -491,7 +490,7 @@ async function setupWizard(
 
   if (enable) {
     const spinner = ora();
-    await enableQualityGates(projectRoot, frameManager, dbManager, spinner);
+    await enableQualityGates(projectRoot, frameManager, db, spinner);
   }
 
   console.log(chalk.bold('\n🎉 Setup Complete!\n'));

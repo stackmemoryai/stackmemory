@@ -1,22 +1,17 @@
-#!/usr/bin/env node
-
 /**
- * Workflow CLI commands for StackMemory
- * Provides structured workflow templates for common development patterns
+ * Workflow command for StackMemory
+ * Manages workflow templates and execution
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import * as path from 'path';
+import Database from 'better-sqlite3';
+import { existsSync } from 'fs';
+import { FrameManager } from '../../core/context/frame-manager';
+import { WorkflowTemplates, WorkflowTemplate } from '../../core/frame/workflow-templates';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import {
-  WorkflowTemplates,
-  WorkflowTemplate,
-} from '../../core/frame/workflow-templates.js';
-import { FrameManager } from '../../core/context/frame-manager.js';
-import { DatabaseManager } from '../../core/storage/database-manager.js';
-import { getProjectRoot } from '../utils/project-utils.js';
-import * as path from 'path';
 import * as fs from 'fs/promises';
 
 export function createWorkflowCommand(): Command {
@@ -49,9 +44,8 @@ export function createWorkflowCommand(): Command {
           process.exit(1);
         }
 
-        const dbManager = new DatabaseManager(dbPath);
-        await dbManager.initialize();
-        const frameManager = new FrameManager(dbManager);
+        const db = new Database(dbPath);
+        const frameManager = new FrameManager(db, 'current');
         const workflowManager = new WorkflowTemplates(frameManager);
 
         // Handle different options
@@ -139,7 +133,7 @@ async function listWorkflows() {
 async function startWorkflow(
   workflowManager: WorkflowTemplates,
   templateName: string,
-  spinner: ora.Ora
+  spinner: any
 ) {
   spinner.start(`Starting ${templateName} workflow...`);
 
@@ -184,7 +178,7 @@ async function startWorkflow(
 async function transitionPhase(
   workflowManager: WorkflowTemplates,
   frameManager: FrameManager,
-  spinner: ora.Ora
+  spinner: any
 ) {
   spinner.start('Validating current phase...');
 
@@ -471,9 +465,8 @@ async function startSpecificWorkflow(templateName: string) {
       'stackmemory.db'
     );
 
-    const dbManager = new DatabaseManager(dbPath);
-    await dbManager.initialize();
-    const frameManager = new FrameManager(dbManager);
+    const db = new Database(dbPath);
+    const frameManager = new FrameManager(db, 'current');
     const workflowManager = new WorkflowTemplates(frameManager);
 
     await startWorkflow(workflowManager, templateName, spinner);
@@ -484,6 +477,10 @@ async function startSpecificWorkflow(templateName: string) {
 }
 
 // Helper functions
+
+async function getProjectRoot(): Promise<string> {
+  return process.cwd();
+}
 
 /**
  * Find active workflow frame

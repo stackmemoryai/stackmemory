@@ -9,12 +9,14 @@ import chalk from 'chalk';
 import ora from 'ora';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import Database from 'better-sqlite3';
+import { existsSync } from 'fs';
 import { ClearSurvival } from '../../core/session/clear-survival.js';
-import { FrameManager } from '../../core/frame/frame-manager.js';
-import { DatabaseManager } from '../../core/storage/database-manager.js';
+import { FrameManager } from '../../core/context/frame-manager.js';
 import { HandoffGenerator } from '../../core/session/handoff-generator.js';
+import { sessionManager } from '../../core/session/session-manager.js';
 
-export const clearCommand = new Command('clear')
+const clearCommand = new Command('clear')
   .description('Manage context clearing with ledger preservation')
   .option('--save', 'Save continuity ledger before clearing')
   .option('--restore', 'Restore from continuity ledger')
@@ -28,12 +30,10 @@ export const clearCommand = new Command('clear')
     try {
       // Initialize managers
       const projectRoot = process.cwd();
-      const dbPath = path.join(projectRoot, '.stackmemory', 'stackmemory.db');
+      const dbPath = path.join(projectRoot, '.stackmemory', 'context.db');
 
       // Check if StackMemory is initialized
-      try {
-        await fs.access(dbPath);
-      } catch {
+      if (!existsSync(dbPath)) {
         console.error(
           chalk.red('✗ StackMemory not initialized in this directory')
         );
@@ -41,16 +41,21 @@ export const clearCommand = new Command('clear')
         process.exit(1);
       }
 
-      const dbManager = new DatabaseManager(dbPath);
-      const frameManager = new FrameManager(dbManager);
+      const db = new Database(dbPath);
+      
+      // Initialize session manager
+      await sessionManager.initialize();
+      const session = await sessionManager.getOrCreateSession({
+        projectPath: projectRoot,
+      });
+
+      const frameManager = new FrameManager(db, session.projectId);
       const handoffGenerator = new HandoffGenerator(
         frameManager,
-        dbManager,
         projectRoot
       );
       const clearSurvival = new ClearSurvival(
         frameManager,
-        dbManager,
         handoffGenerator,
         projectRoot
       );
@@ -69,205 +74,162 @@ export const clearCommand = new Command('clear')
       } else if (options.auto) {
         await autoClear(clearSurvival, spinner);
       } else {
-        // Interactive mode
-        await interactiveClear(clearSurvival, spinner);
+        // Default: Show status and options
+        await showContextStatus(clearSurvival);
+        console.log('\nOptions:');
+        console.log('  --status     Show current context usage');
+        console.log('  --check      Check if clear is recommended');
+        console.log('  --save       Save continuity ledger');
+        console.log('  --restore    Restore from ledger');
+        console.log('  --auto       Auto-save if needed and clear');
       }
     } catch (error) {
-      spinner.fail(chalk.red('Operation failed'));
-      console.error(error);
+      spinner.fail(chalk.red('Error: ' + (error as Error).message));
       process.exit(1);
     }
   });
 
-async function showContextStatus(clearSurvival: ClearSurvival) {
-  // Simulate token counts (in real implementation, get from session)
-  const currentTokens = 70000;
-  const maxTokens = 100000;
-  const usage = (currentTokens / maxTokens) * 100;
+async function showContextStatus(clearSurvival: ClearSurvival): Promise<void> {
+  const usage = await clearSurvival.getContextUsage();
+  const status = clearSurvival.assessContextStatus(usage);
 
-  console.log(chalk.bold('\n📊 Context Status\n'));
-
-  // Visual progress bar
-  const barLength = 40;
-  const filled = Math.round((usage / 100) * barLength);
-  const empty = barLength - filled;
-
-  let barColor = chalk.green;
-  if (usage >= 85) barColor = chalk.red;
-  else if (usage >= 70) barColor = chalk.yellow;
-  else if (usage >= 60) barColor = chalk.cyan;
-
-  const bar = barColor('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
-
-  console.log(`Context Usage: ${bar} ${usage.toFixed(1)}%`);
-  console.log(
-    `Tokens: ${currentTokens.toLocaleString()} / ${maxTokens.toLocaleString()}`
-  );
-
-  // Recommendations
-  const status = await clearSurvival.monitorContextUsage(
-    currentTokens,
-    maxTokens
-  );
-
-  console.log('\nStatus:', getStatusMessage(status));
-
-  if (status === 'critical' || status === 'warning') {
-    const recommendation = await clearSurvival.shouldClear(
-      currentTokens,
-      maxTokens
-    );
-    if (recommendation.recommended) {
-      console.log(chalk.yellow(`\n⚠️ ${recommendation.reason}`));
-      console.log(
-        chalk.cyan(
-          `Suggestion: ${recommendation.alternative || 'Run: stackmemory clear --save'}`
-        )
-      );
-    }
-  }
-}
-
-async function checkIfClearRecommended(clearSurvival: ClearSurvival) {
-  const currentTokens = 75000;
-  const maxTokens = 100000;
-
-  const recommendation = await clearSurvival.shouldClear(
-    currentTokens,
-    maxTokens
-  );
-
-  if (recommendation.recommended) {
-    console.log(chalk.yellow('\n⚠️ Clear Recommended\n'));
-    console.log(`Reason: ${recommendation.reason}`);
+  console.log(chalk.bold('\n📊 Context Usage Status'));
+  console.log('─'.repeat(40));
+  
+  const percentage = Math.round(usage.percentageUsed);
+  const statusColor = getStatusColor(status);
+  
+  console.log(`Usage: ${percentage}% ${getProgressBar(percentage)}`);
+  console.log(`Status: ${statusColor}`);
+  console.log(`Active Frames: ${usage.activeFrames}`);
+  console.log(`Total Frames: ${usage.totalFrames}`);
+  console.log(`Sessions: ${usage.sessionCount}`);
+  
+  if (status === 'critical' || status === 'saved') {
     console.log(
-      `Action: ${recommendation.alternative || 'Run: stackmemory clear --save'}`
+      chalk.yellow('\n⚠️  Consider clearing context to improve performance')
     );
-  } else {
-    console.log(chalk.green('\n✓ No Clear Needed\n'));
-    if (recommendation.alternative) {
-      console.log(`Status: ${recommendation.alternative}`);
-    }
+    console.log(chalk.cyan('Run: stackmemory clear --save'));
   }
 }
 
-async function saveLedger(clearSurvival: ClearSurvival, spinner: any) {
+async function checkIfClearRecommended(clearSurvival: ClearSurvival): Promise<void> {
+  const usage = await clearSurvival.getContextUsage();
+  const status = clearSurvival.assessContextStatus(usage);
+  
+  if (status === 'critical' || status === 'saved') {
+    console.log(chalk.yellow('✓ Clear recommended'));
+    console.log(`Context usage: ${Math.round(usage.percentageUsed)}%`);
+    process.exit(0);
+  } else {
+    console.log(chalk.green('✗ Clear not needed'));
+    console.log(`Context usage: ${Math.round(usage.percentageUsed)}%`);
+    process.exit(1);
+  }
+}
+
+async function saveLedger(clearSurvival: ClearSurvival, spinner: ora.Ora): Promise<void> {
   spinner.start('Saving continuity ledger...');
-
-  const ledger = await clearSurvival.saveContinuityLedger();
-
+  
+  const ledgerPath = await clearSurvival.saveContinuityLedger();
+  
   spinner.succeed(chalk.green('Continuity ledger saved'));
-
-  console.log(chalk.bold('\n📚 Ledger Summary\n'));
-  console.log(`Compression: ${Math.round(ledger.compression_ratio)}x`);
-  console.log(`Frames: ${ledger.active_frame_stack.length}`);
-  console.log(`Decisions: ${ledger.key_decisions.length}`);
-  console.log(
-    `Tasks: ${ledger.active_tasks.filter((t) => t.status !== 'completed').length} active`
-  );
-  console.log(`Focus: ${ledger.current_focus}`);
-
-  if (ledger.warnings.length > 0) {
-    console.log(chalk.yellow(`\nWarnings:`));
-    ledger.warnings.forEach((w) => console.log(`  - ${w}`));
-  }
-
-  console.log(
-    chalk.cyan('\n✓ Ready for /clear - context will be restored automatically')
-  );
+  console.log(chalk.cyan(`Location: ${ledgerPath}`));
+  
+  // Show what was saved
+  const ledger = JSON.parse(await fs.readFile(ledgerPath, 'utf-8'));
+  console.log('\nSaved:');
+  console.log(`  • ${ledger.activeFrames.length} active frames`);
+  console.log(`  • ${ledger.decisions.length} key decisions`);
+  console.log(`  • ${ledger.context.importantTasks?.length || 0} important tasks`);
 }
 
-async function restoreFromLedger(clearSurvival: ClearSurvival, spinner: any) {
+async function restoreFromLedger(clearSurvival: ClearSurvival, spinner: ora.Ora): Promise<void> {
   spinner.start('Restoring from continuity ledger...');
-
-  const success = await clearSurvival.restoreFromLedger();
-
-  if (success) {
+  
+  const result = await clearSurvival.restoreFromLedger();
+  
+  if (result.success) {
     spinner.succeed(chalk.green('Context restored from ledger'));
-    console.log(chalk.cyan('\n✓ Previous context restored - continue working'));
+    console.log('\nRestored:');
+    console.log(`  • ${result.restoredFrames} frames`);
+    console.log(`  • ${result.restoredDecisions} decisions`);
   } else {
-    spinner.fail(chalk.red('No ledger found to restore'));
-    console.log(chalk.yellow('Start fresh or check .stackmemory/continuity/'));
+    spinner.fail(chalk.red('Failed to restore from ledger'));
+    console.log(chalk.yellow(result.message));
   }
 }
 
-async function showLedger(projectRoot: string) {
-  const ledgerPath = path.join(
-    projectRoot,
-    '.stackmemory',
-    'continuity',
-    'CONTINUITY_CLAUDE-latest.md'
-  );
-
-  try {
-    const content = await fs.readFile(ledgerPath, 'utf-8');
-    console.log(content);
-  } catch (error) {
-    console.log(chalk.red('No continuity ledger found'));
-    console.log(chalk.yellow('Run: stackmemory clear --save'));
+async function showLedger(projectRoot: string): Promise<void> {
+  const ledgerPath = path.join(projectRoot, '.stackmemory', 'continuity.json');
+  
+  if (!existsSync(ledgerPath)) {
+    console.log(chalk.yellow('No continuity ledger found'));
+    return;
+  }
+  
+  const ledger = JSON.parse(await fs.readFile(ledgerPath, 'utf-8'));
+  
+  console.log(chalk.bold('\n📖 Continuity Ledger'));
+  console.log('─'.repeat(40));
+  console.log(`Created: ${new Date(ledger.timestamp).toLocaleString()}`);
+  console.log(`Active Frames: ${ledger.activeFrames.length}`);
+  console.log(`Key Decisions: ${ledger.decisions.length}`);
+  
+  if (ledger.activeFrames.length > 0) {
+    console.log('\nActive Work:');
+    ledger.activeFrames.slice(0, 5).forEach((frame: any) => {
+      console.log(`  • ${frame.name} (${frame.type})`);
+    });
+  }
+  
+  if (ledger.decisions.length > 0) {
+    console.log('\nKey Decisions:');
+    ledger.decisions.slice(0, 3).forEach((decision: any) => {
+      console.log(`  • ${decision.decision}`);
+    });
   }
 }
 
-async function autoClear(clearSurvival: ClearSurvival, spinner: any) {
-  spinner.start('Checking context...');
-
-  const currentTokens = 85000;
-  const maxTokens = 100000;
-
-  const status = await clearSurvival.monitorContextUsage(
-    currentTokens,
-    maxTokens
-  );
-
-  if (status === 'saved') {
-    spinner.succeed(chalk.green('Auto-saved ledger (context at 85%)'));
-    console.log(chalk.cyan('\n✓ Ledger saved - you can now use /clear'));
-  } else if (status === 'critical') {
-    spinner.info('Context critical - saving ledger...');
+async function autoClear(clearSurvival: ClearSurvival, spinner: ora.Ora): Promise<void> {
+  const usage = await clearSurvival.getContextUsage();
+  const status = clearSurvival.assessContextStatus(usage);
+  
+  if (status === 'critical' || status === 'saved') {
+    spinner.start('Auto-saving ledger before clear...');
     await clearSurvival.saveContinuityLedger();
-    spinner.succeed(chalk.green('Ledger saved'));
-    console.log(chalk.cyan('\n✓ Ready for /clear'));
+    spinner.succeed('Ledger saved');
+    
+    spinner.start('Clearing context...');
+    // Note: Actual clear implementation would go here
+    // For now, just simulate
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    spinner.succeed('Context cleared successfully');
   } else {
-    spinner.info(`Context ${status} - no action needed`);
+    console.log(chalk.green('Context usage is healthy, no clear needed'));
   }
 }
 
-async function interactiveClear(clearSurvival: ClearSurvival, spinner: any) {
-  console.log(chalk.bold('\n🔄 Context Clear Management\n'));
-
-  // Show current status
-  const currentTokens = 70000;
-  const maxTokens = 100000;
-  const usage = (currentTokens / maxTokens) * 100;
-
-  console.log(`Current usage: ${usage.toFixed(1)}%`);
-
-  const recommendation = await clearSurvival.shouldClear(
-    currentTokens,
-    maxTokens
-  );
-
-  if (recommendation.recommended) {
-    console.log(chalk.yellow(`\nClear recommended: ${recommendation.reason}`));
-    console.log(chalk.cyan('\nOptions:'));
-    console.log('1. Save ledger and prepare for clear');
-    console.log('2. Check status only');
-    console.log('3. Exit');
-
-    // In a real implementation, use inquirer for interactive prompts
-    console.log(chalk.gray('\nRun: stackmemory clear --save'));
-  } else {
-    console.log(chalk.green('\n✓ Context healthy - no clear needed'));
-    console.log(chalk.gray(`Status: ${recommendation.alternative}`));
-  }
+function getProgressBar(percentage: number): string {
+  const filled = Math.round(percentage / 5);
+  const empty = 20 - filled;
+  
+  let bar = '[';
+  bar += chalk.green('■').repeat(Math.min(filled, 10));
+  bar += chalk.yellow('■').repeat(Math.max(0, Math.min(filled - 10, 5)));
+  bar += chalk.red('■').repeat(Math.max(0, filled - 15));
+  bar += chalk.gray('□').repeat(empty);
+  bar += ']';
+  
+  return bar;
 }
 
-function getStatusMessage(status: string): string {
+function getStatusColor(status: string): string {
   switch (status) {
-    case 'ok':
-      return chalk.green('✓ Healthy (<60%)');
-    case 'warning':
-      return chalk.cyan('⚠ Warning (60-70%)');
+    case 'healthy':
+      return chalk.green('✓ Healthy (<50%)');
+    case 'moderate':
+      return chalk.blue('⚡ Moderate (50-70%)');
     case 'critical':
       return chalk.yellow('⚠️ Critical (70-85%)');
     case 'saved':

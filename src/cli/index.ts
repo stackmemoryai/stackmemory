@@ -41,10 +41,10 @@ import { createConfigCommand } from './commands/config.js';
 import { createAgentCommand } from './commands/agent.js';
 import { createHandoffCommand } from './commands/handoff.js';
 import { createStorageCommand } from './commands/storage.js';
-// import clearCommand from './commands/clear.js';
-// import createWorkflowCommand from './commands/workflow.js';
-// import createMonitorCommand from './commands/monitor.js';
-// import createQualityCommand from './commands/quality.js';
+import clearCommand from './commands/clear.js';
+import createWorkflowCommand from './commands/workflow.js';
+import createMonitorCommand from './commands/monitor.js';
+import createQualityCommand from './commands/quality.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
@@ -1286,10 +1286,10 @@ program.addCommand(createConfigCommand());
 program.addCommand(createAgentCommand());
 program.addCommand(createHandoffCommand());
 program.addCommand(createStorageCommand());
-// program.addCommand(clearCommand);
-// program.addCommand(createWorkflowCommand());
-// program.addCommand(createMonitorCommand());
-// program.addCommand(createQualityCommand());
+program.addCommand(clearCommand);
+program.addCommand(createWorkflowCommand);
+program.addCommand(createMonitorCommand);
+program.addCommand(createQualityCommand);
 
 // Auto-detect current project on startup
 if (process.argv.length > 2) {

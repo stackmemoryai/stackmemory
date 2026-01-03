@@ -129,13 +129,19 @@ describe('ContextBridge', () => {
     it('should start auto-sync when enabled', async () => {
       vi.useFakeTimers();
 
+      // Setup mock frames for sync to work
+      vi.mocked(mockFrameManager.getActiveFramePath).mockReturnValue([
+        { frame_id: 'test', type: 'task', name: 'Test Task' } as any,
+      ]);
+      vi.mocked(mockFrameManager.getRecentFrames).mockResolvedValue([]);
+      
       await bridge.initialize(mockFrameManager as FrameManager, {
         autoSync: true,
         syncInterval: 5000,
       });
 
-      // Fast-forward time
-      vi.advanceTimersByTime(5000);
+      // Fast-forward time to trigger the interval
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(sharedContextLayer.addToSharedContext).toHaveBeenCalled();
 
@@ -177,6 +183,9 @@ describe('ContextBridge', () => {
     });
 
     it('should handle empty shared context', async () => {
+      // Reset the mock to clear any calls from initialization
+      vi.mocked(mockFrameManager.addContext).mockClear();
+      
       vi.mocked(sharedContextLayer.autoDiscoverContext).mockResolvedValueOnce({
         hasSharedContext: false,
         sessionCount: 0,
@@ -371,25 +380,26 @@ describe('ContextBridge', () => {
     });
 
     it('should sync periodically when auto-sync is enabled', async () => {
+      // Setup mock frames before initialization
+      vi.mocked(mockFrameManager.getActiveFramePath).mockReturnValue([
+        { frame_id: 'test', type: 'task', name: 'Test' } as any,
+      ]);
+      vi.mocked(mockFrameManager.getRecentFrames).mockResolvedValue([]);
+      
       await bridge.initialize(mockFrameManager as FrameManager, {
         autoSync: true,
         syncInterval: 10000,
       });
 
-      // Setup mock frames
-      vi.mocked(mockFrameManager.getActiveFramePath).mockReturnValue([
-        { frame_id: 'test', type: 'task', name: 'Test' } as any,
-      ]);
-
       // Initial sync shouldn't happen immediately
       expect(sharedContextLayer.addToSharedContext).not.toHaveBeenCalled();
 
-      // Fast-forward 10 seconds
-      vi.advanceTimersByTime(10000);
+      // Fast-forward 10 seconds and wait for async operations
+      await vi.advanceTimersByTimeAsync(10000);
       expect(sharedContextLayer.addToSharedContext).toHaveBeenCalledTimes(1);
 
-      // Fast-forward another 10 seconds
-      vi.advanceTimersByTime(10000);
+      // Fast-forward another 10 seconds and wait for async operations
+      await vi.advanceTimersByTimeAsync(10000);
       expect(sharedContextLayer.addToSharedContext).toHaveBeenCalledTimes(2);
     });
 
