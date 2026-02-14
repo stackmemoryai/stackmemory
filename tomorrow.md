@@ -1,28 +1,30 @@
-# Tomorrow — 2026-02-12
+# Tomorrow — 2026-02-13
 
-## Publish v1.0.1
+## Publish — DONE (v1.2.0)
 
-npm token expired. Re-auth and publish:
+v1.2.0 published to npm. Since v1.0.1:
+- feat: multi-provider routing with sensitive content guard
+- feat: auto-compact at 95% of model token limit
+- feat: 6 trigger-based feedback loops with engine + CLI
+- feat: harness benchmarks with SWE-bench baselines
+- feat: audit CLI, edit telemetry, sm_edit fuzzy MCP tool
+- fix: flaky integration test timeout, pre-commit nvm sourcing, bench vitest config
 
-```bash
-npm login --scope=@stackmemoryai
-npm publish --access public
-```
+## Graphiti Integration — Committed, Needs Wiring
 
-v1.0.1 is committed, pushed, and pre-publish verified (652 tests, lint clean, build OK).
+All files committed on main (no longer untracked):
 
-## Graphiti Integration
-
-Untracked files on main — work in progress:
-
-- `src/integrations/graphiti/` — client, types, config
-- `src/hooks/graphiti-hooks.ts` — session/file change episode hooks (lint-fixed)
+- `src/integrations/graphiti/` — client (REST stub with retry/timeout), types (Episode, EntityNode, RelationEdge, TemporalQuery), config (env-gated via `GRAPHITI_ENDPOINT`)
+- `src/hooks/graphiti-hooks.ts` — registers on session_start/file_change/session_end, emits Episodes to Graphiti. Includes `buildTemporalContext()` helper for future MCP tooling.
 - `docs/graphiti-integration.md` — integration spec
 
+Status: Stub client + hooks are wired, but no tests and not exposed as MCP tool yet.
+
 Next steps:
-- Wire graphiti client into MCP tools or expose as new tool
-- Add tests for graphiti hooks
-- Decide: optional dependency or always-on?
+- Add MCP tool handler for temporal queries (e.g., `graphiti_query`)
+- Add tests for GraphitiClient and GraphitiHooks
+- Wire scanner events (Stripe, Salesforce, GitHub) to emit episodes/entities
+- Decide: optional dependency or always-on? (currently env-gated, which is correct)
 
 ## Remaining Doc Cleanup
 
@@ -39,9 +41,9 @@ Lower priority items not addressed in the 1.0 docs refresh:
 
 ## Codex Linear Sync — Verify
 
-The fix is deployed (gated on `LINEAR_API_KEY`, 10s timeout, non-fatal). After publishing v1.0.1:
+The fix is deployed (gated on `LINEAR_API_KEY`, 10s timeout, non-fatal):
 
-1. `npm install -g @stackmemoryai/stackmemory@1.0.1`
+1. `npm install -g @stackmemoryai/stackmemory@1.2.0`
 2. Run `codex-sm` with `LINEAR_API_KEY` set
 3. Exit codex and verify Linear sync fires
 
@@ -49,4 +51,4 @@ The fix is deployed (gated on `LINEAR_API_KEY`, 10s timeout, non-fatal). After p
 
 - Shared `onSessionExit()` utility to deduplicate exit logic across claude-sm/codex-sm/pty-wrapper
 - `session_end` hook event should trigger Linear sync via hook system (not just inline execSync)
-- Consider adding `CHANGELOG.md` back with proper v0.6-v1.0.1 entries (the old one was deleted because it stopped at v0.5.51)
+- Consider adding `CHANGELOG.md` back with proper v0.6-v1.2.0 entries (the old one was deleted because it stopped at v0.5.51)

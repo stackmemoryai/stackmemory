@@ -1,0 +1,41 @@
+{
+  "variant": "variant-b",
+  "generation": 1,
+  "results": [
+    {
+      "taskId": "eval-001",
+      "taskName": "simple_function",
+      "passed": false,
+      "duration": 5,
+      "output": "/bin/sh: timeout: command not found\n"
+    },
+    {
+      "taskId": "eval-002",
+      "taskName": "refactor_code",
+      "passed": false,
+      "duration": 5,
+      "output": "/bin/sh: timeout: command not found\n"
+    },
+    {
+      "taskId": "eval-003",
+      "taskName": "fix_bug",
+      "passed": false,
+      "duration": 4,
+      "output": "/bin/sh: timeout: command not found\n"
+    },
+    {
+      "taskId": "eval-004",
+      "taskName": "add_feature",
+      "passed": false,
+      "duration": 5,
+      "output": "/bin/sh: timeout: command not found\n"
+    },
+    {
+      "taskId": "eval-005",
+      "taskName": "code_review",
+      "passed": false,
+      "duration": 5,
+      "output": "/bin/sh: timeout: command not found\n"
+    }
+  ]
+}
