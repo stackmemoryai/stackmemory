@@ -41,6 +41,14 @@ import {
   sendCtrlC,
   sessionExists,
 } from '../features/workers/tmux-manager.js';
+import {
+  CANONICAL_HOOKS,
+  mergeSettings,
+  hasDeadHooks,
+  readSettings,
+  writeSettingsAtomic,
+  getSettingsPath,
+} from '../utils/hook-installer.js';
 
 // __filename and __dirname are provided by esbuild banner for ESM compatibility
 
@@ -446,6 +454,75 @@ class ClaudeSM {
     return null;
   }
 
+  /**
+   * Ensure Claude Code hooks are installed. Copies missing scripts from
+   * templates and updates settings.json. Non-fatal on any error.
+   */
+  private ensureHooks(): void {
+    try {
+      const hooksDir = path.join(os.homedir(), '.claude', 'hooks');
+
+      // 1. Ensure hooks dir exists
+      if (!fs.existsSync(hooksDir)) {
+        fs.mkdirSync(hooksDir, { recursive: true });
+      }
+
+      // 2. Find templates dir (dev → dist → global npm)
+      const candidateDirs = [
+        path.join(__dirname, '../../templates/claude-hooks'),
+        path.join(__dirname, '../../../templates/claude-hooks'),
+        path.join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          '..',
+          'templates',
+          'claude-hooks'
+        ),
+      ];
+      const templatesDir = candidateDirs.find(
+        (d) => fs.existsSync(d) && fs.readdirSync(d).length > 0
+      );
+      if (!templatesDir) return; // No templates found, skip silently
+
+      // 3. Copy missing hook scripts
+      let copiedCount = 0;
+      for (const entry of CANONICAL_HOOKS) {
+        const dest = path.join(hooksDir, entry.scriptName);
+        if (!fs.existsSync(dest)) {
+          const src = path.join(templatesDir, entry.scriptName);
+          if (fs.existsSync(src)) {
+            fs.copyFileSync(src, dest);
+            // Make executable
+            try {
+              fs.chmodSync(dest, 0o755);
+            } catch {
+              // Best-effort
+            }
+            copiedCount++;
+          }
+        }
+      }
+
+      // 4. Update settings.json if scripts were copied or dead hooks exist
+      const settingsPath = getSettingsPath();
+      const current = readSettings(settingsPath);
+      if (copiedCount > 0 || hasDeadHooks(current)) {
+        const merged = mergeSettings(current, hooksDir);
+        writeSettingsAtomic(merged, settingsPath);
+      }
+
+      if (copiedCount > 0) {
+        console.log(
+          chalk.gray(`   Hooks: installed ${copiedCount} missing hook(s)`)
+        );
+      }
+    } catch {
+      // Non-fatal: Claude should continue even if hook install fails
+    }
+  }
+
   private loadContext(): void {
     if (!this.config.contextEnabled) return;
 
@@ -717,6 +794,9 @@ class ClaudeSM {
 
     // Load previous context
     this.loadContext();
+
+    // Ensure Claude Code hooks are installed (non-fatal)
+    this.ensureHooks();
 
     // Setup environment
     process.env['CLAUDE_INSTANCE_ID'] = this.config.instanceId;

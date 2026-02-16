@@ -99,21 +99,6 @@ describe('CLI Integration Tests', { timeout: 120_000 }, () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  describe('Clear Survival Commands', () => {
-    // Flaky in CI/pre-publish: execSync ETIMEDOUT under load. Not production-gating.
-    it.skip('should show clear status', { timeout: 30000 }, () => {
-      const result = execSync(cli('clear --status'), {
-        cwd: testDir,
-        encoding: 'utf8',
-        timeout: EXEC_TIMEOUT,
-      });
-
-      // Updated expectations to match actual output
-      expect(result).toContain('Context Usage Status');
-      expect(result).toContain('Usage:');
-    });
-  });
-
   describe('Capture/Restore Commands', () => {
     it('should generate handoff document', { timeout: 30000 }, () => {
       const result = execSync(cli('capture'), {
