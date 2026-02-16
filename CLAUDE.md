@@ -114,6 +114,22 @@ Environment sources (check in order):
 
 Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
 
+## Deploy
+
+```bash
+# npm publish (uses NPM_TOKEN from .env, no OTP needed)
+git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
+NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
+  npm publish --registry https://registry.npmjs.org/ \
+  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
+git stash pop                         # restore GEPA state
+
+# Railway
+railway up
+
+# Pre-publish checks require clean git status — stash GEPA files first
+```
+
 ## Workflow
 
 - Check .env for API keys before asking
