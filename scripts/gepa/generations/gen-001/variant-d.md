@@ -1,119 +1,148 @@
-# ProvenantAI — CLAUDE.md
+# StackMemory - Project Configuration
 
-## Quick Reference
+## Project Structure
+
 ```
-AGENTS.md                                # TDD workflow, checklists, guardrails
-docs/STYLE.md                            # Design system (Hatchet + Outliner)
-docs/business/ONE_PAGER.md               # Executive summary
-docs/business/VISION.md                  # Product vision + self-learning thesis
-DEV_SPEC.md|PROMPT_PLAN.md               # Dev spec + 20 staged prompts
-docs/architecture/{SYSTEM_INTEGRATION,HEARTBEAT_DESIGN,WEBHOOK_SYSTEM_DESIGN}.md
-docs/nudge-engine-design.md              # Proactive alerts
-docs/VALUES.md                           # Company values
-docs/reference/PROJECT.md                # Quick reference (sync with verbose docs)
+src/
+  cli/           # CLI commands and entry point
+  core/          # Core business logic
+    context/     # Frame and context management
+    database/    # Database adapters (SQLite, ParadeDB)
+    digest/      # Digest generation
+    query/       # Query parsing and routing
+  integrations/  # External integrations (Linear, MCP)
+  services/      # Business services
+  skills/        # Claude Code skills
+  utils/         # Shared utilities
+scripts/         # Build and utility scripts
+config/          # Configuration files
+docs/            # Documentation
 ```
-
-## Stack & Commands
-```bash
-# Stack: Node/Express/PostgreSQL/Redis | Railway | Stripe/Salesforce/QuickBooks
-npm run dev|test|lint|migrate
-docker-compose up -d                # Local DBs
-railway up --detach                 # Deploy
-```
-
-## Core Principles [C:10]
-**Code First**: code>docs | simple→complex | action>explanation | do>plan
-**Security**: NEVER commit secrets|exec untrusted|expose PII|force push
-  ALWAYS validate input|parameterized queries|hash passwords
-  BLOCK ~/.ssh|~/.aws|/api[_-]?key|token|secret/i
-**ESM**: add .js to relative imports | use ts-node-lint-fixer on ERR_MODULE_NOT_FOUND
-**Reliability**: return undefined>throw | log+continue>crash | filter nulls
-**Style**: no emojis | comments only for complex logic | short names | concise output
-
-## Workflow [H:8-9]
-**Tasks**: TodoWrite for 3+ steps | one in_progress | update immediately
-**Files**: read before write | edit>write | no docs unless asked
-**Git**: status→branch→fetch→pull --rebase | clean commits | type(scope): message
-  Branches: feature/|fix/|chore/ prefix
-  NO Co-Authored-By lines
-**Validate**: lint→test→build→run | never assume success | maintain test coverage
-**Parallel**: independent tool calls in one message | sequential only for dependencies
-**Recovery**: try alt→explain→suggest | never silent fail
-
-## Architecture
-**Core** (src/core/): monitoring-service|cache-service|queue-service|master-agent|api-validation
-**Structure**: src/{api,core,features,shared,integrations} | docs/ | scripts/ | docker/
-**Patterns**: DI via deps objects | Mock providers in tests | Bull queues | AES-256-GCM KMS
-**Provenance**: every data point = source + timestamp + lineage | multi-tenant isolation
-**SSE**: adapter.streamLLM() → query/stream → frontend ReadableStream
-**Graph**: optional graphService in query router (null when GRAPHITI_URL unset)
-
-## Standards [H:8]
-**Design**: KISS|YAGNI|SOLID | <20 lines/fn | <5 complexity
-**Testing**: Jest+SWC | @jest/globals imports | DB/fetch mocks via DI
-  Supertest: pass Express app (NOT server)
-  Redis: skip connect in NODE_ENV=test
-  afterAll: Promise.race + .unref() timer
-  Parallel suites: test:unit|test:core|test:integrations (~9s vs 18s)
-  **After code changes**: run targeted sub-suite in background
-**Coverage**: maintain or improve | no untested paths
-
-## Key Context
-- All 20 PROMPT_PLAN.md prompts complete | 80 suites, 1547 tests passing
-- KG: FalkorDB port 6380 + Graphiti MCP port 8100 | MCP protocol (not REST)
-- @provenantai/cli@1.0.0 published | Railway deployed | Bundle: 236KB+346KB
-- Stripe: Growth (prod_TyNYCJmlKbMdlz) $1499/mo | Scale (prod_TyNY5SGKvVlbpo) $4499/mo
-- Clerk: test keys active | production validator: scripts/setup-clerk-production.sh
-- Dashboard: /app/ base | SSE to /api/v1/query | Sidebar in localStorage
-- Slack: OAuth v2 (migration 030) | delivery.js listens nudge:created | demo: seed-demo-data.js
 
 ## Key Files
+
+- Entry: src/cli/index.ts
+- MCP Server: src/integrations/mcp/server.ts
+- Frame Manager: src/core/context/frame-manager.ts
+- Database: src/core/database/sqlite-adapter.ts
+
+## Documentation
+
+Quick reference (agent_docs/):
+- linear_integration.md - Linear sync
+- mcp_server.md - MCP tools
+- database_storage.md - Storage
+- claude_hooks.md - Hooks
+
+Full documentation (docs/):
+- principles.md - Agent programming paradigm
+- architecture.md - Extension model and browser sandbox
+- SPEC.md - Technical specification
+- API_REFERENCE.md - API docs
+- DEVELOPMENT.md - Dev guide
+- SETUP.md - Installation
+
+## Development Workflow
+
+### Build & Validation (MUST DO)
+
+After code changes:
+1. `npm run lint` - fix errors AND warnings
+2. `npm run test:run` - verify no regressions
+3. `npm run build` - ensure compilation
+4. Run code to verify it works
+
+Never: Assume success | Skip testing | Use mock data as fallback
+
+### Commands
+
+```bash
+# Development
+npm run build          # Compile TypeScript (esbuild)
+npm run lint           # ESLint check
+npm run lint:fix       # Auto-fix lint issues
+npm test               # Run Vitest (watch)
+npm run test:run       # Run tests once
+
+# StackMemory CLI
+stackmemory capture    # Save session state for handoff
+stackmemory restore    # Restore from captured state
+npm run linear:sync    # Sync with Linear
 ```
-src/graph/{client.ts,service.ts}         # MCP client + graph logic
-src/llm/adapter.js                       # SYSTEM_PROMPT + streaming
-src/routes/query.js                      # Query + KG enrichment
-src/auth/auth.middleware.js              # Clerk + API key + test mode
-src/nudge/{rule-engine,nudge-engine,delivery}.js  # Rules + lifecycle + Slack
-src/integrations/slack/app.js            # OAuth v2 + token mgmt
-scripts/{create-stripe-products,seed-demo-data}.js
-dashboard-app/src/pages/{pricing/PricingPage,checkout/*}.tsx
-docs/content/{linkedin-pillar1-drafts,gtm-launch-materials}.md
-docs/business/{CONTENT_INBOUND_STRATEGY,FRACTIONAL_CMO_AGENT}.md
+
+### Test Coverage
+
+- New features require tests in `src/**/__tests__/`
+- Maintain or improve coverage (no untested code paths)
+- Critical paths: context management, handoff, Linear sync
+
+### Task Management
+
+- Use TodoWrite for 3+ steps or multiple requests
+- Keep one task in_progress at a time
+- Update task status immediately on completion
+
+## Git & Deployment
+
+### Git Rules (CRITICAL)
+
+- NEVER use `--no-verify` on git push or commit
+- ALWAYS fix lint/test errors before pushing
+- If pre-push hooks fail, fix the underlying issue
+- Run `npm run lint && npm run test:run` before pushing
+- Commit message format: `type(scope): message`
+- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+
+### Deploy
+
+```bash
+# npm publish (uses NPM_TOKEN from .env, no OTP needed)
+git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
+NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
+  npm publish --registry https://registry.npmjs.org/ \
+  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
+git stash pop                         # restore GEPA state
+
+# Railway
+railway up
+
+# Pre-publish checks require clean git status — stash GEPA files first
 ```
 
-## Design System (docs/STYLE.md)
-- Layout: 208px sidebar | inset shadow main | shadow-soft variants
-- Type: 10-24px (no text-lg+ in app) | tabular-nums | Inter/SF Mono | font-mono headers
-- Color: slate/zinc | brand-600 blue | rose accent CTAs
-- Anti-patterns: no @apply sprawl | no inline hex | no shadow-md+ | max rounded-xl
+## Security & Environment
 
-## Output Format
-**Session Summary**:
+### Environment Variables
+
+NEVER hardcode secrets - use process.env with dotenv/config
+
+```javascript
+import 'dotenv/config';
+const API_KEY = process.env.LINEAR_API_KEY;
+if (!API_KEY) {
+  console.error('LINEAR_API_KEY not set');
+  process.exit(1);
+}
 ```
-Actual vs estimated | variance %
-Completed: N/M tasks | files modified | commits
-Deliverables | blockers | next actions
-```
-**Communication**: concise | bullets>paragraphs | <4 lines | structured
-**Pushback**: "Simpler: X" | "Risk: Y" | "Consider: Z"
-**Questions**: 1-3 max | one at a time | no time estimates
 
-## Token Budget (Think Mode)
-[NONE] single file, <10 lines
-[THINK] multi-file, standard | ~4K
-[HARD] architecture, complex | ~10K
-[ULTRA] critical redesign | ~32K
+Environment sources (check in order):
+1. .env file
+2. .env.local
+3. ~/.zshrc
+4. Process environment
 
-## Auto-Activate
-[FILES] *.tsx→frontend | *.sql→data | Docker→devops | *.test→qa
-[KEYWORDS] bug/error→debugger | optimize→perf | secure→security
+Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
 
-## Next Priorities (Memory)
-- Commit uncommitted agent work (SlackSettings, Nudges polish, smoke tests)
-- Clerk: swap to production keys (user action in dashboard)
-- Slack: create app at api.slack.com, run migration 030
-- Content: schedule pillar posts in Typefully, record Loom demo
-- Design partners: outreach to 3-5 ICP companies
-- Ad platform connectors: Google Ads / Meta for attribution story
+## Working Directory
 
-<!-- Update docs/reference/PROJECT.md when verbose docs change -->
+- PRIMARY: /Users/jwu/Dev/stackmemory
+- ALLOWED: All subdirectories
+- TEMP: /tmp for temporary operations
+
+## Session Workflow
+
+- Check .env for API keys before asking
+- Run npm run linear:sync after task completion
+- Use browser MCP for visual testing
+- Review recent commits and stackmemory.json on session start
+- Use subagents for multi-step tasks
+- Ask 1-3 clarifying questions for complex commands (one at a time)

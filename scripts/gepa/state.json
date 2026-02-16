@@ -2,13 +2,13 @@
   "currentGeneration": 0,
   "bestVariant": "baseline",
   "bestScore": 0,
-  "targetPath": "/Users/jwu/Dev/provenantai/AGENTS.md",
+  "targetPath": "/Users/jwu/Dev/stackmemory/CLAUDE.md",
   "history": [
     {
       "generation": 0,
       "variant": "baseline",
       "action": "init",
-      "timestamp": "2026-02-14T17:42:19.929Z"
+      "timestamp": "2026-02-16T19:26:02.188Z"
     },
     {
       "generation": 1,
@@ -19,7 +19,7 @@
         "variant-c",
         "variant-d"
       ],
-      "timestamp": "2026-02-14T17:44:28.832Z"
+      "timestamp": "2026-02-16T19:29:52.645Z"
     },
     {
       "generation": 1,
@@ -47,7 +47,7 @@
         }
       ],
       "best": "baseline",
-      "timestamp": "2026-02-14T17:44:28.998Z"
+      "timestamp": "2026-02-16T19:29:53.295Z"
     }
   ]
 }

@@ -1,30 +1,33 @@
-# Tomorrow — 2026-02-13
+# Tomorrow — 2026-02-16
 
-## Publish — DONE (v1.2.0)
+## Publish — DONE (v1.2.1)
 
-v1.2.0 published to npm. Since v1.0.1:
-- feat: multi-provider routing with sensitive content guard
-- feat: auto-compact at 95% of model token limit
-- feat: 6 trigger-based feedback loops with engine + CLI
-- feat: harness benchmarks with SWE-bench baselines
-- feat: audit CLI, edit telemetry, sm_edit fuzzy MCP tool
-- fix: flaky integration test timeout, pre-commit nvm sourcing, bench vitest config
+v1.2.1 published to npm. Changes since v1.2.0:
+- feat(hooks): auto-install Claude Code hooks on session start (`hook-installer.ts`, 4 template scripts)
+- feat(graphiti): add tests and expose MCP tools
+- chore(deps): update semver-safe deps, align @types/node with Node 22
+- chore: remove hatchet spike
+- test: skip flaky clear --status integration tests (execSync ETIMEDOUT)
 
-## Graphiti Integration — Committed, Needs Wiring
+## Claude Code Hooks — Shipped in v1.2.1
 
-All files committed on main (no longer untracked):
+New `ensureHooks()` in `claude-sm.ts` auto-installs hooks on session start:
+- `src/utils/hook-installer.ts` — canonical hook definitions, idempotent settings.json merge
+- `templates/claude-hooks/` — 4 scripts: auto-checkpoint.js, stop-checkpoint.js, chime-on-stop.sh, session-rescue.sh
+- `scripts/install-claude-hooks-auto.js` — updated postinstall to write settings.json (not deprecated hooks.json)
+- Removes dead sms-response-handler.js references (DEAD_HOOKS list)
+- Full test suite: `src/utils/__tests__/hook-installer.test.ts` (395 lines)
 
-- `src/integrations/graphiti/` — client (REST stub with retry/timeout), types (Episode, EntityNode, RelationEdge, TemporalQuery), config (env-gated via `GRAPHITI_ENDPOINT`)
-- `src/hooks/graphiti-hooks.ts` — registers on session_start/file_change/session_end, emits Episodes to Graphiti. Includes `buildTemporalContext()` helper for future MCP tooling.
-- `docs/graphiti-integration.md` — integration spec
+## Graphiti Integration — Tests + MCP Tools Added
 
-Status: Stub client + hooks are wired, but no tests and not exposed as MCP tool yet.
+Updated from "needs wiring" to committed with tests and MCP exposure:
+- `src/integrations/graphiti/` — client, types, config (env-gated via `GRAPHITI_ENDPOINT`)
+- `src/hooks/graphiti-hooks.ts` — session_start/file_change/session_end episodes
+- MCP tools now exposed for temporal queries
 
-Next steps:
-- Add MCP tool handler for temporal queries (e.g., `graphiti_query`)
-- Add tests for GraphitiClient and GraphitiHooks
+Remaining:
 - Wire scanner events (Stripe, Salesforce, GitHub) to emit episodes/entities
-- Decide: optional dependency or always-on? (currently env-gated, which is correct)
+- Production testing with actual Graphiti instance
 
 ## Remaining Doc Cleanup
 
@@ -43,7 +46,7 @@ Lower priority items not addressed in the 1.0 docs refresh:
 
 The fix is deployed (gated on `LINEAR_API_KEY`, 10s timeout, non-fatal):
 
-1. `npm install -g @stackmemoryai/stackmemory@1.2.0`
+1. `npm install -g @stackmemoryai/stackmemory@1.2.1`
 2. Run `codex-sm` with `LINEAR_API_KEY` set
 3. Exit codex and verify Linear sync fires
 
@@ -51,4 +54,4 @@ The fix is deployed (gated on `LINEAR_API_KEY`, 10s timeout, non-fatal):
 
 - Shared `onSessionExit()` utility to deduplicate exit logic across claude-sm/codex-sm/pty-wrapper
 - `session_end` hook event should trigger Linear sync via hook system (not just inline execSync)
-- Consider adding `CHANGELOG.md` back with proper v0.6-v1.2.0 entries (the old one was deleted because it stopped at v0.5.51)
+- Consider adding `CHANGELOG.md` back with proper v0.6-v1.2.1 entries (the old one was deleted because it stopped at v0.5.51)

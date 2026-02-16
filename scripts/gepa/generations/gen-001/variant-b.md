@@ -1,237 +1,256 @@
-# CLAUDE.md [compact]
+# StackMemory - Project Configuration
 
-## Refs
+## Project Structure
+
 ```
-~/.claude/MCP.md|PERSONAS.md|STACKMEMORY.md
-~/.claude/agent_docs/*.compact.md (on-demand)
+src/
+  cli/           # CLI commands and entry point
+  core/          # Core business logic
+    context/     # Frame and context management
+    database/    # Database adapters (SQLite, ParadeDB)
+    digest/      # Digest generation
+    query/       # Query parsing and routing
+  integrations/  # External integrations (Linear, MCP)
+  services/      # Business services
+  skills/        # Claude Code skills
+  utils/         # Shared utilities
+scripts/         # Build and utility scripts
+config/          # Configuration files
+docs/            # Documentation
 ```
+
+## Key Files
+
+- Entry: src/cli/index.ts
+- MCP Server: src/integrations/mcp/server.ts
+- Frame Manager: src/core/context/frame-manager.ts
+- Database: src/core/database/sqlite-adapter.ts
+
+## Detailed Guides
+
+Quick reference (agent_docs/):
+- linear_integration.md - Linear sync
+- mcp_server.md - MCP tools
+- database_storage.md - Storage
+- claude_hooks.md - Hooks
+
+Full documentation (docs/):
+- principles.md - Agent programming paradigm
+- architecture.md - Extension model and browser sandbox
+- SPEC.md - Technical specification
+- API_REFERENCE.md - API docs
+- DEVELOPMENT.md - Dev guide
+- SETUP.md - Installation
 
 ## Commands
+
+```bash
+npm run build          # Compile TypeScript (esbuild)
+npm run lint           # ESLint check
+npm run lint:fix       # Auto-fix lint issues
+npm test               # Run Vitest (watch)
+npm run test:run       # Run tests once
+npm run linear:sync    # Sync with Linear
+
+# StackMemory CLI
+stackmemory capture    # Save session state for handoff
+stackmemory restore    # Restore from captured state
 ```
-build|lint|lint:fix|test|test:run
-git status|diff|log --oneline -10
-npx tsc --noEmit|npm run format
-```
 
-## Core
-[PRINCIPLE]code>docs|simple→complex|security first|evidence-based
-[COMM]concise|symbols>prose|bullets>paragraphs|<4 lines
-[WORKFLOW]TodoWrite(3+)→execute→update
-[GIT]clean commits|type(scope): message|feature/|fix/|chore/ prefix
-[STACK]React/TS/Vite|Node/Express/PG|Git/ESLint/Jest
+## Working Directory
 
-## Think
-[NONE]single file,<10 lines
-[THINK]multi-file,standard|~4K
-[HARD]architecture,complex|~10K
-[ULTRA]critical redesign|~32K
+- PRIMARY: /Users/jwu/Dev/stackmemory
+- ALLOWED: All subdirectories
+- TEMP: /tmp for temporary operations
 
-## Critical [C:10]
-[SECURITY]
-  NEVER:commit secrets|exec untrusted|expose PII|force push
-  ALWAYS:validate input|parameterized queries|hash passwords
-  BLOCK:~/.ssh|~/.aws|/api[_-]?key|token|secret/i
+## Validation (MUST DO)
+
+After code changes:
+1. `npm run lint` - fix any errors AND warnings
+2. `npm run test:run` - verify no regressions
+3. `npm run build` - ensure compilation
+4. Run code to verify it works
 
 <example>
-❌ BAD:
-```js
-db.query(`SELECT * FROM users WHERE id = ${userId}`)
-```
-✅ GOOD:
-```js
-db.query('SELECT * FROM users WHERE id = $1', [userId])
-```
+# After modifying src/core/database/sqlite-adapter.ts:
+npm run lint           # Fix all errors/warnings
+npm run test:run       # Verify all tests pass
+npm run build          # Ensure no TypeScript errors
+node dist/cli/index.js # Test actual functionality
 </example>
 
-[ESM]add .js to relative imports|use ts-node-lint-fixer agent on ERR_MODULE_NOT_FOUND
+Test coverage:
+- New features require tests in `src/**/__tests__/`
+- Maintain or improve coverage (no untested code paths)
+- Critical paths: context management, handoff, Linear sync
 
 <example>
-❌ BAD:
-```ts
-import { foo } from './bar'
-```
-✅ GOOD:
-```ts
-import { foo } from './bar.js'
-```
+# Adding a new feature to frame-manager.ts:
+# 1. Create src/core/context/__tests__/frame-manager.test.ts if not exists
+# 2. Add test cases for new feature
+# 3. Verify coverage: npm run test:run -- --coverage
 </example>
 
-[ERROR]return undefined>throw|log+continue>crash|filter nulls
+Never: Assume success | Skip testing | Use mock data as fallback
+
+## Git Rules (CRITICAL)
+
+- NEVER use `--no-verify` on git push or commit
+- ALWAYS fix lint/test errors before pushing
+- If pre-push hooks fail, fix the underlying issue
+- Run `npm run lint && npm run test:run` before pushing
+- Commit message format: `type(scope): message`
+- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
 <example>
-❌ BAD:
-```js
-function getUser(id) {
-  if (!id) throw new Error('No ID')
-  return users.find(u => u.id === id)
+# Good commit messages:
+feat(linear): add automatic issue sync
+fix(database): resolve FTS5 scoring for empty queries
+chore(deps): update vitest to 2.1.0
+
+# Bad commit messages:
+update stuff
+fixed bug
+WIP
+</example>
+
+<example>
+# Good branch names:
+feature/STA-123-add-digest-export
+fix/STA-456-memory-leak-in-daemon
+chore/upgrade-typescript
+
+# Bad branch names:
+my-feature
+bugfix
+temp
+</example>
+
+<example>
+# Pre-push workflow:
+npm run lint              # Fix issues first
+npm run test:run          # Ensure tests pass
+git add .
+git commit -m "feat(cli): add export command"
+git push                  # Hooks will run automatically
+# If hooks fail, fix the issue - DO NOT use --no-verify
+</example>
+
+## Task Management
+
+- Use TodoWrite for 3+ steps or multiple requests
+- Keep one task in_progress at a time
+- Update task status immediately on completion
+
+<example>
+# User request: "Add Linear sync and update docs"
+# Response:
+# 1. Create tasks via TodoWrite:
+#    - Implement Linear API sync
+#    - Add unit tests for sync
+#    - Update linear_integration.md
+# 2. Start first task: TaskUpdate(id: "1", status: "in_progress")
+# 3. After completing: TaskUpdate(id: "1", status: "completed")
+# 4. Move to next: TaskUpdate(id: "2", status: "in_progress")
+</example>
+
+## Security
+
+NEVER hardcode secrets - use process.env with dotenv/config
+
+```javascript
+import 'dotenv/config';
+const API_KEY = process.env.LINEAR_API_KEY;
+if (!API_KEY) {
+  console.error('LINEAR_API_KEY not set');
+  process.exit(1);
 }
 ```
-✅ GOOD:
-```js
-function getUser(id) {
-  if (!id) return undefined
-  return users.find(u => u.id === id)
-}
-```
-</example>
-
-[CODE]no emojis|comments only complex logic|short names
 
 <example>
-❌ BAD:
-```js
-// This function gets the user from the database
-function getUserFromDatabase(userId) { ... }
-```
-✅ GOOD:
-```js
-function getUser(id) { ... }
-// Only comment complex parts:
-const hash = await bcrypt.hash(pwd, 10) // 10 rounds for security/perf balance
-```
+# Bad (hardcoded):
+const token = 'lin_api_abc123xyz';
+
+# Good (from environment):
+import 'dotenv/config';
+const token = process.env.LINEAR_API_KEY;
+if (!token) throw new Error('LINEAR_API_KEY not set');
 </example>
 
-## High [H:8-9]
-[EFFICIENCY]do>explain|action>ceremony|parallel>sequential
+Environment sources (check in order):
+1. .env file
+2. .env.local
+3. ~/.zshrc
+4. Process environment
 
 <example>
-❌ BAD: "I'll read file A, then file B, then file C..."
-✅ GOOD: [Read A, Read B, Read C in parallel]
+# User: "I can't connect to Linear"
+# Response:
+# 1. Check if .env exists and contains LINEAR_API_KEY
+# 2. Read .env: cat .env | grep LINEAR_API_KEY
+# 3. If missing, ask user to add it (don't ask them to provide the key)
 </example>
 
-[GIT]status→branch→fetch→pull --rebase|type(scope): message
+Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
 
-<example>
-✅ GOOD commit messages:
-- feat(auth): add JWT token refresh
-- fix(api): handle null responses
-- chore(deps): bump express to 4.18
-</example>
+## Deploy
 
-[RECOVERY]try alt→explain→suggest next|never silent fail
+```bash
+# npm publish (uses NPM_TOKEN from .env, no OTP needed)
+git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
+NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
+  npm publish --registry https://registry.npmjs.org/ \
+  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
+git stash pop                         # restore GEPA state
 
-<example>
-❌ BAD: Test fails → retry same command → retry again
-✅ GOOD: Test fails → check logs → try different approach → explain issue
-</example>
+# Railway
+railway up
 
-[SESSION]track edits/corrections/paths|cache versions/locations
-
-## Standards
-[TASK]TodoWrite 3+|one in_progress|update immediate
-
-<example>
-✅ GOOD workflow:
-1. User asks to add feature
-2. TodoWrite: ["Design API", "Implement handler", "Add tests", "Update docs"]
-3. TaskUpdate task1 → in_progress
-4. Complete work
-5. TaskUpdate task1 → completed
-6. TaskUpdate task2 → in_progress
-</example>
-
-[DESIGN]KISS|YAGNI|SOLID|<20 lines/fn|<5 complexity
-
-<example>
-❌ BAD:
-```js
-function processUserDataWithValidationAndTransformation(user, options) {
-  // 50 lines of mixed concerns
-}
-```
-✅ GOOD:
-```js
-function validateUser(user) { ... }     // 8 lines
-function transformUser(user) { ... }   // 6 lines
-function processUser(user) {           // 3 lines
-  const valid = validateUser(user)
-  return valid ? transformUser(user) : null
-}
-```
-</example>
-
-[FILES]read before write|edit>write|no docs unless asked
-
-<example>
-❌ BAD: User asks to update function → Write entire new file
-✅ GOOD: User asks to update function → Read file → Edit specific function
-</example>
-
-[VALIDATE]lint→test→build→run|never assume success
-
-<example>
-✅ GOOD workflow:
-1. Edit code
-2. `npm run lint` → check output
-3. `npm test` → verify passing
-4. `npm run build` → ensure clean build
-5. Only then mark task complete
-</example>
-
-[COVERAGE]maintain or improve test coverage|no untested code paths
-
-<example>
-❌ BAD: Add new route without tests
-✅ GOOD: Add new route + unit test + integration test
-</example>
-
-## Style
-[OUTPUT]concise|structured|actionable
-
-<example>
-❌ BAD: "I've made some changes to the authentication system to improve security..."
-✅ GOOD: "Added JWT refresh tokens in src/auth/tokens.js:45"
-</example>
-
-[PUSHBACK]"Simpler: X"|"Risk: Y"|"Consider: Z"
-
-<example>
-User: "Add Redis caching to all endpoints"
-✅ GOOD response: "Risk: premature optimization. Consider: profile first, cache hot paths only"
-</example>
-
-[QUESTIONS]1-3 clarifying|one at a time|no time estimates
-
-<example>
-❌ BAD: "This will take 2-3 hours. Should I add error handling, logging, tests, docs, and type safety?"
-✅ GOOD: "Add error handling for network failures?"
-</example>
-
-## Summary Format
-```
-Session: actual vs estimated|variance %
-Completed: N/M tasks|files modified|commits
-Outcomes: deliverables|blockers|next actions
+# Pre-publish checks require clean git status — stash GEPA files first
 ```
 
 <example>
-✅ GOOD summary:
-```
-Completed: 3/4 tasks | 7 files | 2 commits
-Outcomes: Auth refresh implemented, tests passing
-Blockers: Redis connection requires env var
-Next: Add REDIS_URL to .env, deploy to staging
-```
+# Pre-publish workflow:
+git status                           # Check for uncommitted changes
+git stash -- scripts/gepa/          # Stash GEPA files
+npm run lint && npm run test:run    # Validate
+npm version patch                    # Bump version
+NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
+  npm publish --registry https://registry.npmjs.org/ \
+  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
+git stash pop                        # Restore GEPA
 </example>
 
-## Auto-Activate
-[FILES]*.tsx→frontend|*.sql→data|Docker→devops|*.test→qa
-[KEYWORDS]bug/error→debugger|optimize→perf|secure→security
+## Workflow
+
+- Check .env for API keys before asking
+- Run npm run linear:sync after task completion
+- Use browser MCP for visual testing
+- Review recent commits and stackmemory.json on session start
+- Use subagents for multi-step tasks
+- Ask 1-3 clarifying questions for complex commands (one at a time)
 
 <example>
-User shares error.tsx → automatically apply frontend patterns
-User mentions "slow query" → automatically consider performance context
+# Session start:
+1. Read recent commits: git log --oneline -5
+2. Check stackmemory.json for context
+3. Read .env to see available integrations
+4. Ask user for their primary goal this session
 </example>
 
-## Expand (read on match)
-[AGENTIC]multi-agent→AGENTIC_CODING.compact.md
-[CONTEXT]token budget→CONTEXT_MANAGEMENT.compact.md
-[TOOLS]parallel tools→TOOL_USE.compact.md
-[HORIZON]multi-session→LONG_HORIZON.compact.md
-[PROMPTS]prompt design→PROMPT_ENGINEERING.compact.md
-[BUILD]npm build|esbuild|tsc→building_the_project.md
-[CODE]conventions|naming|imports→code_conventions.md
-[TEST]vitest|jest|test:run→running_tests.md
-[OVERVIEW]agent docs|guides→OVERVIEW.md
+<example>
+# User: "Fix the search bug"
+# Response:
+# Question: "Which search feature - FTS5 full-text, vector similarity, or LIKE pattern matching?"
+# (Wait for answer, then proceed)
+</example>
 
-~150t|v4.4.0-compact
+<example>
+# User: "Add a new feature to export contexts"
+# Response:
+# 1. Use subagent (Task tool with Explore agent) to find existing export patterns
+# 2. Create TodoWrite tasks for implementation
+# 3. Implement feature
+# 4. Run validation: npm run lint && npm run test:run
+# 5. Run: stackmemory export --help (to verify)
+</example>

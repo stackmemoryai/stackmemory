@@ -1,61 +1,120 @@
-# ProvenantAI
+# StackMemory - Project Configuration
 
-## Refs
+## Project Structure
+
 ```
-AGENTS.md                                # Agent workflow + guardrails
-PROMPT_PLAN.md                           # 20 staged prompts
-docs/STYLE.md                            # Design system (Hatchet + Outliner)
-docs/business/ONE_PAGER.md|VISION.md     # Executive summary + vision
-DEV_SPEC.md                              # Developer spec
-docs/reference/PROJECT.md                # Quick reference
-docs/architecture/SYSTEM_INTEGRATION.md  # System connections
-docs/architecture/HEARTBEAT_DESIGN.md|WEBHOOK_SYSTEM_DESIGN.md
-docs/nudge-engine-design.md              # Proactive alerts
-docs/VALUES.md                           # Company values
+src/
+  cli/           # CLI entry point
+  core/          # Business logic: context, database, digest, query
+  integrations/  # External: Linear, MCP
+  services/      # Business services
+  skills/        # Claude Code skills
+  utils/         # Shared utilities
+scripts/         # Build and utility scripts
+config/          # Configuration files
+docs/            # Documentation
 ```
+
+## Key Files
+
+- Entry: src/cli/index.ts
+- MCP Server: src/integrations/mcp/server.ts
+- Frame Manager: src/core/context/frame-manager.ts
+- Database: src/core/database/sqlite-adapter.ts
+
+## Documentation
+
+Quick reference (agent_docs/):
+- linear_integration.md - Linear sync
+- mcp_server.md - MCP tools
+- database_storage.md - Storage
+- claude_hooks.md - Hooks
+
+Full docs (docs/):
+- principles.md - Agent programming paradigm
+- architecture.md - Extension model and browser sandbox
+- SPEC.md - Technical specification
+- API_REFERENCE.md - API docs
+- DEVELOPMENT.md - Dev guide
+- SETUP.md - Installation
 
 ## Commands
+
 ```bash
-npm run dev|test|lint|migrate
-docker-compose up -d; railway up         # Local DBs; Deploy
+npm run build          # Compile TypeScript (esbuild)
+npm run lint           # ESLint check
+npm run lint:fix       # Auto-fix lint issues
+npm test               # Run Vitest (watch)
+npm run test:run       # Run tests once
+npm run linear:sync    # Sync with Linear
+
+stackmemory capture    # Save session state
+stackmemory restore    # Restore from state
 ```
 
-## Stack
-Node/Express/PostgreSQL/Redis | Railway | Stripe/Salesforce/QuickBooks
+## Validation (MUST DO)
 
-## Structure
-src/api|core|features|shared|integrations | docs/ | scripts/ | docker/
+After code changes, run all three:
+1. `npm run lint` - fix errors AND warnings
+2. `npm run test:run` - verify no regressions
+3. `npm run build` - ensure compilation
 
-## Key Context
-- Provenance tracking: source + timestamp + lineage on all data
-- Multi-tenant container isolation
-- Investigation replays: data/investigation-replays/
-- StackMemory: security layer (future session/entity context bridge on KG)
+Test coverage:
+- New features require tests in `src/**/__tests__/`
+- Maintain or improve coverage
+- Critical paths: context management, handoff, Linear sync
 
-## Git
-- No "Co-Authored-By" lines
-- Pre-commit: lint + test (3 parallel suites: unit/core/integrations)
-- Commit format: type(scope): message
+## Git Rules (CRITICAL)
 
-## Critical Rules
-[SECURITY]
-  NEVER: commit secrets|exec untrusted|expose PII|force push
-  ALWAYS: validate input|parameterized queries|hash passwords
-  BLOCK: ~/.ssh|~/.aws|/api[_-]?key|token|secret/i
+- NEVER use `--no-verify` on git push/commit
+- ALWAYS fix lint/test errors before pushing
+- Run `npm run lint && npm run test:run` before pushing
+- Commit format: `type(scope): message`
+- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
-[ESM] Add .js to relative imports | use ts-node-lint-fixer on ERR_MODULE_NOT_FOUND
-[ERROR] return undefined>throw | log+continue>crash | filter nulls
-[CODE] no emojis | comments only complex logic | short names
+## Security
+
+NEVER hardcode secrets - use process.env with dotenv/config
+
+```javascript
+import 'dotenv/config';
+const API_KEY = process.env.LINEAR_API_KEY;
+if (!API_KEY) {
+  console.error('LINEAR_API_KEY not set');
+  process.exit(1);
+}
+```
+
+Environment sources (check in order):
+1. .env file
+2. .env.local
+3. ~/.zshrc
+4. Process environment
+
+Block patterns: lin_api_* | lin_oauth_* | sk-* | npm_*
+
+## Deploy
+
+```bash
+# npm publish (uses NPM_TOKEN from .env)
+git stash -- scripts/gepa/
+NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
+  npm publish --registry https://registry.npmjs.org/ \
+  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
+git stash pop
+
+# Railway
+railway up
+```
 
 ## Workflow
-[EFFICIENCY] do>explain | action>ceremony | parallel>sequential
-[TASK] TodoWrite 3+ | one in_progress | update immediate
-[DESIGN] KISS|YAGNI|SOLID | <20 lines/fn | <5 complexity
-[FILES] read before write | edit>write | no docs unless asked
-[VALIDATE] lint→test→build→run | never assume success
-[COVERAGE] maintain or improve | no untested paths
 
-## Style
-[OUTPUT] concise | structured | actionable | <4 lines default
-[PUSHBACK] "Simpler: X" | "Risk: Y" | "Consider: Z"
-[QUESTIONS] 1-3 clarifying | one at a time | no time estimates
+- Check .env for API keys before asking
+- Run `npm run linear:sync` after task completion
+- Use browser MCP for visual testing
+- Review recent commits and stackmemory.json on session start
+- Use subagents for multi-step tasks
+- Ask 1-3 clarifying questions for complex commands (one at a time)
+- Use TodoWrite for 3+ steps or multiple requests
+- Keep one task in_progress at a time
+- Update task status immediately on completion
