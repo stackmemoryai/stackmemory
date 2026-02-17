@@ -44,6 +44,7 @@ import { ToolCall, Trace } from '../../core/trace/types.js';
 import { LLMContextRetrieval } from '../../core/retrieval/index.js';
 import { DiscoveryHandlers } from './handlers/discovery-handlers.js';
 import { DiffMemHandlers } from './handlers/diffmem-handlers.js';
+import { GreptileHandlers } from './handlers/greptile-handlers.js';
 import { GraphitiClient } from '../graphiti/client.js';
 import { fuzzyEdit } from '../../utils/fuzzy-edit.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -85,6 +86,7 @@ class LocalStackMemoryMCP {
   private contextRetrieval: LLMContextRetrieval;
   private discoveryHandlers: DiscoveryHandlers;
   private diffMemHandlers: DiffMemHandlers;
+  private greptileHandlers: GreptileHandlers;
   private providerHandlers:
     | import('./handlers/provider-handlers.js').ProviderHandlers
     | null = null;
@@ -185,6 +187,9 @@ class LocalStackMemoryMCP {
 
     // Initialize DiffMem Handlers
     this.diffMemHandlers = new DiffMemHandlers();
+
+    // Initialize Greptile Handlers
+    this.greptileHandlers = new GreptileHandlers();
 
     // Initialize Provider Handlers (lazy, only when multiProvider enabled)
     this.initProviderHandlers();
@@ -1257,6 +1262,10 @@ class LocalStackMemoryMCP {
                   },
                 ]
               : []),
+            // Greptile tools (only active when GREPTILE_API_KEY is set)
+            ...(process.env.GREPTILE_API_KEY
+              ? this.greptileHandlers.getToolDefinitions()
+              : []),
             // Provider tools (only active when STACKMEMORY_MULTI_PROVIDER=true)
             ...(isFeatureEnabled('multiProvider')
               ? [
@@ -1554,6 +1563,36 @@ class LocalStackMemoryMCP {
 
             case 'diffmem_status':
               result = await this.diffMemHandlers.handleStatus();
+              break;
+
+            // Greptile handlers
+            case 'greptile_pr_comments':
+              result = await this.greptileHandlers.handleListPRComments(args);
+              break;
+
+            case 'greptile_pr_details':
+              result = await this.greptileHandlers.handleGetMergeRequest(args);
+              break;
+
+            case 'greptile_list_prs':
+              result = await this.greptileHandlers.handleListPullRequests(args);
+              break;
+
+            case 'greptile_trigger_review':
+              result =
+                await this.greptileHandlers.handleTriggerCodeReview(args);
+              break;
+
+            case 'greptile_search_patterns':
+              result = await this.greptileHandlers.handleSearchPatterns(args);
+              break;
+
+            case 'greptile_create_pattern':
+              result = await this.greptileHandlers.handleCreatePattern(args);
+              break;
+
+            case 'greptile_status':
+              result = await this.greptileHandlers.handleStatus();
               break;
 
             case 'sm_edit':
