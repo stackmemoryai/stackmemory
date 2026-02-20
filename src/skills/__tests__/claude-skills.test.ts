@@ -501,12 +501,6 @@ describe('Claude Skills', () => {
     });
 
     it('should get available skills', () => {
-      const prevKey = process.env['CHROMADB_API_KEY'];
-      const prevTenant = process.env['CHROMADB_TENANT'];
-      // Ensure repo skill initializes for this test
-      process.env['CHROMADB_API_KEY'] = 'test-key';
-      process.env['CHROMADB_TENANT'] = 'test-tenant';
-
       const manager = new ClaudeSkillsManager(context);
       const skills = manager.getAvailableSkills();
 
@@ -518,14 +512,7 @@ describe('Claude Skills', () => {
         'api',
         'spec',
         'agent',
-        'repo',
       ]);
-
-      // Restore env
-      if (prevKey === undefined) delete process.env['CHROMADB_API_KEY'];
-      else process.env['CHROMADB_API_KEY'] = prevKey;
-      if (prevTenant === undefined) delete process.env['CHROMADB_TENANT'];
-      else process.env['CHROMADB_TENANT'] = prevTenant;
     });
 
     it('should get skill help', () => {
