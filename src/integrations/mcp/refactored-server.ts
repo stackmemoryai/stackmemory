@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Refactored StackMemory MCP Server - Modular Implementation
+ * StackMemory MCP Server - Modular Implementation
  * Clean, maintainable MCP server using focused handler modules
  */
 
@@ -14,7 +14,7 @@ import { execSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 
 // Core components
-import { RefactoredFrameManager } from '../../core/context/refactored-frame-manager.js';
+import { FrameManager } from '../../core/context/frame-manager.js';
 import { LinearTaskManager } from '../../features/tasks/linear-task-manager.js';
 import { LinearAuthManager } from '../linear/auth.js';
 import { LinearSyncEngine, DEFAULT_SYNC_CONFIG } from '../linear/sync.js';
@@ -42,7 +42,6 @@ function getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
-
 /**
  * Configuration for MCP server
  */
@@ -55,16 +54,16 @@ interface MCPServerConfig {
 }
 
 /**
- * Refactored StackMemory MCP Server
+ * StackMemory MCP Server
  */
-class RefactoredStackMemoryMCP {
+class StackMemoryMCP {
   private server!: Server;
   private db!: Database.Database;
   private projectRoot: string;
   private projectId: string;
-  
+
   // Core components
-  private frameManager!: RefactoredFrameManager;
+  private frameManager!: FrameManager;
   private taskStore!: LinearTaskManager;
   private linearAuthManager!: LinearAuthManager;
   private linearSync!: LinearSyncEngine;
@@ -73,7 +72,7 @@ class RefactoredStackMemoryMCP {
   private contextRetrieval!: LLMContextRetrieval;
   private configManager!: ConfigManager;
   private toolScoringMiddleware!: ToolScoringMiddleware;
-  
+
   // Handler factory
   private handlerFactory!: MCPHandlerFactory;
   private toolDefinitions!: MCPToolDefinitions;
@@ -81,7 +80,7 @@ class RefactoredStackMemoryMCP {
   constructor(config: MCPServerConfig = {}) {
     this.projectRoot = this.findProjectRoot();
     this.projectId = this.getProjectId();
-    
+
     this.initializeDatabase();
     this.initializeComponents(config);
     this.initializeServer();
@@ -99,7 +98,7 @@ class RefactoredStackMemoryMCP {
 
     const dbPath = join(dbDir, 'context.db');
     this.db = new Database(dbPath);
-    
+
     logger.info('Database initialized', { dbPath });
   }
 
@@ -112,7 +111,7 @@ class RefactoredStackMemoryMCP {
     this.configManager = new ConfigManager(configPath);
 
     // Frame manager
-    this.frameManager = new RefactoredFrameManager(this.db, this.projectId);
+    this.frameManager = new FrameManager(this.db, this.projectId);
 
     // Task store
     this.taskStore = new LinearTaskManager(this.projectRoot, this.db);
@@ -128,10 +127,11 @@ class RefactoredStackMemoryMCP {
     // Browser integration (if enabled)
     if (config.enableBrowser !== false) {
       this.browserMCP = new BrowserMCPIntegration({
-        headless: config.headless ?? process.env['BROWSER_HEADLESS'] !== 'false',
-        defaultViewport: { 
-          width: config.viewportWidth ?? 1280, 
-          height: config.viewportHeight ?? 720 
+        headless:
+          config.headless ?? process.env['BROWSER_HEADLESS'] !== 'false',
+        defaultViewport: {
+          width: config.viewportWidth ?? 1280,
+          height: config.viewportHeight ?? 720,
         },
       });
     }
@@ -199,7 +199,7 @@ class RefactoredStackMemoryMCP {
 
     // Setup tool listing handler
     this.setupToolListHandler();
-    
+
     // Setup tool execution handler
     this.setupToolExecutionHandler();
 
@@ -216,9 +216,9 @@ class RefactoredStackMemoryMCP {
       }),
       async () => {
         const tools = this.toolDefinitions.getAllToolDefinitions();
-        
+
         logger.debug('Listed tools', { count: tools.length });
-        
+
         return { tools };
       }
     );
@@ -299,17 +299,17 @@ class RefactoredStackMemoryMCP {
             });
           }
 
-          logger.info('Tool call completed', { 
-            toolName: name, 
-            callId, 
-            duration 
+          logger.info('Tool call completed', {
+            toolName: name,
+            callId,
+            duration,
           });
 
           return result;
-
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
 
           // Score the failed tool call
           const score = await this.toolScoringMiddleware.scoreToolCall(
@@ -333,11 +333,11 @@ class RefactoredStackMemoryMCP {
             });
           }
 
-          logger.error('Tool call failed', { 
-            toolName: name, 
-            callId, 
-            duration, 
-            error: errorMessage 
+          logger.error('Tool call failed', {
+            toolName: name,
+            callId,
+            duration,
+            error: errorMessage,
           });
 
           return {
@@ -374,9 +374,11 @@ class RefactoredStackMemoryMCP {
 
       // Setup cleanup handlers
       this.setupCleanup();
-
     } catch (error: unknown) {
-      logger.error('Failed to start MCP server', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to start MCP server',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -387,28 +389,34 @@ class RefactoredStackMemoryMCP {
   private setupCleanup(): void {
     const cleanup = async () => {
       logger.info('Shutting down MCP server...');
-      
+
       try {
         if (this.browserMCP) {
           await this.browserMCP.cleanup();
         }
-        
+
         if (this.db) {
           this.db.close();
         }
-        
+
         logger.info('MCP server shutdown complete');
       } catch (error: unknown) {
-        logger.error('Error during cleanup', error instanceof Error ? error : new Error(String(error)));
+        logger.error(
+          'Error during cleanup',
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
-      
+
       process.exit(0);
     };
 
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
     process.on('uncaughtException', (error) => {
-      logger.error('Uncaught exception', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Uncaught exception',
+        error instanceof Error ? error : new Error(String(error))
+      );
       cleanup();
     });
   }
@@ -435,11 +443,11 @@ class RefactoredStackMemoryMCP {
    */
   private getProjectId(): string {
     try {
-      const remoteUrl = execSync('git remote get-url origin', { 
-        cwd: this.projectRoot, 
-        encoding: 'utf8' 
+      const remoteUrl = execSync('git remote get-url origin', {
+        cwd: this.projectRoot,
+        encoding: 'utf8',
       }).trim();
-      
+
       const match = remoteUrl.match(/([^/]+\/[^/]+)(?:\.git)?$/);
       if (match) {
         return match[1];
@@ -463,11 +471,13 @@ async function main(): Promise<void> {
       enableBrowser: process.env['DISABLE_BROWSER'] !== 'true',
     };
 
-    const server = new RefactoredStackMemoryMCP(config);
+    const server = new StackMemoryMCP(config);
     await server.start();
-
   } catch (error: unknown) {
-    logger.error('Failed to start server', error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      'Failed to start server',
+      error instanceof Error ? error : new Error(String(error))
+    );
     process.exit(1);
   }
 }
@@ -480,4 +490,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { RefactoredStackMemoryMCP };
+export { StackMemoryMCP };

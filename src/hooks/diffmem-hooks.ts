@@ -5,7 +5,7 @@
 
 import { logger } from '../core/monitoring/logger.js';
 import type { HookEventEmitter, HookEventData } from './events.js';
-import type { RefactoredFrameManager } from '../core/context/refactored-frame-manager.js';
+import type { FrameManager } from '../core/context/frame-manager.js';
 import type {
   UserMemory,
   MemoryQuery,
@@ -58,7 +58,7 @@ export class DiffMemHooks {
   private fetchedMemories: UserMemory[] = [];
   private learningBuffer: LearnedInsight[] = [];
   private isConnected: boolean = false;
-  private frameManager?: RefactoredFrameManager;
+  private frameManager?: FrameManager;
   private sessionStartTime: number = 0;
 
   constructor(config: Partial<DiffMemHookConfig> = {}) {
@@ -68,10 +68,7 @@ export class DiffMemHooks {
   /**
    * Register session hooks with the event emitter
    */
-  register(
-    emitter: HookEventEmitter,
-    frameManager?: RefactoredFrameManager
-  ): void {
+  register(emitter: HookEventEmitter, frameManager?: FrameManager): void {
     this.frameManager = frameManager;
 
     if (!this.config.enabled) {

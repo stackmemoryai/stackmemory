@@ -1,10 +1,9 @@
 /**
  * MCP Integration Exports
- * Provides access to both original and refactored MCP server implementations
  */
 
-// Export refactored server as primary
-export { RefactoredStackMemoryMCP as StackMemoryMCP } from './refactored-server.js';
+// Export primary MCP server
+export { StackMemoryMCP } from './refactored-server.js';
 
 // Export handler modules for direct access
 export { MCPHandlerFactory } from './handlers/index.js';

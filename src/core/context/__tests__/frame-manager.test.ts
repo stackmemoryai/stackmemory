@@ -1,5 +1,5 @@
 /**
- * Comprehensive tests for RefactoredFrameManager public methods.
+ * Comprehensive tests for FrameManager public methods.
  *
  * Covers methods not exercised by frame-closure-cascade, cycle-detection,
  * or recovery tests: getFrame, getStack, getStatistics, getRecentFrames,

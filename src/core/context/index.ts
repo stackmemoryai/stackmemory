@@ -1,10 +1,9 @@
 /**
  * Context Module Exports
- * Maintains compatibility while providing access to refactored components
  */
 
-// Export refactored components as primary
-export { RefactoredFrameManager as FrameManager } from './refactored-frame-manager.js';
+// Export primary frame manager
+export { FrameManager } from './frame-manager.js';
 
 // Export types (type-only, no runtime value)
 export type {

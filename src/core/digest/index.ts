@@ -5,5 +5,5 @@
 
 export * from './types.js';
 export * from './hybrid-digest-generator.js';
-export * from './enhanced-hybrid-digest.js';
+export * from './hybrid-digest.js';
 export * from './frame-digest-integration.js';

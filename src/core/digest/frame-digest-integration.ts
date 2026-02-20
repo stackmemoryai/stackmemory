@@ -4,13 +4,8 @@
  */
 
 import Database from 'better-sqlite3';
-import {
-  FrameManager,
-  Frame,
-  Event,
-  Anchor,
-} from '../context/index.js';
-import { EnhancedHybridDigestGenerator } from './enhanced-hybrid-digest.js';
+import { FrameManager, Frame, Event, Anchor } from '../context/index.js';
+import { EnhancedHybridDigestGenerator } from './hybrid-digest.js';
 import { DigestInput, DigestLLMProvider } from './types.js';
 import { logger } from '../monitoring/logger.js';
 

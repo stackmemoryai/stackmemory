@@ -1,5 +1,5 @@
 /**
- * Refactored Frame Manager - Modular Implementation
+ * Frame Manager - Modular Implementation
  * Main orchestrator that uses focused modules for frame management
  */
 
@@ -39,7 +39,7 @@ import { FrameStack } from './frame-stack.js';
 import { FrameDigestGenerator } from './frame-digest.js';
 import { FrameRecovery, type RecoveryReport } from './frame-recovery.js';
 
-export class RefactoredFrameManager {
+export class FrameManager {
   private frameDb: FrameDatabase;
   private frameStack: FrameStack;
   private digestGenerator: FrameDigestGenerator;
@@ -88,7 +88,7 @@ export class RefactoredFrameManager {
     // Initialize database schema
     this.frameDb.initSchema();
 
-    logger.info('RefactoredFrameManager initialized', {
+    logger.info('FrameManager initialized', {
       projectId: this.projectId,
       runId: this.currentRunId,
       sessionId: this.sessionId,

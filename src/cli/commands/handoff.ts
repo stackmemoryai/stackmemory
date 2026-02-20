@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { FrameManager } from '../../core/context/index.js';
 import { LinearTaskManager } from '../../features/tasks/linear-task-manager.js';
 import { logger } from '../../core/monitoring/logger.js';
-import { EnhancedHandoffGenerator } from '../../core/session/enhanced-handoff.js';
+import { EnhancedHandoffGenerator } from '../../core/session/handoff.js';
 
 // Simple token estimation (avg 3.5 chars per token for English)
 const countTokens = (text: string): number => Math.ceil(text.length / 3.5);
