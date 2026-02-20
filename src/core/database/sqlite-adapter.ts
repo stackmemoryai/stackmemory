@@ -343,6 +343,14 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
         'FTS5 index populated from existing frames (migration v1→v2)'
       );
     }
+
+    if (version < 3) {
+      // GC score index added by frame-database.ts initSchema; just bump version
+      this.db
+        .prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (?)')
+        .run(3);
+      logger.info('Schema migration v2→v3: GC importance_score support');
+    }
   }
 
   /**
@@ -416,6 +424,7 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
       retentionDays?: number;
       batchSize?: number;
       dryRun?: boolean;
+      protectedRunIds?: string[];
     } = {}
   ): Promise<{
     framesDeleted: number;
@@ -433,13 +442,14 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     const retentionDays = options.retentionDays ?? 90;
     const batchSize = options.batchSize ?? 100;
     const dryRun = options.dryRun ?? false;
+    const protectedRunIds = options.protectedRunIds ?? [];
 
     const nowSec = Math.floor(Date.now() / 1000);
     const defaultCutoff = nowSec - retentionDays * 86400;
     const ttl30dCutoff = nowSec - 30 * 86400;
     const ttl7dCutoff = nowSec - 7 * 86400;
 
-    // Find candidate frames (excluding keep_forever)
+    // Find candidate frames (excluding keep_forever, active frames, and protected run_ids)
     const candidates = this.db
       .prepare(
         `SELECT frame_id FROM frames
@@ -449,11 +459,18 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
            OR (retention_policy = 'ttl_7d' AND created_at < ?)
          )
          AND retention_policy != 'keep_forever'
+         AND state = 'closed'
+         AND run_id NOT IN (SELECT value FROM json_each(?))
+         ORDER BY importance_score ASC, created_at ASC
          LIMIT ?`
       )
-      .all(defaultCutoff, ttl30dCutoff, ttl7dCutoff, batchSize) as Array<{
-      frame_id: string;
-    }>;
+      .all(
+        defaultCutoff,
+        ttl30dCutoff,
+        ttl7dCutoff,
+        JSON.stringify(protectedRunIds),
+        batchSize
+      ) as Array<{ frame_id: string }>;
 
     const frameIds = candidates.map((r) => r.frame_id);
 
@@ -560,6 +577,108 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
       embeddingsDeleted,
       ftsEntriesDeleted: frameIds.length,
     };
+  }
+
+  /**
+   * Compute importance score for a single frame.
+   * Score range: [0.0, 1.0] — higher means more important, less likely to be GC'd.
+   */
+  computeImportanceScore(frameId: string): number {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const frame = this.db
+      .prepare(
+        'SELECT frame_id, digest_text, created_at FROM frames WHERE frame_id = ?'
+      )
+      .get(frameId) as
+      | { frame_id: string; digest_text: string | null; created_at: number }
+      | undefined;
+
+    if (!frame) return 0.3;
+
+    let score = 0.3; // base
+
+    // +0.15 for DECISION anchors
+    const decisionCount = (
+      this.db
+        .prepare(
+          "SELECT COUNT(*) as count FROM anchors WHERE frame_id = ? AND type = 'DECISION'"
+        )
+        .get(frameId) as CountResult
+    ).count;
+    if (decisionCount > 0) score += 0.15;
+
+    // +0.1 for event count > 3
+    const eventCount = (
+      this.db
+        .prepare('SELECT COUNT(*) as count FROM events WHERE frame_id = ?')
+        .get(frameId) as CountResult
+    ).count;
+    if (eventCount > 3) score += 0.1;
+
+    // +0.15 for having digest_text
+    if (frame.digest_text) score += 0.15;
+
+    // +0.1 for having children
+    const childCount = (
+      this.db
+        .prepare(
+          'SELECT COUNT(*) as count FROM frames WHERE parent_frame_id = ?'
+        )
+        .get(frameId) as CountResult
+    ).count;
+    if (childCount > 0) score += 0.1;
+
+    // +0.1 for recency (< 1 day old)
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (nowSec - frame.created_at < 86400) score += 0.1;
+
+    return Math.round(Math.min(score, 1.0) * 100) / 100;
+  }
+
+  /**
+   * Recompute importance scores for frames still at default score (0.5).
+   * Processes oldest frames first in batches.
+   * Returns count of frames updated.
+   */
+  recomputeImportanceScores(batchSize: number = 100): number {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const frames = this.db
+      .prepare(
+        'SELECT frame_id FROM frames WHERE importance_score = 0.5 ORDER BY created_at ASC LIMIT ?'
+      )
+      .all(batchSize) as Array<{ frame_id: string }>;
+
+    const updateStmt = this.db.prepare(
+      'UPDATE frames SET importance_score = ? WHERE frame_id = ?'
+    );
+
+    let updated = 0;
+    for (const { frame_id } of frames) {
+      const score = this.computeImportanceScore(frame_id);
+      if (score !== 0.5) {
+        updateStmt.run(score, frame_id);
+        updated++;
+      }
+    }
+
+    if (updated > 0) {
+      logger.info('Recomputed importance scores', {
+        checked: frames.length,
+        updated,
+      });
+    }
+
+    return updated;
   }
 
   async migrateSchema(targetVersion: number): Promise<void> {

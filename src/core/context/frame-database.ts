@@ -118,6 +118,7 @@ export class FrameDatabase {
           created_at INTEGER NOT NULL DEFAULT (unixepoch()),
           closed_at INTEGER,
           retention_policy TEXT DEFAULT 'default',
+          importance_score REAL DEFAULT 0.5,
           FOREIGN KEY (parent_frame_id) REFERENCES frames(frame_id)
         );
       `);
@@ -160,6 +161,15 @@ export class FrameDatabase {
         // Column already exists — safe to ignore
       }
 
+      // Migration: add importance_score column if missing (pre-v1.3 databases)
+      try {
+        this.db.exec(
+          'ALTER TABLE frames ADD COLUMN importance_score REAL DEFAULT 0.5'
+        );
+      } catch {
+        // Column already exists — safe to ignore
+      }
+
       // Create indexes for performance
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_frames_run ON frames(run_id);
@@ -170,6 +180,7 @@ export class FrameDatabase {
         CREATE INDEX IF NOT EXISTS idx_frames_project_state ON frames(project_id, state);
         CREATE INDEX IF NOT EXISTS idx_frames_project_created ON frames(project_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_frames_retention_created ON frames(retention_policy, created_at);
+        CREATE INDEX IF NOT EXISTS idx_frames_gc_score ON frames(state, retention_policy, importance_score ASC, created_at ASC);
         CREATE INDEX IF NOT EXISTS idx_events_frame ON events(frame_id);
         CREATE INDEX IF NOT EXISTS idx_events_seq ON events(frame_id, seq);
         CREATE INDEX IF NOT EXISTS idx_anchors_frame ON anchors(frame_id);

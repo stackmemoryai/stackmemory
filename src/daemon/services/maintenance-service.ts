@@ -29,6 +29,7 @@ export class DaemonMaintenanceService {
   private state: MaintenanceServiceState;
   private embeddingProvider: EmbeddingProvider | null = null;
   private intervalId?: NodeJS.Timeout;
+  private gcIntervalId?: NodeJS.Timeout;
   private isRunning = false;
   private onLog: (level: string, message: string, data?: unknown) => void;
 
@@ -76,12 +77,28 @@ export class DaemonMaintenanceService {
         );
       });
     }, intervalMs);
+
+    // Schedule dedicated GC cycle (more frequent than full maintenance)
+    if (this.config.gcEnabled !== false) {
+      const gcMs = (this.config.gcIntervalSeconds ?? 60) * 1000;
+      this.gcIntervalId = setInterval(() => {
+        this.runGCCycle().catch((err) => {
+          this.addError(
+            `GC cycle: ${err instanceof Error ? err.message : String(err)}`
+          );
+        });
+      }, gcMs);
+    }
   }
 
   stop(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
+    }
+    if (this.gcIntervalId) {
+      clearInterval(this.gcIntervalId);
+      this.gcIntervalId = undefined;
     }
     this.isRunning = false;
     this.onLog('INFO', 'Maintenance service stopped');
@@ -139,6 +156,9 @@ export class DaemonMaintenanceService {
 
       // Task 5: Digest generation for frames missing digest_text
       await this.generateMissingDigests(db);
+
+      // Task 5.5: Recompute importance scores
+      await this.recomputeScores(db);
 
       // Task 6: Incremental garbage collection
       await this.runGC(db);
@@ -385,15 +405,88 @@ export class DaemonMaintenanceService {
     }
   }
 
-  private async runGC(db: any): Promise<void> {
+  /**
+   * Dedicated lightweight GC cycle (runs more frequently than full maintenance).
+   * Queries active run_ids for protection and delegates to adapter.runGC().
+   */
+  private async runGCCycle(): Promise<void> {
     try {
-      if (this.config.gcEnabled === false) return;
-      if (typeof db.runGC !== 'function') return;
+      const db = await this.getDatabase();
+      if (!db) return;
+
+      // Gather active run_ids to protect from GC
+      const rawDb = db.getRawDatabase?.();
+      let protectedRunIds: string[] = [];
+      if (rawDb) {
+        const rows = rawDb
+          .prepare(
+            "SELECT DISTINCT run_id FROM frames WHERE state = 'active' LIMIT 10"
+          )
+          .all() as Array<{ run_id: string }>;
+        protectedRunIds = rows.map((r: { run_id: string }) => r.run_id);
+      }
 
       const result = await db.runGC({
         retentionDays: this.config.gcRetentionDays ?? 90,
         batchSize: this.config.gcBatchSize ?? 100,
         dryRun: false,
+        protectedRunIds,
+      });
+
+      this.state.framesGarbageCollected += result.framesDeleted;
+      this.state.lastGcRun = Date.now();
+
+      if (result.framesDeleted > 0) {
+        this.onLog(
+          'INFO',
+          `GC cycle deleted ${result.framesDeleted} expired frames`
+        );
+      }
+
+      await db.disconnect();
+    } catch (err) {
+      this.addError(
+        `GC cycle: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  private async recomputeScores(db: any): Promise<void> {
+    try {
+      if (typeof db.recomputeImportanceScores !== 'function') return;
+      const updated = db.recomputeImportanceScores(100);
+      if (updated > 0) {
+        this.onLog('INFO', `Recomputed ${updated} importance scores`);
+      }
+    } catch (err) {
+      this.addError(
+        `Score recompute: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  private async runGC(db: any): Promise<void> {
+    try {
+      if (this.config.gcEnabled === false) return;
+      if (typeof db.runGC !== 'function') return;
+
+      // Gather active run_ids to protect from GC
+      const rawDb = db.getRawDatabase?.();
+      let protectedRunIds: string[] = [];
+      if (rawDb) {
+        const rows = rawDb
+          .prepare(
+            "SELECT DISTINCT run_id FROM frames WHERE state = 'active' LIMIT 10"
+          )
+          .all() as Array<{ run_id: string }>;
+        protectedRunIds = rows.map((r: { run_id: string }) => r.run_id);
+      }
+
+      const result = await db.runGC({
+        retentionDays: this.config.gcRetentionDays ?? 90,
+        batchSize: this.config.gcBatchSize ?? 100,
+        dryRun: false,
+        protectedRunIds,
       });
 
       this.state.framesGarbageCollected += result.framesDeleted;

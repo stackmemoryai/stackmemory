@@ -234,6 +234,7 @@ export abstract class DatabaseAdapter {
     retentionDays?: number;
     batchSize?: number;
     dryRun?: boolean;
+    protectedRunIds?: string[];
   }): Promise<{
     framesDeleted: number;
     eventsDeleted: number;

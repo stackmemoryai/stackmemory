@@ -39,6 +39,7 @@ export interface MaintenanceServiceConfig extends DaemonServiceConfig {
   gcEnabled?: boolean; // default: true
   gcRetentionDays?: number; // default: 90
   gcBatchSize?: number; // default: 100
+  gcIntervalSeconds?: number; // default: 60
   coldTierProvider?: 'none' | 's3' | 'gcs'; // default: 'none'
   coldTierBucket?: string;
   coldTierPrefix?: string; // default: 'stackmemory/frames/'
@@ -92,6 +93,7 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     ftsRebuildInterval: 24, // hours
     embeddingBatchSize: 50,
     vacuumInterval: 168, // weekly
+    gcIntervalSeconds: 60,
   },
   memory: {
     enabled: true,
