@@ -6,7 +6,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
@@ -471,7 +471,7 @@ export function createSetupPluginsCommand(): Command {
           if (options.force) {
             // Remove existing
             try {
-              execSync(`rm -rf "${targetPath}"`, { encoding: 'utf-8' });
+              rmSync(targetPath, { recursive: true, force: true });
             } catch {
               console.log(
                 chalk.red(`  [ERROR] ${plugin} - could not remove existing`)

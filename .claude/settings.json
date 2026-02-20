@@ -78,7 +78,11 @@
   },
   "permissions": {
     "deny": [
-      "Read(./.entire/metadata/**)"
+      "Read(./.entire/metadata/**)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -r :*)",
+      "Bash(rm -fr:*)",
+      "Bash(rm -Rf:*)"
     ]
   }
 }

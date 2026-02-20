@@ -14,6 +14,7 @@ import {
   sanitizeForLogging,
   InputSchemas,
   validateInput,
+  validateShellCommand,
 } from '../input-sanitizer.js';
 import { ValidationError } from '../../errors/index.js';
 
@@ -79,6 +80,34 @@ describe('validateShellArg', () => {
     expect(validateShellArg('filename.txt')).toBe('filename.txt');
     expect(() => validateShellArg('file; rm -rf /')).toThrow(ValidationError);
     expect(() => validateShellArg('$(whoami)')).toThrow(ValidationError);
+  });
+});
+
+describe('validateShellCommand', () => {
+  it('should block rm -rf patterns', () => {
+    expect(() => validateShellCommand('rm -rf /')).toThrow(ValidationError);
+    expect(() => validateShellCommand('rm -rf /tmp/foo')).toThrow(
+      ValidationError
+    );
+    expect(() => validateShellCommand('rm -fr /tmp/bar')).toThrow(
+      ValidationError
+    );
+    expect(() => validateShellCommand('rm -Rf node_modules')).toThrow(
+      ValidationError
+    );
+    expect(() => validateShellCommand('rm -r /some/dir')).toThrow(
+      ValidationError
+    );
+  });
+
+  it('should allow safe rm (single file)', () => {
+    expect(validateShellCommand('rm file.txt')).toBe('rm file.txt');
+    expect(validateShellCommand('rm -f file.txt')).toBe('rm -f file.txt');
+  });
+
+  it('should allow non-rm commands', () => {
+    expect(validateShellCommand('ls -la')).toBe('ls -la');
+    expect(validateShellCommand('npm run build')).toBe('npm run build');
   });
 });
 

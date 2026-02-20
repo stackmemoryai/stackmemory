@@ -415,6 +415,34 @@ export function createAggregateSchema(allowedFields: string[]) {
 }
 
 /**
+ * Dangerous shell command patterns that should never be executed programmatically
+ */
+const DANGEROUS_SHELL_PATTERNS = [
+  /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|--recursive)\b/i, // rm -rf, rm -fr, rm --recursive
+  /\brm\s+-[a-zA-Z]*r\b/i, // rm -r (any flag combo with r)
+  /\bmkfs\b/i,
+  /\bdd\s+if=/i,
+  /\b:\(\)\s*\{/i, // fork bomb
+];
+
+/**
+ * Validate a shell command string for dangerous patterns
+ * Use before execSync/exec to prevent destructive commands
+ */
+export function validateShellCommand(command: string): string {
+  for (const pattern of DANGEROUS_SHELL_PATTERNS) {
+    if (pattern.test(command)) {
+      throw new ValidationError(
+        `Blocked dangerous shell command: ${command.substring(0, 80)}`,
+        ErrorCode.VALIDATION_FAILED,
+        { reason: 'dangerous_command' }
+      );
+    }
+  }
+  return command;
+}
+
+/**
  * Validate command line arguments for shell safety
  * Prevents command injection
  */

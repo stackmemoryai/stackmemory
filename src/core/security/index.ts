@@ -25,6 +25,7 @@ export {
 
   // Shell command safety
   validateShellArg,
+  validateShellCommand,
 
   // JSON safety
   safeJsonParse,

@@ -265,8 +265,8 @@ export function createRalphCommand(): Command {
         try {
           // Clean up Ralph directory
           if (!options.keepHistory && existsSync('.ralph/history')) {
-            const { execSync } = await import('child_process');
-            execSync('rm -rf .ralph/history');
+            const fs = await import('fs');
+            fs.rmSync('.ralph/history', { recursive: true, force: true });
           }
 
           // Remove working files but keep task definition
