@@ -14,6 +14,9 @@ export type HookEventType =
   | 'prompt_submit'
   | 'tool_use'
   | 'suggestion_ready'
+  | 'agent_start'
+  | 'agent_complete'
+  | 'agent_error'
   | 'error';
 
 export interface HookEvent {
@@ -59,11 +62,41 @@ export interface SuggestionReadyEvent extends HookEvent {
   };
 }
 
+export type AgentType = 'research' | 'maintain' | 'spec-run';
+
+export interface AgentStartEvent extends HookEvent {
+  type: 'agent_start';
+  data: { agentType: AgentType; workDir: string; task: string };
+}
+
+export interface AgentCompleteEvent extends HookEvent {
+  type: 'agent_complete';
+  data: {
+    agentType: AgentType;
+    workDir: string;
+    exitCode: number | null;
+    timedOut: boolean;
+    frameId?: string;
+    patchPath?: string;
+    validated?: boolean;
+    branch?: string;
+    validation?: { lint: boolean; test: boolean; build: boolean };
+  };
+}
+
+export interface AgentErrorEvent extends HookEvent {
+  type: 'agent_error';
+  data: { agentType: AgentType; error: string; workDir?: string };
+}
+
 export type HookEventData =
   | FileChangeEvent
   | InputIdleEvent
   | ContextSwitchEvent
   | SuggestionReadyEvent
+  | AgentStartEvent
+  | AgentCompleteEvent
+  | AgentErrorEvent
   | HookEvent;
 
 export type HookHandler = (event: HookEventData) => Promise<void> | void;

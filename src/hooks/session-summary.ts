@@ -4,6 +4,8 @@
  */
 
 import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import { pickNextLinearTask, TaskSuggestion } from './linear-task-picker.js';
 
 export interface SessionContext {
@@ -191,6 +193,44 @@ async function generateSuggestions(
     }
   } catch {
     // Linear not available, skip
+  }
+
+  // Pending patches
+  try {
+    const patchDir = path.join(process.cwd(), '.stackmemory', 'patches');
+    if (fs.existsSync(patchDir)) {
+      const patches = fs
+        .readdirSync(patchDir)
+        .filter((f) => f.endsWith('.patch'));
+      if (patches.length > 0) {
+        suggestions.push({
+          key: String(keyIndex++),
+          label: `Review ${patches.length} pending patch${patches.length > 1 ? 'es' : ''}`,
+          action: `ls -la .stackmemory/patches/`,
+          priority: 75,
+        });
+      }
+    }
+  } catch {
+    /* skip */
+  }
+
+  // Pending spec branches
+  try {
+    const tmpEntries = fs
+      .readdirSync('/tmp')
+      .filter((d) => d.startsWith('sm-spec-'));
+    if (tmpEntries.length > 0) {
+      const latest = path.join('/tmp', tmpEntries[tmpEntries.length - 1]);
+      suggestions.push({
+        key: String(keyIndex++),
+        label: `Inspect spec branch (${tmpEntries.length} workspace${tmpEntries.length > 1 ? 's' : ''})`,
+        action: `cd ${latest} && git log --oneline -5`,
+        priority: 65,
+      });
+    }
+  } catch {
+    /* skip */
   }
 
   // Long session suggestion
