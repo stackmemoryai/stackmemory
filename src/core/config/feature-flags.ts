@@ -11,7 +11,6 @@ export interface FeatureFlags {
 
   // External integrations (can be disabled)
   linear: boolean;
-  chromadb: boolean;
   aiSummaries: boolean;
   skills: boolean;
   ralph: boolean;
@@ -46,8 +45,6 @@ export function isFeatureEnabled(feature: keyof FeatureFlags): boolean {
         process.env['STACKMEMORY_LINEAR'] !== 'false' &&
         (!!process.env['LINEAR_API_KEY'] || !!process.env['LINEAR_OAUTH_TOKEN'])
       );
-    case 'chromadb':
-      return process.env['STACKMEMORY_CHROMADB'] === 'true';
     case 'aiSummaries':
       return (
         process.env['STACKMEMORY_AI'] !== 'false' &&
@@ -80,7 +77,6 @@ export function getFeatureFlags(): FeatureFlags {
   return {
     core: true,
     linear: isFeatureEnabled('linear'),
-    chromadb: isFeatureEnabled('chromadb'),
     aiSummaries: isFeatureEnabled('aiSummaries'),
     skills: isFeatureEnabled('skills'),
     ralph: isFeatureEnabled('ralph'),
@@ -102,7 +98,6 @@ export function logFeatureStatus(): void {
     console.log(
       `  Linear: ${flags.linear ? 'enabled' : 'disabled (no API key)'}`
     );
-    console.log(`  ChromaDB: ${flags.chromadb ? 'enabled' : 'disabled'}`);
     console.log(
       `  AI Summaries: ${flags.aiSummaries ? 'enabled' : 'disabled (no API key)'}`
     );

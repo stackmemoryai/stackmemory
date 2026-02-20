@@ -62,7 +62,7 @@ class ClaudeAutoStartManager {
   /**
    * 1. Context Monitor Daemon
    * Saves context and decisions every 15 minutes
-   * Also loads context from ChromaDB
+   * Saves context periodically
    */
   startContextMonitor() {
     this.log('Starting Context Monitor...');
@@ -81,23 +81,6 @@ class ClaudeAutoStartManager {
           );
 
           this.log('Context checkpoint saved');
-
-          // Load context from ChromaDB if available
-          if (process.env.CHROMADB_API_KEY) {
-            try {
-              await execAsync(
-                `cd ${this.projectRoot} && node scripts/chromadb-context-loader.js load 1`
-              );
-              this.log('ChromaDB context loaded');
-
-              // Check for important changes
-              await execAsync(
-                `cd ${this.projectRoot} && node scripts/chromadb-context-loader.js changes`
-              );
-            } catch (error) {
-              // Silent fail for ChromaDB
-            }
-          }
         } catch (error) {
           this.log(`Context monitor error: ${error.message}`, 'ERROR');
         }
@@ -112,19 +95,8 @@ class ClaudeAutoStartManager {
   }
 
   async loadInitialContext() {
-    if (!process.env.CHROMADB_API_KEY) return;
-
     try {
-      const { exec } = await import('child_process');
-      const { promisify } = await import('util');
-      const execAsync = promisify(exec);
-
-      // Load last 24 hours of context
-      await execAsync(
-        `cd ${this.projectRoot} && node scripts/chromadb-context-loader.js auto`
-      );
-
-      this.log('Initial ChromaDB context loaded');
+      this.log('Initial context check completed');
     } catch (error) {
       this.log(`Initial context load error: ${error.message}`, 'WARN');
     }

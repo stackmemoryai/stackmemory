@@ -12,10 +12,6 @@ import { SQLiteAdapter } from '../core/database/sqlite-adapter.js';
 import { ContextRetriever } from '../core/retrieval/context-retriever.js';
 import type { FrameManager } from '../core/context/index.js';
 import { logger } from '../core/monitoring/logger.js';
-import {
-  RepoIngestionSkill,
-  type RepoIngestionOptions,
-} from './repo-ingestion-skill.js';
 import { DashboardLauncherSkill } from './dashboard-launcher.js';
 import {
   RecursiveAgentOrchestrator,
@@ -849,7 +845,6 @@ export class ClaudeSkillsManager {
   private checkpointSkill: CheckpointSkill;
   private archaeologistSkill: ArchaeologistSkill;
   private dashboardLauncher: DashboardLauncherSkill;
-  private repoIngestionSkill: RepoIngestionSkill | null = null;
   private rlmOrchestrator: RecursiveAgentOrchestrator | null = null;
   private apiSkill: APISkill;
   private specGeneratorSkill: SpecGeneratorSkill;
@@ -869,25 +864,6 @@ export class ClaudeSkillsManager {
       // User can manually launch with 'stackmemory skills dashboard launch'
       logger.info('Dashboard launcher initialized (manual launch required)');
     });
-
-    // Initialize repo ingestion skill if ChromaDB is configured
-    const chromaConfig = {
-      apiKey: process.env['CHROMADB_API_KEY'] || '',
-      tenant: process.env['CHROMADB_TENANT'] || '',
-      database: process.env['CHROMADB_DATABASE'] || 'stackmemory',
-      collectionName: process.env['CHROMADB_COLLECTION'] || 'stackmemory_repos',
-    };
-
-    if (chromaConfig.apiKey && chromaConfig.tenant) {
-      this.repoIngestionSkill = new RepoIngestionSkill(
-        chromaConfig,
-        context.userId,
-        process.env['CHROMADB_TEAM_ID']
-      );
-      this.repoIngestionSkill.initialize().catch((error: unknown) => {
-        logger.warn('Repo ingestion skill initialization failed:', error);
-      });
-    }
 
     // Initialize RLM Orchestrator
     // Import dynamically to avoid circular dependencies
@@ -1011,71 +987,6 @@ export class ClaudeSkillsManager {
           };
         }
         return this.rlmOrchestrator.execute(args[0], options as RLMOptions);
-
-      case 'repo':
-      case 'ingest':
-        if (!this.repoIngestionSkill) {
-          return {
-            success: false,
-            message:
-              'Repo ingestion skill not initialized. Please configure ChromaDB.',
-          };
-        }
-
-        const repoCommand = args[0];
-        switch (repoCommand) {
-          case 'ingest':
-            const repoPath = args[1] || process.cwd();
-            const repoName = args[2] || path.basename(repoPath);
-            return await this.repoIngestionSkill.ingestRepository(
-              repoPath,
-              repoName,
-              options as RepoIngestionOptions
-            );
-
-          case 'update':
-            const updatePath = args[1] || process.cwd();
-            const updateName = args[2] || path.basename(updatePath);
-            return await this.repoIngestionSkill.updateRepository(
-              updatePath,
-              updateName,
-              options as RepoIngestionOptions
-            );
-
-          case 'search':
-            const query = args[1];
-            if (!query) {
-              return {
-                success: false,
-                message: 'Search query required',
-              };
-            }
-            const results = await this.repoIngestionSkill.searchCode(query, {
-              repoName: options?.repoName as string,
-              language: options?.language as string,
-              limit: options?.limit as number,
-              includeContext: options?.includeContext as boolean,
-            });
-            return {
-              success: true,
-              message: `Found ${results.length} results`,
-              data: results,
-            };
-
-          case 'stats':
-            const stats = await this.repoIngestionSkill.getRepoStats(args[1]);
-            return {
-              success: true,
-              message: 'Repository statistics',
-              data: stats,
-            };
-
-          default:
-            return {
-              success: false,
-              message: `Unknown repo command: ${repoCommand}. Use: ingest, update, search, or stats`,
-            };
-        }
 
       case 'dashboard':
         const dashboardCmd = args[0];
@@ -1316,9 +1227,6 @@ export class ClaudeSkillsManager {
       'spec',
       'agent',
     ];
-    if (this.repoIngestionSkill) {
-      skills.push('repo');
-    }
     if (this.rlmOrchestrator) {
       skills.push('rlm', 'lint');
     }
@@ -1408,28 +1316,6 @@ Launch the StackMemory web dashboard for real-time monitoring
 - launch: Start the web dashboard and open in browser (default)
 - stop: Stop the dashboard server
 Auto-launches on new sessions when configured
-`;
-
-      case 'repo':
-        return `
-/repo ingest [path] [name] [--incremental] [--include-tests] [--include-docs]
-/repo update [path] [name] [--force-update]
-/repo search "query" [--repo-name name] [--language lang] [--limit n]
-/repo stats [repo-name]
-
-Ingest and search code repositories in ChromaDB:
-- ingest: Index a new repository (defaults to current directory)
-- update: Update an existing repository with changes
-- search: Semantic search across ingested code
-- stats: View statistics about ingested repositories
-
-Options:
-- --incremental: Only process changed files
-- --include-tests: Include test files in indexing
-- --include-docs: Include documentation files
-- --force-update: Force re-indexing of all files
-- --language: Filter search by programming language
-- --limit: Maximum search results (default: 20)
 `;
 
       case 'recursive':

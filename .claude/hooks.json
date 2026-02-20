@@ -10,34 +10,12 @@
         "USER_MESSAGE": "{{MESSAGE}}"
       }
     },
-    "on-startup": {
-      "description": "Load context from ChromaDB and setup periodic saves",
-      "command": "node",
-      "args": ["{{PROJECT_ROOT}}/.claude/hooks/on-startup.js"],
-      "async": true,
-      "enabled": true
-    },
-    "on-code-change": {
-      "description": "Save context when code is modified",
-      "triggers": ["edit", "create", "delete"],
-      "command": "node",
-      "args": ["{{PROJECT_ROOT}}/.claude/hooks/on-code-change.js"],
-      "enabled": true
-    },
     "on-task-complete": {
       "description": "Save context and update Linear when tasks complete",
       "triggers": ["task_done", "todo_complete", "completed", "finished"],
       "command": "node",
       "args": ["{{PROJECT_ROOT}}/.claude/hooks/on-task-complete.js"],
       "enabled": true
-    },
-    "periodic-save": {
-      "description": "Save context every 1-5 minutes based on activity",
-      "command": "node",
-      "args": ["{{PROJECT_ROOT}}/.claude/hooks/periodic-save.js"],
-      "interval": 60000,
-      "enabled": true,
-      "adaptive": true
     },
     "linear-update": {
       "description": "Auto-update Linear tasks",
@@ -48,14 +26,6 @@
     }
   },
   "settings": {
-    "chromadb": {
-      "enabled": true,
-      "api_key_env": "CHROMADB_API_KEY",
-      "api_url_env": "CHROMADB_API_URL",
-      "collection": "claude_context",
-      "auto_load_on_startup": true,
-      "save_interval": 900000
-    },
     "linear": {
       "enabled": true,
       "api_key_env": "LINEAR_API_KEY",

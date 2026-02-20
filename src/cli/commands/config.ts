@@ -15,13 +15,6 @@ import {
   DEFAULT_WEIGHTS,
   DEFAULT_TOOL_SCORES,
 } from '../../core/config/types.js';
-import {
-  loadStorageConfig,
-  enableChromaDB,
-  disableChromaDB,
-  getStorageModeDescription,
-} from '../../core/config/storage-config.js';
-import inquirer from 'inquirer';
 
 export function createConfigCommand(): Command {
   const config = new Command('config').description(
@@ -492,102 +485,6 @@ export function createConfigCommand(): Command {
       console.log('  • High-importance operations');
       console.log('  • Profile usage frequency');
       console.log('  • Score trends over time');
-    });
-
-  // Storage configuration subcommand
-  const storageCmd = config.command('storage').description(
-    `Manage storage configuration
-
-Storage Modes:
-  sqlite (default): Local storage only, fast, no external dependencies
-  hybrid: SQLite + ChromaDB for semantic search and cloud backup`
-  );
-
-  storageCmd
-    .command('show')
-    .description('Show current storage configuration')
-    .action(async () => {
-      const storageConfig = loadStorageConfig();
-
-      console.log(chalk.blue('\nStorage Configuration:'));
-      console.log(`  Mode: ${chalk.cyan(storageConfig.mode)}`);
-      console.log(`  Description: ${chalk.gray(getStorageModeDescription())}`);
-
-      if (storageConfig.chromadb.enabled) {
-        console.log(chalk.blue('\nChromaDB Settings:'));
-        console.log(`  Enabled: ${chalk.green('Yes')}`);
-        console.log(
-          `  API URL: ${chalk.gray(storageConfig.chromadb.apiUrl || 'https://api.trychroma.com')}`
-        );
-        console.log(
-          `  Tenant: ${chalk.gray(storageConfig.chromadb.tenant || 'default_tenant')}`
-        );
-        console.log(
-          `  Database: ${chalk.gray(storageConfig.chromadb.database || 'default_database')}`
-        );
-        console.log(
-          `  API Key: ${chalk.gray(storageConfig.chromadb.apiKey ? '[configured]' : '[not set]')}`
-        );
-      } else {
-        console.log(chalk.blue('\nChromaDB Settings:'));
-        console.log(`  Enabled: ${chalk.yellow('No')}`);
-        console.log(
-          chalk.gray(
-            '  Enable with: stackmemory config storage enable-chromadb'
-          )
-        );
-      }
-    });
-
-  storageCmd
-    .command('enable-chromadb')
-    .description('Enable ChromaDB for semantic search and cloud backup')
-    .option('--api-key <key>', 'ChromaDB API key')
-    .option('--api-url <url>', 'ChromaDB API URL', 'https://api.trychroma.com')
-    .action(async (options) => {
-      let apiKey = options.apiKey;
-
-      if (!apiKey && process.stdin.isTTY) {
-        const answers = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'apiKey',
-            message: 'Enter your ChromaDB API key:',
-            validate: (input: string) => {
-              if (!input || input.trim().length === 0) {
-                return 'API key is required for ChromaDB';
-              }
-              return true;
-            },
-          },
-        ]);
-        apiKey = answers.apiKey;
-      }
-
-      if (!apiKey) {
-        console.log(chalk.red('[ERROR] ChromaDB API key is required.'));
-        console.log(
-          chalk.gray('Provide via --api-key flag or run interactively.')
-        );
-        process.exit(1);
-      }
-
-      enableChromaDB({
-        apiKey,
-        apiUrl: options.apiUrl,
-      });
-
-      console.log(chalk.green('[OK] ChromaDB enabled successfully.'));
-      console.log(chalk.gray(`Storage mode: ${getStorageModeDescription()}`));
-    });
-
-  storageCmd
-    .command('disable-chromadb')
-    .description('Disable ChromaDB and use SQLite-only storage')
-    .action(async () => {
-      disableChromaDB();
-      console.log(chalk.green('[OK] ChromaDB disabled.'));
-      console.log(chalk.gray(`Storage mode: ${getStorageModeDescription()}`));
     });
 
   return config;

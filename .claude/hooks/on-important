@@ -1,29 +1,26 @@
 #!/bin/bash
 
-# ChromaDB Hook: Capture Important Context
+# Hook: Capture Important Context
 # Triggers when important decisions, errors, or milestones occur
 
 IMPORTANCE_LEVEL="$1"
 CONTEXT="$2"
 TRIGGER="$3"
 
-PROJECT_DIR="$(pwd)"
-CHROMADB_SCRIPT="$PROJECT_DIR/scripts/claude-chromadb-hook.js"
-
 # Detect importance triggers
 detect_importance() {
     local content="$1"
-    
+
     # Keywords that indicate importance
     if echo "$content" | grep -qiE "decision|important|critical|breaking change|major|milestone|completed|finished|deployed|released|error|failed|bug|issue|TODO|FIXME|WARNING"; then
         return 0
     fi
-    
+
     # Check if it's a significant code change
     if echo "$content" | grep -qE "class|function|interface|export|import.*from|CREATE TABLE|ALTER|DROP"; then
         return 0
     fi
-    
+
     return 1
 }
 
@@ -36,25 +33,7 @@ if [ -z "$IMPORTANCE_LEVEL" ]; then
     fi
 fi
 
-# Store to ChromaDB with importance metadata
-if [ -f "$CHROMADB_SCRIPT" ]; then
-    HOOK_DATA=$(cat <<EOF
-{
-    "type": "important",
-    "content": "$CONTEXT",
-    "importance": "$IMPORTANCE_LEVEL",
-    "trigger": "$TRIGGER",
-    "timestamp": $(date +%s)000,
-    "auto_detected": true
-}
-EOF
-)
-    
-    # Execute ChromaDB storage
-    node "$CHROMADB_SCRIPT" "on-important" "$HOOK_DATA" 2>/dev/null &
-fi
-
-# Also save to StackMemory for redundancy
+# Save to StackMemory
 if command -v stackmemory &> /dev/null; then
     case "$IMPORTANCE_LEVEL" in
         critical|high)

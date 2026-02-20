@@ -68,8 +68,6 @@ import { filterPending } from '../integrations/mcp/pending-utils.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import inquirer from 'inquirer';
-import { enableChromaDB } from '../core/config/storage-config.js';
 import type {
   HarnessResult,
   PlanStep,
@@ -139,10 +137,6 @@ program
     'Initialize StackMemory in current project (zero-config by default)'
   )
   .option('-i, --interactive', 'Interactive mode with configuration prompts')
-  .option(
-    '--chromadb',
-    'Enable ChromaDB for semantic search (prompts for API key)'
-  )
   .option('--daemon', 'Start the background daemon after initialization')
   .action(async (options) => {
     try {
@@ -159,33 +153,6 @@ program
 
       if (!existsSync(dbDir)) {
         mkdirSync(dbDir, { recursive: true });
-      }
-
-      // Zero-config by default - just use SQLite, no questions
-      if (options.chromadb) {
-        await promptAndEnableChromaDB();
-      } else if (options.interactive && process.stdin.isTTY) {
-        // Only ask questions in interactive mode
-        console.log(chalk.cyan('\nStorage Configuration'));
-        console.log(
-          chalk.gray('SQLite (default) is fast and requires no setup.')
-        );
-        console.log(
-          chalk.gray('ChromaDB adds semantic search but requires an API key.\n')
-        );
-
-        const { enableChroma } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'enableChroma',
-            message: 'Enable ChromaDB for semantic search?',
-            default: false,
-          },
-        ]);
-
-        if (enableChroma) {
-          await promptAndEnableChromaDB();
-        }
       }
 
       // Initialize SQLite database (skip in test env)
@@ -251,41 +218,6 @@ program
       process.exit(1);
     }
   });
-
-/**
- * Prompt user for ChromaDB configuration and enable it
- */
-async function promptAndEnableChromaDB(): Promise<void> {
-  const answers = await inquirer.prompt([
-    {
-      type: 'password',
-      name: 'apiKey',
-      message: 'Enter your ChromaDB API key:',
-      validate: (input: string) => {
-        if (!input || input.trim().length === 0) {
-          return 'API key is required for ChromaDB';
-        }
-        return true;
-      },
-    },
-    {
-      type: 'input',
-      name: 'apiUrl',
-      message: 'ChromaDB API URL (press Enter for default):',
-      default: 'https://api.trychroma.com',
-    },
-  ]);
-
-  enableChromaDB({
-    apiKey: answers.apiKey,
-    apiUrl: answers.apiUrl,
-  });
-
-  console.log(chalk.green('[OK] ChromaDB enabled for semantic search.'));
-  console.log(
-    chalk.gray('API key saved to ~/.stackmemory/storage-config.json')
-  );
-}
 
 program
   .command('status')
