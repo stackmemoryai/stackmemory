@@ -72,11 +72,10 @@ After code changes:
 4. Run code to verify it works
 
 <example>
-# After modifying src/core/database/sqlite-adapter.ts:
-npm run lint           # Fix all errors/warnings
-npm run test:run       # Verify all tests pass
-npm run build          # Ensure no TypeScript errors
-node dist/cli/index.js # Test actual functionality
+# After adding a new MCP tool handler
+npm run lint && npm run test:run && npm run build
+# Then test the tool:
+echo '{"method":"tools/call","params":{"name":"your_tool"}}' | node dist/integrations/mcp/server.js
 </example>
 
 Test coverage:
@@ -85,10 +84,9 @@ Test coverage:
 - Critical paths: context management, handoff, Linear sync
 
 <example>
-# Adding a new feature to frame-manager.ts:
-# 1. Create src/core/context/__tests__/frame-manager.test.ts if not exists
-# 2. Add test cases for new feature
-# 3. Verify coverage: npm run test:run -- --coverage
+# New feature: src/core/context/frame-deduplicator.ts
+# Required: src/core/context/__tests__/frame-deduplicator.test.ts
+# Test both happy path and edge cases (empty input, duplicates, conflicts)
 </example>
 
 Never: Assume success | Skip testing | Use mock data as fallback
@@ -103,37 +101,15 @@ Never: Assume success | Skip testing | Use mock data as fallback
 - Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
 <example>
-# Good commit messages:
-feat(linear): add automatic issue sync
-fix(database): resolve FTS5 scoring for empty queries
-chore(deps): update vitest to 2.1.0
+# Good commits:
+feat(mcp): add search_frames tool for context retrieval
+fix(linear): handle null assignee in webhook handler
+chore(deps): upgrade better-sqlite3 to 11.8.0
 
-# Bad commit messages:
-update stuff
-fixed bug
-WIP
-</example>
-
-<example>
-# Good branch names:
+# Good branches:
 feature/STA-123-add-digest-export
-fix/STA-456-memory-leak-in-daemon
-chore/upgrade-typescript
-
-# Bad branch names:
-my-feature
-bugfix
-temp
-</example>
-
-<example>
-# Pre-push workflow:
-npm run lint              # Fix issues first
-npm run test:run          # Ensure tests pass
-git add .
-git commit -m "feat(cli): add export command"
-git push                  # Hooks will run automatically
-# If hooks fail, fix the issue - DO NOT use --no-verify
+fix/STA-456-frame-timestamp-parsing
+chore/upgrade-typescript-5.3
 </example>
 
 ## Task Management
@@ -143,38 +119,32 @@ git push                  # Hooks will run automatically
 - Update task status immediately on completion
 
 <example>
-# User request: "Add Linear sync and update docs"
-# Response:
-# 1. Create tasks via TodoWrite:
-#    - Implement Linear API sync
-#    - Add unit tests for sync
-#    - Update linear_integration.md
-# 2. Start first task: TaskUpdate(id: "1", status: "in_progress")
-# 3. After completing: TaskUpdate(id: "1", status: "completed")
-# 4. Move to next: TaskUpdate(id: "2", status: "in_progress")
+# Multi-step task requires TodoWrite:
+User: "Add Graphiti integration with Linear bridge"
+1. Create TodoWrite with 4 tasks:
+   - Research Graphiti API patterns
+   - Implement LinearGraphitiBridge class
+   - Add webhook handler for Linear events
+   - Write integration tests
+2. Mark task 1 in_progress, complete it
+3. Mark task 2 in_progress, etc.
 </example>
 
 ## Security
 
 NEVER hardcode secrets - use process.env with dotenv/config
 
-```javascript
+<example>
+// ✓ CORRECT
 import 'dotenv/config';
 const API_KEY = process.env.LINEAR_API_KEY;
 if (!API_KEY) {
   console.error('LINEAR_API_KEY not set');
   process.exit(1);
 }
-```
 
-<example>
-# Bad (hardcoded):
-const token = 'lin_api_abc123xyz';
-
-# Good (from environment):
-import 'dotenv/config';
-const token = process.env.LINEAR_API_KEY;
-if (!token) throw new Error('LINEAR_API_KEY not set');
+// ✗ WRONG
+const API_KEY = 'lin_api_abc123def456';
 </example>
 
 Environment sources (check in order):
@@ -183,15 +153,14 @@ Environment sources (check in order):
 3. ~/.zshrc
 4. Process environment
 
-<example>
-# User: "I can't connect to Linear"
-# Response:
-# 1. Check if .env exists and contains LINEAR_API_KEY
-# 2. Read .env: cat .env | grep LINEAR_API_KEY
-# 3. If missing, ask user to add it (don't ask them to provide the key)
-</example>
-
 Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
+
+<example>
+# If you see this pattern, STOP and use env vars:
+const token = 'lin_api_...';
+const apiKey = 'sk-...';
+const npmToken = 'npm_...';
+</example>
 
 ## Deploy
 
@@ -209,17 +178,67 @@ railway up
 # Pre-publish checks require clean git status — stash GEPA files first
 ```
 
+## Task Delegation Model
+
+Route effort by task complexity — not all code changes deserve equal scrutiny:
+
+**AUTOMATE** — Execute immediately, lint+test is sufficient:
+- CRUD operations, boilerplate, formatting, simple transforms
+- Adding a tool handler following existing switch/case pattern
+- Config additions (new env var, feature flag)
+
 <example>
-# Pre-publish workflow:
-git status                           # Check for uncommitted changes
-git stash -- scripts/gepa/          # Stash GEPA files
-npm run lint && npm run test:run    # Validate
-npm version patch                    # Bump version
-NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
-  npm publish --registry https://registry.npmjs.org/ \
-  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
-git stash pop                        # Restore GEPA
+# AUTOMATE tier example:
+User: "Add a new MCP tool for listing frames by tag"
+Action: Add case to server.ts switch, follow existing pattern, lint+test
 </example>
+
+**STANDARD** — Normal workflow, lint+test+build:
+- Feature implementation, bug fixes, refactoring
+- New test coverage, documentation updates
+- Integration wiring (adding handler to server.ts dispatch)
+
+<example>
+# STANDARD tier example:
+User: "Fix the digest generation to include frame metadata"
+Action: Modify digest-generator.ts, add tests, lint+test+build, verify output
+</example>
+
+**CAREFUL** — Review approach before implementation:
+- API/schema changes, database migrations, auth flows
+- New integration patterns (MCP tools, webhook handlers)
+- Changes to frame-manager, sqlite-adapter, or daemon lifecycle
+- Anything touching error handling chains
+
+<example>
+# CAREFUL tier example:
+User: "Add a new column to frames table for priority scoring"
+Action: Read schema, check migrations, discuss ALTER TABLE vs rebuild, plan rollback
+</example>
+
+**ARCHITECT** — Plan mode required, explore existing patterns first:
+- New service boundaries, system integrations
+- Performance-critical paths (FTS5 queries, search scoring)
+- Breaking changes to MCP protocol or CLI interface
+
+<example>
+# ARCHITECT tier example:
+User: "Integrate Graphiti knowledge graph with existing frame storage"
+Action: EnterPlanMode, explore frame-manager.ts, research Graphiti API, design bridge layer
+</example>
+
+**HUMAN** — Explicit user approval before any changes:
+- Security-critical decisions, secret handling
+- Irreversible operations (data migrations, schema drops)
+- Publishing (npm publish, Railway deploy)
+
+<example>
+# HUMAN tier example:
+User: "Publish v1.3.0 to npm"
+Action: Ask "Ready to publish? This will run npm publish with NPM_TOKEN." Wait for approval.
+</example>
+
+Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
 
 ## Workflow
 
@@ -231,26 +250,17 @@ git stash pop                        # Restore GEPA
 - Ask 1-3 clarifying questions for complex commands (one at a time)
 
 <example>
-# Session start:
-1. Read recent commits: git log --oneline -5
-2. Check stackmemory.json for context
-3. Read .env to see available integrations
-4. Ask user for their primary goal this session
+# Session start workflow:
+1. Read stackmemory.json for project state
+2. Run: git log --oneline -5
+3. Check git status for uncommitted work
+4. If user mentions Linear task, run: npm run linear:sync
+5. Proceed with user request
 </example>
 
 <example>
-# User: "Fix the search bug"
-# Response:
-# Question: "Which search feature - FTS5 full-text, vector similarity, or LIKE pattern matching?"
-# (Wait for answer, then proceed)
-</example>
-
-<example>
-# User: "Add a new feature to export contexts"
-# Response:
-# 1. Use subagent (Task tool with Explore agent) to find existing export patterns
-# 2. Create TodoWrite tasks for implementation
-# 3. Implement feature
-# 4. Run validation: npm run lint && npm run test:run
-# 5. Run: stackmemory export --help (to verify)
+# Complex command clarification:
+User: "Optimize the search performance"
+Response: "Which search path should I focus on? (1) FTS5 queries, (2) Hybrid search scoring, or (3) Database indexes?"
+# Wait for answer before proceeding
 </example>

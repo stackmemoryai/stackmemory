@@ -130,6 +130,38 @@ railway up
 # Pre-publish checks require clean git status — stash GEPA files first
 ```
 
+## Task Delegation Model
+
+Route effort by task complexity — not all code changes deserve equal scrutiny:
+
+**AUTOMATE** — Execute immediately, lint+test is sufficient:
+- CRUD operations, boilerplate, formatting, simple transforms
+- Adding a tool handler following existing switch/case pattern
+- Config additions (new env var, feature flag)
+
+**STANDARD** — Normal workflow, lint+test+build:
+- Feature implementation, bug fixes, refactoring
+- New test coverage, documentation updates
+- Integration wiring (adding handler to server.ts dispatch)
+
+**CAREFUL** — Review approach before implementation:
+- API/schema changes, database migrations, auth flows
+- New integration patterns (MCP tools, webhook handlers)
+- Changes to frame-manager, sqlite-adapter, or daemon lifecycle
+- Anything touching error handling chains
+
+**ARCHITECT** — Plan mode required, explore existing patterns first:
+- New service boundaries, system integrations
+- Performance-critical paths (FTS5 queries, search scoring)
+- Breaking changes to MCP protocol or CLI interface
+
+**HUMAN** — Explicit user approval before any changes:
+- Security-critical decisions, secret handling
+- Irreversible operations (data migrations, schema drops)
+- Publishing (npm publish, Railway deploy)
+
+Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
+
 ## Workflow
 
 - Check .env for API keys before asking

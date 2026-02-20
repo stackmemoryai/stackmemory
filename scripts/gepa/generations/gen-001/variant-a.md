@@ -34,7 +34,7 @@ Quick reference (agent_docs/):
 - database_storage.md - Storage
 - claude_hooks.md - Hooks
 
-Full documentation (docs/):
+Full docs (docs/):
 - principles.md - Agent programming paradigm
 - architecture.md - Extension model and browser sandbox
 - SPEC.md - Technical specification
@@ -63,43 +63,43 @@ stackmemory restore    # Restore from captured state
 - ALLOWED: All subdirectories
 - TEMP: /tmp for temporary operations
 
-## Validation (Required After Code Changes)
+## Required Validation
 
-1. Run `npm run lint` - fix ALL errors and warnings
-2. Run `npm run test:run` - verify no regressions
-3. Run `npm run build` - ensure compilation succeeds
-4. Execute code to verify functionality
+After every code change:
+1. `npm run lint` - fix all errors AND warnings
+2. `npm run test:run` - verify no regressions
+3. `npm run build` - confirm compilation succeeds
+4. Execute code to confirm functionality
 
-## Testing Requirements
+Test coverage requirements:
+- Write tests in `src/**/__tests__/` for all new features
+- Maintain or improve coverage - no untested code paths
+- Critical paths require tests: context management, handoff, Linear sync
 
-- Add tests in `src/**/__tests__/` for new features
-- Maintain or improve test coverage
-- Test critical paths: context management, handoff, Linear sync
-- Never skip testing or use mock data as fallback
+Do NOT: assume success | skip testing | use mock data as fallback
 
-## Git Workflow (Critical)
+## Git Rules (CRITICAL)
 
-**Pre-commit/push:**
-- Run `npm run lint && npm run test:run`
-- Fix all lint/test errors before committing
-- NEVER use `--no-verify` flags
-- If hooks fail, fix the root cause
+NEVER:
+- Use `--no-verify` on git push or commit
+- Push without fixing lint/test errors
+- Skip validation when pre-push hooks fail
 
-**Commit format:**
-```
-type(scope): message
-```
+ALWAYS:
+- Fix underlying issues when hooks fail
+- Run `npm run lint && npm run test:run` before pushing
+- Use commit format: `type(scope): message`
+- Use branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
-**Branch naming:**
-```
-feature/STA-XXX-description
-fix/STA-XXX-description
-chore/description
-```
+## Task Management
 
-## Security (Critical)
+- Create TodoWrite for 3+ steps or multiple requests
+- Work on one task at a time (keep one in_progress)
+- Update task status immediately on completion
 
-**Never hardcode secrets.** Load from environment:
+## Security
+
+NEVER hardcode secrets. Use process.env with dotenv/config:
 
 ```javascript
 import 'dotenv/config';
@@ -110,19 +110,19 @@ if (!API_KEY) {
 }
 ```
 
-**Environment sources (check in order):**
+Environment sources (check in order):
 1. .env file
 2. .env.local
 3. ~/.zshrc
 4. Process environment
 
-**Block patterns:** `lin_api_*` | `lin_oauth_*` | `sk-*` | `npm_*`
+Block secret patterns: lin_api_* | lin_oauth_* | sk-* | npm_*
 
-## Deployment
+## Deploy
 
 ```bash
-# npm publish (automation token required)
-git stash -- scripts/gepa/           # stash GEPA state
+# npm publish (uses NPM_TOKEN from .env, no OTP needed)
+git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
 NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
   npm publish --registry https://registry.npmjs.org/ \
   --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
@@ -131,18 +131,44 @@ git stash pop                         # restore GEPA state
 # Railway
 railway up
 
-# Note: Pre-publish checks require clean git status
+# Pre-publish checks require clean git status — stash GEPA files first
 ```
 
-## Task Management
+## Task Delegation Model
 
-- Use TodoWrite for 3+ steps or multiple requests
-- Maintain one task in_progress at a time
-- Update task status immediately upon completion
+Match effort to complexity:
 
-## Workflow Best Practices
+**AUTOMATE** — Execute immediately, lint+test only:
+- CRUD operations, boilerplate, formatting, simple transforms
+- Adding tool handler following existing switch/case pattern
+- Config additions (env var, feature flag)
 
-- Check .env for API keys before requesting them
+**STANDARD** — Normal workflow, lint+test+build:
+- Feature implementation, bug fixes, refactoring
+- New test coverage, documentation updates
+- Integration wiring (adding handler to server.ts dispatch)
+
+**CAREFUL** — Review approach before coding:
+- API/schema changes, database migrations, auth flows
+- New integration patterns (MCP tools, webhook handlers)
+- Changes to frame-manager, sqlite-adapter, daemon lifecycle
+- Error handling chain modifications
+
+**ARCHITECT** — Plan mode required, explore patterns first:
+- New service boundaries, system integrations
+- Performance-critical paths (FTS5 queries, search scoring)
+- Breaking changes to MCP protocol or CLI interface
+
+**HUMAN** — Explicit user approval required:
+- Security-critical decisions, secret handling
+- Irreversible operations (data migrations, schema drops)
+- Publishing (npm publish, Railway deploy)
+
+Scale quality gates to tier. Don't over-engineer AUTOMATE tasks or under-review CAREFUL ones.
+
+## Workflow
+
+- Check .env for API keys before asking user
 - Run `npm run linear:sync` after task completion
 - Use browser MCP for visual testing
 - Review recent commits and stackmemory.json at session start

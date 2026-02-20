@@ -5,37 +5,214 @@
     {
       "taskId": "eval-001",
       "taskName": "simple_function",
+      "weight": 1,
       "passed": false,
-      "duration": 21,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "has_function": {
+          "passed": false,
+          "reason": "No actual function code is provided, only a description of what the function would do"
+        },
+        "handles_edge_cases": {
+          "passed": false,
+          "reason": "Edge cases are mentioned in the description but not actually handled in code since no code is provided"
+        },
+        "is_tested": {
+          "passed": false,
+          "reason": "No test cases or test code are shown"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 14935,
+      "output": "I've written a palindrome checker function that:\n\n- Normalizes the string (lowercase, removes non-alphanumeric characters)\n- Compares the cleaned string with its reverse\n- Returns true if they match\n\nThe function handles edge cases like spaces, punctuation, and mixed case (e.g., \"A man, a plan, a canal: Panama\" returns true).\n"
     },
     {
       "taskId": "eval-002",
       "taskName": "refactor_code",
+      "weight": 1.5,
       "passed": false,
-      "duration": 23,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "uses_async": {
+          "passed": false,
+          "reason": "No async/await code is provided in the output. The AI only asks for code to be shared and does not demonstrate any async/await refactoring."
+        },
+        "preserves_behavior": {
+          "passed": false,
+          "reason": "Without providing refactored code, behavior cannot be verified or preserved. The output is a request for input rather than a solution."
+        },
+        "no_nested_callbacks": {
+          "passed": false,
+          "reason": "No code refactoring was performed, so there is no demonstration that nested callbacks were eliminated or replaced with async/await patterns."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 9934,
+      "output": "I'd be happy to help refactor code from callbacks to async/await! However, I don't see any code in your message. Could you please share the code you'd like me to refactor?\n\nYou can either:\n1. Provide the file path (e.g., `src/some-file.ts`)\n2. Paste the code directly\n3. Describe which file/function needs refactoring\n\nOnce you share the code, I'll refactor it to use modern async/await syntax.\n"
     },
     {
       "taskId": "eval-003",
       "taskName": "fix_bug",
+      "weight": 1.2,
       "passed": false,
-      "duration": 23,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "bug_fixed": {
+          "passed": false,
+          "reason": "No code was provided by the user, so the AI could not fix any bug. The output only requests code without attempting to fix anything."
+        },
+        "no_new_bugs": {
+          "passed": true,
+          "reason": "Since no code fix was attempted, no new bugs were introduced."
+        },
+        "explains_fix": {
+          "passed": false,
+          "reason": "No explanation of any fix is provided. The AI only asks for code to be shared and does not explain what an off-by-one error is or how to fix it."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 11837,
+      "output": "I'd be happy to help fix the off-by-one error! However, I don't see any code in your message. Could you please share the code containing the loop with the off-by-one error?\n\nYou can either:\n1. Paste the code snippet directly\n2. Tell me which file contains the problematic loop so I can read it\n"
     },
     {
       "taskId": "eval-004",
       "taskName": "add_feature",
-      "passed": false,
-      "duration": 19,
-      "output": "/bin/sh: timeout: command not found\n"
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 0.75,
+      "criteria": {
+        "has_pagination": {
+          "passed": true,
+          "reason": "Pagination is explicitly described with page/limit parameters and pagination metadata in response"
+        },
+        "has_limit": {
+          "passed": true,
+          "reason": "Limit parameter is defined with default value of 10 and max constraint of 100"
+        },
+        "has_offset": {
+          "passed": false,
+          "reason": "Output uses page-based pagination, not offset-based. Offset parameter is not mentioned or implemented"
+        },
+        "backwards_compatible": {
+          "passed": true,
+          "reason": "Default values (page=1, limit=10) ensure existing calls without parameters continue to work"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 23886,
+      "output": "I've added pagination to the `/users` endpoint with:\n\n**Query Parameters:**\n- `page` (default: 1, min: 1)\n- `limit` (default: 10, min: 1, max: 100)\n\n**Response Format:**\n```json\n{\n  \"data\": [...users],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 100,\n    \"totalPages\": 10,\n    \"hasNext\": true,\n    \"hasPrev\": false\n  }\n}\n```\n\n**Examples:**\n- `GET /users` → first 10 users\n- `GET /users?page=2&limit=20` → users 21-40\n- `GET /users?page=5&limit=25` → users 101-125 (last page)\n"
     },
     {
       "taskId": "eval-005",
       "taskName": "code_review",
+      "weight": 1.3,
       "passed": false,
-      "duration": 19,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "identifies_security_issue": {
+          "passed": false,
+          "reason": "The output does not identify any security issues. It only requests more information without performing any actual review."
+        },
+        "identifies_performance_issue": {
+          "passed": false,
+          "reason": "The output does not identify any performance issues. It is a request for additional context rather than an actual review."
+        },
+        "actionable_feedback": {
+          "passed": false,
+          "reason": "The output provides no actionable feedback about code issues. It only lists procedural steps for obtaining PR information, which is not actionable feedback about the code itself."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 16784,
+      "output": "I need more information to review the PR. Could you provide:\n\n1. **PR link or number** (e.g., GitHub URL or PR #123)\n2. **PR description/changes**, or\n3. **Specific files to review**\n\nIf you're using GitHub, I can fetch the PR details using the `gh` CLI:\n\n```bash\ngh pr view <number>\ngh pr diff <number>\n```\n\nOr if you have specific files that changed, let me know their paths and I'll review them directly.\n"
+    },
+    {
+      "taskId": "sm-001",
+      "taskName": "add_mcp_tool_handler",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "has_switch_case": {
+          "passed": false,
+          "reason": "AI claims to have added the handler but provides no actual code showing a switch/case statement. Only describes it was added to a file at specific line numbers without showing the implementation."
+        },
+        "has_zod_schema": {
+          "passed": false,
+          "reason": "AI mentions Zod validation in text but does not provide actual Zod schema code. The schema definition `z.object({ frameId: z.string() })` is only described, not shown as implemented."
+        },
+        "validates_input": {
+          "passed": false,
+          "reason": "No actual code shown demonstrating input validation. The claim about validation is unsupported by visible implementation details."
+        },
+        "returns_typed_response": {
+          "passed": false,
+          "reason": "No actual return statement or type definition is shown in the output. The return shape is only described narratively, not demonstrated in code."
+        },
+        "handles_not_found": {
+          "passed": false,
+          "reason": "While error handling is mentioned, no actual code showing the error handling logic is provided. The claim about throwing if frame not found is unverified."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 30061,
+      "output": "Done! I've added the `get_frame_summary` handler to mcp-dispatch-stub.ts:32-41. It follows the existing pattern:\n\n- **Zod validation**: `z.object({ frameId: z.string() })` ensures required string input\n- **Error handling**: Throws if frame not found (consistent with `close_frame`)\n- **Return shape**: `{ frameId, name, status, eventCount }`\n\nThe handler retrieves the frame from the store and returns a summary with the event count computed from `frame.events.length`.\n"
+    },
+    {
+      "taskId": "sm-002",
+      "taskName": "fix_fts5_trigger_bug",
+      "weight": 1.8,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "has_delete_trigger": {
+          "passed": true,
+          "reason": "A DELETE trigger named 'frames_ad' is explicitly defined with CREATE TRIGGER IF NOT EXISTS syntax, targeting the frames table."
+        },
+        "uses_fts_delete_syntax": {
+          "passed": true,
+          "reason": "The trigger uses FTS5's special 'delete' command in the VALUES clause: VALUES('delete', old.rowid, ...), which is the correct syntax for removing entries from an FTS5 index."
+        },
+        "references_old_row": {
+          "passed": true,
+          "reason": "The trigger correctly references the deleted row using 'old' qualifiers: old.rowid, old.name, old.digest_text, old.inputs, old.outputs."
+        },
+        "matches_column_list": {
+          "passed": true,
+          "reason": "The column list (frames_fts, rowid, name, digest_text, inputs, outputs) matches the pattern used in existing INSERT and UPDATE triggers, maintaining consistency across all three DML triggers."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 39327,
+      "output": "Added the missing DELETE trigger `frames_ad` following the existing pattern:\n\n```sql\n-- Sync trigger: DELETE\nCREATE TRIGGER IF NOT EXISTS frames_ad AFTER DELETE ON frames BEGIN\n  INSERT INTO frames_fts(frames_fts, rowid, name, digest_text, inputs, outputs)\n  VALUES ('delete', old.rowid, old.name, old.digest_text, old.inputs, old.outputs);\nEND;\n```\n\nThis matches the pattern used in the UPDATE trigger — it uses FTS5's special `'delete'` command to remove entries from the index when frames are deleted from the main table.\n"
+    },
+    {
+      "taskId": "sm-003",
+      "taskName": "daemon_service_lifecycle",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 0.75,
+      "criteria": {
+        "clears_old_interval": {
+          "passed": false,
+          "reason": "The AI output only prevents double-start but doesn't clear the old interval. The fix uses `if (this.isRunning) return;` which exits early, but doesn't call `clearInterval()` on any existing `intervalId`. A proper fix would need `clearInterval(this.intervalId)` before creating a new one, especially in `updateConfig()`."
+        },
+        "prevents_double_start": {
+          "passed": true,
+          "reason": "The guard condition `if (this.isRunning) return;` at the start of `start()` effectively prevents calling the method twice while already running."
+        },
+        "has_getstate_method": {
+          "passed": true,
+          "reason": "A `getState()` method is defined that returns an object with the required properties."
+        },
+        "returns_correct_state_shape": {
+          "passed": true,
+          "reason": "The returned object includes all four required fields: `isRunning`, `intervalMs`, `lastRunTime`, and `errorCount` with appropriate values."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 31264,
+      "output": "I've identified the fixes needed for `/private/tmp/gepa-eval-yzj5wz/leaky-service.ts`:\n\n## Fixes\n\n**1. Timer leak fix (line 28)** — Add guard in `start()`:\n```typescript\nstart(): void {\n  if (this.isRunning) return;  // Prevent double-start\n  // ... rest of method\n}\n```\n\n**2. Add `getState()` method** (after line 55):\n```typescript\ngetState(): ServiceState {\n  return {\n    isRunning: this.isRunning,\n    intervalMs: this.config.interval * 60 * 1000,\n    lastRunTime: this.lastRunTime,\n    errorCount: this.errorCount,\n  };\n}\n```\n\nThe root cause: `start()` doesn't check if the service is already running before creating a new interval. If called twice (or via `updateConfig()` when `stop()` fails silently), it overwrites `intervalId` without clearing the old timer, causing the leak.\n\nReady to apply these changes?\n"
     }
   ]
 }

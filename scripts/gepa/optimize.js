@@ -21,6 +21,18 @@ import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
+
+// Load .env from project root
+const envPath = path.join(PROJECT_ROOT, '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
+  }
+}
 
 // Configuration
 const CONFIG_PATH = path.join(__dirname, 'config.json');
@@ -186,6 +198,9 @@ ${strategyPrompts[strategy]}
 EVALUATION FEEDBACK FROM PREVIOUS GENERATIONS:
 ${getRecentFeedback(state)}
 
+REFLECTION INSIGHTS (from failure pattern analysis):
+${getReflectionInsights()}
+
 REQUIREMENTS:
 1. Output ONLY the improved markdown content
 2. Preserve all critical instructions and constraints
@@ -231,16 +246,104 @@ function getRecentFeedback(state) {
 }
 
 /**
+ * Load most recent reflection insights for mutation context
+ */
+function getReflectionInsights() {
+  const reflectionFiles = fs.existsSync(RESULTS_DIR)
+    ? fs
+        .readdirSync(RESULTS_DIR)
+        .filter((f) => f.startsWith('reflection-') && f.endsWith('.json'))
+    : [];
+
+  if (reflectionFiles.length === 0) return 'No reflection data yet.';
+
+  // Pick the most recent reflection file
+  reflectionFiles.sort().reverse();
+  const latest = JSON.parse(
+    fs.readFileSync(path.join(RESULTS_DIR, reflectionFiles[0]), 'utf8')
+  );
+
+  const insights = latest.insights;
+  if (!insights) return 'No reflection insights available.';
+
+  const parts = [];
+
+  if (insights.failureModes?.length) {
+    parts.push(`Failure modes: ${insights.failureModes.join('; ')}`);
+  }
+  if (insights.missingInstructions?.length) {
+    parts.push(
+      `Missing instructions: ${insights.missingInstructions.join('; ')}`
+    );
+  }
+  if (insights.unclearInstructions?.length) {
+    parts.push(
+      `Unclear instructions: ${insights.unclearInstructions.join('; ')}`
+    );
+  }
+  if (insights.priorityMutations?.length) {
+    parts.push(
+      `Priority changes:\n${insights.priorityMutations
+        .map((m) => `  - [${m.type}] ${m.section}: ${m.change}`)
+        .join('\n')}`
+    );
+  }
+
+  return parts.join('\n') || 'No actionable insights.';
+}
+
+/**
+ * Call Claude CLI via spawn (stdin pipe, no shell interpolation)
+ */
+function spawnClaude(prompt, { cwd, timeoutMs } = {}) {
+  return new Promise((resolve, reject) => {
+    const args = ['--print'];
+    const child = spawn('claude', args, {
+      cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env },
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let killed = false;
+
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          killed = true;
+          child.kill('SIGTERM');
+        }, timeoutMs)
+      : null;
+
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+
+    child.on('close', (code) => {
+      if (timer) clearTimeout(timer);
+      if (killed)
+        return reject(new Error(`claude timed out after ${timeoutMs}ms`));
+      if (code !== 0 && !stdout)
+        return reject(new Error(stderr || `claude exited ${code}`));
+      resolve(stdout);
+    });
+
+    child.on('error', (err) => {
+      if (timer) clearTimeout(timer);
+      reject(err);
+    });
+
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
+/**
  * Call Claude API for mutation generation
  */
 async function callClaude(prompt) {
-  // Try using claude CLI first
+  // Try using claude CLI first (stdin pipe, no shell injection)
   try {
-    const result = execSync(`echo ${JSON.stringify(prompt)} | claude --print`, {
-      encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return result;
+    return await spawnClaude(prompt);
   } catch (e) {
     // Fallback to API
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -310,6 +413,7 @@ async function runEval(variantName) {
     results.push({
       taskId: task.id,
       taskName: task.name,
+      weight: task.weight || 1.0,
       ...result,
     });
   }
@@ -333,10 +437,11 @@ async function runEval(variantName) {
  */
 async function runSingleEval(task, variantPath) {
   const startTime = Date.now();
+  let tempDir;
 
   try {
     // Create temp project with variant as CLAUDE.md
-    const tempDir = fs.mkdtempSync('/tmp/gepa-eval-');
+    tempDir = fs.mkdtempSync('/tmp/gepa-eval-');
     fs.copyFileSync(variantPath, path.join(tempDir, 'CLAUDE.md'));
 
     // Copy fixture if needed
@@ -350,20 +455,20 @@ async function runSingleEval(task, variantPath) {
       }
     }
 
-    // Run claude with the task prompt
-    const result = execSync(
-      `cd ${tempDir} && echo ${JSON.stringify(task.prompt)} | timeout ${config.evals.timeout / 1000} claude --print 2>&1 || true`,
-      { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
-    );
+    // Run claude via spawn with Node-native timeout (no GNU timeout needed)
+    const result = await spawnClaude(task.prompt, {
+      cwd: tempDir,
+      timeoutMs: config.evals.timeout,
+    });
 
-    // Evaluate result against expected outcomes
-    const passed = evaluateExpectations(result, task.expected);
-
-    // Cleanup
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    // Evaluate result against expected outcomes (LLM judge with regex fallback)
+    const evaluation = await evaluateExpectations(result, task.expected, task);
 
     return {
-      passed,
+      passed: evaluation.passed,
+      passRate: evaluation.passRate,
+      criteria: evaluation.criteria,
+      judgeMode: evaluation.judgeMode,
       duration: Date.now() - startTime,
       output: result.slice(0, 2000),
     };
@@ -373,49 +478,186 @@ async function runSingleEval(task, variantPath) {
       duration: Date.now() - startTime,
       error: error.message,
     };
+  } finally {
+    if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
 /**
- * Evaluate output against expectations
+ * Evaluate output against expectations using LLM judge (regex fallback)
  */
-function evaluateExpectations(output, expected) {
-  if (!expected) return true;
+async function evaluateExpectations(output, expected, task) {
+  if (!expected)
+    return { passed: true, passRate: 1.0, criteria: {}, judgeMode: 'skip' };
 
-  const checks = Object.entries(expected).map(([key, value]) => {
-    // Simple heuristic checks
-    switch (key) {
-      case 'has_function':
-        return /function\s+\w+|const\s+\w+\s*=\s*(\([^)]*\)|async)?\s*(=>|\{)/.test(
-          output
-        );
-      case 'handles_edge_cases':
-        return /if\s*\(|edge|empty|null|undefined|\.length/.test(output);
-      case 'uses_async':
-        return /async|await|Promise/.test(output);
-      case 'no_nested_callbacks':
-        return !/callback\s*\(\s*function|\.then\s*\([^)]*\.then/.test(output);
-      case 'bug_fixed':
-        return /fix|correct|change|update/i.test(output);
-      case 'explains_fix':
-        return (
-          output.length > 200 &&
-          /because|since|the issue|the problem/i.test(output)
-        );
-      default:
-        return output.toLowerCase().includes(key.toLowerCase());
-    }
-  });
-
-  return checks.filter(Boolean).length / checks.length >= 0.6;
+  // Try LLM judge first
+  try {
+    const result = await llmJudge(output, expected, task);
+    return { ...result, judgeMode: 'llm' };
+  } catch (e) {
+    console.log(`    LLM judge failed (${e.message}), using regex fallback`);
+    const result = regexJudge(output, expected);
+    return { ...result, judgeMode: 'regex' };
+  }
 }
 
 /**
- * Calculate weighted score
+ * LLM-as-judge — uses a fast model to evaluate output against criteria
+ */
+async function llmJudge(output, expected, task) {
+  const criteriaList = Object.entries(expected)
+    .map(
+      ([key, value]) =>
+        `- ${key}: ${typeof value === 'string' ? value : 'should be ' + value}`
+    )
+    .join('\n');
+
+  const judgePrompt = `You are a strict code evaluation judge. Evaluate whether the AI output satisfies each criterion.
+
+TASK GIVEN TO AI:
+${task.prompt}
+
+AI OUTPUT:
+\`\`\`
+${output.slice(0, 6000)}
+\`\`\`
+
+CRITERIA TO EVALUATE:
+${criteriaList}
+
+For each criterion, determine if the output genuinely satisfies it. Be strict:
+- "has_function" means a real, working function is defined (not just mentioned)
+- "bug_fixed" means the actual bug is corrected (not just discussed)
+- "handles_edge_cases" means edge cases are actually handled in code
+- "explains_fix" means there's a clear explanation of what was wrong and why
+
+Respond with ONLY this JSON (no markdown fences):
+{
+  "criteria": {
+    "criterion_name": {"passed": true, "reason": "brief explanation"},
+    "criterion_name": {"passed": false, "reason": "brief explanation"}
+  }
+}`;
+
+  const judgeModel = config.judge?.model || 'claude-haiku-4-5-20251001';
+  const raw = await callJudge(judgePrompt, judgeModel);
+
+  // Extract JSON from response
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('No JSON in judge response');
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  const criteria = parsed.criteria || {};
+  const entries = Object.values(criteria);
+  const passedCount = entries.filter((c) => c.passed).length;
+  const passRate = entries.length > 0 ? passedCount / entries.length : 0;
+
+  return {
+    passed: passRate >= 0.6,
+    passRate,
+    criteria,
+  };
+}
+
+/**
+ * Call judge model via Anthropic API (fast, cheap model for evaluation)
+ */
+async function callJudge(prompt, model) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (apiKey) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Judge API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  }
+
+  // Fallback to CLI
+  return await spawnClaude(prompt, { timeoutMs: 30000 });
+}
+
+/**
+ * Regex fallback judge (used when LLM judge is unavailable)
+ */
+function regexJudge(output, expected) {
+  const criteria = {};
+
+  for (const [key, value] of Object.entries(expected)) {
+    let passed = false;
+    switch (key) {
+      case 'has_function':
+        passed =
+          /function\s+\w+|const\s+\w+\s*=\s*(\([^)]*\)|async)?\s*(=>|\{)/.test(
+            output
+          );
+        break;
+      case 'handles_edge_cases':
+        passed = /if\s*\(|edge|empty|null|undefined|\.length/.test(output);
+        break;
+      case 'uses_async':
+        passed = /async|await|Promise/.test(output);
+        break;
+      case 'no_nested_callbacks':
+        passed = !/callback\s*\(\s*function|\.then\s*\([^)]*\.then/.test(
+          output
+        );
+        break;
+      case 'bug_fixed':
+        passed = /fix|correct|change|update/i.test(output);
+        break;
+      case 'explains_fix':
+        passed =
+          output.length > 200 &&
+          /because|since|the issue|the problem/i.test(output);
+        break;
+      default:
+        passed = output.toLowerCase().includes(key.toLowerCase());
+    }
+    criteria[key] = { passed, reason: 'regex heuristic' };
+  }
+
+  const entries = Object.values(criteria);
+  const passedCount = entries.filter((c) => c.passed).length;
+  const passRate = entries.length > 0 ? passedCount / entries.length : 0;
+
+  return { passed: passRate >= 0.6, passRate, criteria };
+}
+
+/**
+ * Calculate weighted score using task weights and per-criterion pass rates
  */
 function calculateScore(results) {
-  const passed = results.filter((r) => r.passed).length;
-  return passed / results.length;
+  if (results.length === 0) return 0;
+
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  for (const r of results) {
+    const weight = r.weight || 1.0;
+    // Use passRate for partial credit when available (LLM judge),
+    // fall back to binary passed for regex judge
+    const score = r.passRate !== undefined ? r.passRate : r.passed ? 1.0 : 0.0;
+    weightedSum += score * weight;
+    totalWeight += weight;
+  }
+
+  return totalWeight > 0 ? weightedSum / totalWeight : 0;
 }
 
 /**

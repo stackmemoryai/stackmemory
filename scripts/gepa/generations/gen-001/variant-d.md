@@ -1,119 +1,127 @@
 # StackMemory - Project Configuration
 
-## Project Structure
+## Overview
+
+StackMemory is an agent programming platform with CLI, MCP server, and Linear integration.
+
+**Primary**: /Users/jwu/Dev/stackmemory  
+**Tech**: TypeScript, Node.js, SQLite, Vitest, ESLint, esbuild
+
+## Architecture
 
 ```
 src/
-  cli/           # CLI commands and entry point
-  core/          # Core business logic
-    context/     # Frame and context management
-    database/    # Database adapters (SQLite, ParadeDB)
+  cli/           # CLI entry (index.ts)
+  core/          # Business logic
+    context/     # Frame management (frame-manager.ts)
+    database/    # Storage adapters (sqlite-adapter.ts)
     digest/      # Digest generation
-    query/       # Query parsing and routing
-  integrations/  # External integrations (Linear, MCP)
+    query/       # Query routing
+  integrations/  # Linear, MCP (mcp/server.ts)
   services/      # Business services
   skills/        # Claude Code skills
   utils/         # Shared utilities
-scripts/         # Build and utility scripts
-config/          # Configuration files
-docs/            # Documentation
 ```
-
-## Key Files
-
-- Entry: src/cli/index.ts
-- MCP Server: src/integrations/mcp/server.ts
-- Frame Manager: src/core/context/frame-manager.ts
-- Database: src/core/database/sqlite-adapter.ts
 
 ## Documentation
 
-Quick reference (agent_docs/):
-- linear_integration.md - Linear sync
-- mcp_server.md - MCP tools
-- database_storage.md - Storage
-- claude_hooks.md - Hooks
+**Quick reference** (agent_docs/):
+- linear_integration.md
+- mcp_server.md
+- database_storage.md
+- claude_hooks.md
 
-Full documentation (docs/):
-- principles.md - Agent programming paradigm
-- architecture.md - Extension model and browser sandbox
-- SPEC.md - Technical specification
-- API_REFERENCE.md - API docs
-- DEVELOPMENT.md - Dev guide
-- SETUP.md - Installation
+**Full docs** (docs/):
+- principles.md - Agent paradigm
+- architecture.md - Extension model
+- SPEC.md - Technical spec
+- API_REFERENCE.md
+- DEVELOPMENT.md
+- SETUP.md
 
-## Development Workflow
-
-### Build & Validation (MUST DO)
-
-After code changes:
-1. `npm run lint` - fix errors AND warnings
-2. `npm run test:run` - verify no regressions
-3. `npm run build` - ensure compilation
-4. Run code to verify it works
-
-Never: Assume success | Skip testing | Use mock data as fallback
-
-### Commands
+## Commands
 
 ```bash
-# Development
-npm run build          # Compile TypeScript (esbuild)
-npm run lint           # ESLint check
-npm run lint:fix       # Auto-fix lint issues
-npm test               # Run Vitest (watch)
-npm run test:run       # Run tests once
+# Build & Quality
+npm run build          # Compile (esbuild)
+npm run lint           # Check
+npm run lint:fix       # Auto-fix
+npm test               # Watch mode
+npm run test:run       # Run once
 
-# StackMemory CLI
-stackmemory capture    # Save session state for handoff
-stackmemory restore    # Restore from captured state
-npm run linear:sync    # Sync with Linear
+# Integration
+npm run linear:sync    # Sync Linear
+
+# CLI
+stackmemory capture    # Save session state
+stackmemory restore    # Restore session
 ```
 
-### Test Coverage
+## Validation Checklist
 
+After EVERY code change:
+
+1. **Lint**: `npm run lint` - fix ALL errors AND warnings
+2. **Test**: `npm run test:run` - verify no regressions
+3. **Build**: `npm run build` - ensure compilation
+4. **Run**: Execute code to verify functionality
+
+**Test coverage**:
 - New features require tests in `src/**/__tests__/`
-- Maintain or improve coverage (no untested code paths)
-- Critical paths: context management, handoff, Linear sync
+- Maintain or improve coverage (no untested paths)
+- Critical: context management, handoff, Linear sync
 
-### Task Management
+**Never**: Assume success | Skip testing | Use mock fallbacks
 
-- Use TodoWrite for 3+ steps or multiple requests
-- Keep one task in_progress at a time
-- Update task status immediately on completion
+## Git Workflow
 
-## Git & Deployment
+**Commit format**: `type(scope): message`  
+**Branch naming**: `feature/STA-XXX-desc` | `fix/STA-XXX-desc` | `chore/desc`
 
-### Git Rules (CRITICAL)
-
-- NEVER use `--no-verify` on git push or commit
+**Critical rules**:
+- NEVER use `--no-verify` on commit/push
 - ALWAYS fix lint/test errors before pushing
-- If pre-push hooks fail, fix the underlying issue
 - Run `npm run lint && npm run test:run` before pushing
-- Commit message format: `type(scope): message`
-- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+- If pre-push hooks fail, fix the underlying issue
 
-### Deploy
+## Task Delegation Model
 
-```bash
-# npm publish (uses NPM_TOKEN from .env, no OTP needed)
-git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
-NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
-  npm publish --registry https://registry.npmjs.org/ \
-  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
-git stash pop                         # restore GEPA state
+Route effort by complexity:
 
-# Railway
-railway up
+### AUTOMATE
+Execute immediately, lint+test is sufficient:
+- CRUD, boilerplate, formatting, simple transforms
+- Tool handler following existing switch/case
+- Config additions (env var, feature flag)
 
-# Pre-publish checks require clean git status — stash GEPA files first
-```
+### STANDARD
+Normal workflow, lint+test+build:
+- Features, bug fixes, refactoring
+- Test coverage, documentation
+- Integration wiring (server.ts dispatch)
 
-## Security & Environment
+### CAREFUL
+Review approach before implementation:
+- API/schema changes, database migrations, auth
+- New integration patterns (MCP tools, webhooks)
+- Changes to frame-manager, sqlite-adapter, daemon lifecycle
+- Error handling chains
 
-### Environment Variables
+### ARCHITECT
+Plan mode required, explore patterns first:
+- New service boundaries, system integrations
+- Performance-critical (FTS5 queries, search scoring)
+- Breaking changes (MCP protocol, CLI interface)
 
-NEVER hardcode secrets - use process.env with dotenv/config
+### HUMAN
+Explicit approval before changes:
+- Security decisions, secret handling
+- Irreversible operations (migrations, schema drops)
+- Publishing (npm, Railway)
+
+## Security
+
+**NEVER hardcode secrets** - use process.env with dotenv/config:
 
 ```javascript
 import 'dotenv/config';
@@ -124,24 +132,40 @@ if (!API_KEY) {
 }
 ```
 
-Environment sources (check in order):
+**Env sources** (check in order):
 1. .env file
 2. .env.local
 3. ~/.zshrc
 4. Process environment
 
-Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
+**Block patterns**: lin_api_* | lin_oauth_* | sk-* | npm_*
 
-## Working Directory
+## Deployment
 
-- PRIMARY: /Users/jwu/Dev/stackmemory
-- ALLOWED: All subdirectories
-- TEMP: /tmp for temporary operations
+```bash
+# npm publish (uses NPM_TOKEN from .env, no OTP)
+git stash -- scripts/gepa/           # stash GEPA state
+NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
+  npm publish --registry https://registry.npmjs.org/ \
+  --//registry.npmjs.org/:_authToken="$NPM_TOKEN"
+git stash pop                         # restore GEPA state
 
-## Session Workflow
+# Railway
+railway up
+
+# Note: Pre-publish checks require clean git status
+```
+
+## Task Management
+
+- Use TodoWrite for 3+ steps or multiple requests
+- Keep one task in_progress at a time
+- Update status immediately on completion
+
+## Workflow Tips
 
 - Check .env for API keys before asking
-- Run npm run linear:sync after task completion
+- Run `npm run linear:sync` after task completion
 - Use browser MCP for visual testing
 - Review recent commits and stackmemory.json on session start
 - Use subagents for multi-step tasks

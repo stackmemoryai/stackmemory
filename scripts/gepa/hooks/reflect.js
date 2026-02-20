@@ -9,9 +9,51 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+
+// Load .env from project root
+const envPath = path.join(PROJECT_ROOT, '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
+  }
+}
+
+/**
+ * Call Claude CLI via spawn (stdin pipe, no shell interpolation)
+ */
+function spawnClaude(prompt) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('claude', ['--print'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env },
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+
+    child.on('close', (code) => {
+      if (code !== 0 && !stdout)
+        return reject(new Error(stderr || `claude exited ${code}`));
+      resolve(stdout);
+    });
+
+    child.on('error', reject);
+
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
 const GEPA_DIR = path.join(__dirname, '..');
 const RESULTS_DIR = path.join(GEPA_DIR, 'results');
 const GENERATIONS_DIR = path.join(GEPA_DIR, 'generations');
@@ -212,10 +254,7 @@ Format as JSON:
 }`;
 
   try {
-    const result = execSync(
-      `echo ${JSON.stringify(reflectionPrompt)} | claude --print`,
-      { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
-    );
+    const result = await spawnClaude(reflectionPrompt);
 
     // Parse JSON from response
     const jsonMatch = result.match(/\{[\s\S]*\}/);

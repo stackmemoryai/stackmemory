@@ -5,37 +5,214 @@
     {
       "taskId": "eval-001",
       "taskName": "simple_function",
+      "weight": 1,
       "passed": false,
-      "duration": 19,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "has_function": {
+          "passed": false,
+          "reason": "No actual function code is provided. The output only describes what the function should do and mentions it exists, but doesn't show the real implementation."
+        },
+        "handles_edge_cases": {
+          "passed": false,
+          "reason": "While edge cases are mentioned in the description, no actual code is provided to verify they are genuinely handled in the implementation."
+        },
+        "is_tested": {
+          "passed": false,
+          "reason": "Tests are only mentioned/described, not actually provided. The AI says it 'will run the tests' after approval, meaning tests don't currently exist in the output."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 20953,
+      "output": "I've created a palindrome checker function with the following features:\n\n**`isPalindrome(str: string): boolean`**\n- Returns `true` if the string reads the same forwards and backwards\n- Case-insensitive\n- Ignores spaces and non-alphanumeric characters\n- Handles edge cases (single character, empty string)\n\nThe implementation:\n1. Converts to lowercase\n2. Removes non-alphanumeric characters\n3. Compares with reversed version\n\nI've also included comprehensive tests covering:\n- Simple palindromes (racecar, level)\n- Non-palindromes\n- Case variations\n- Strings with spaces/punctuation\n- Edge cases\n\nOnce you approve the file writes, I'll run the tests to verify everything works correctly.\n"
     },
     {
       "taskId": "eval-002",
       "taskName": "refactor_code",
+      "weight": 1.5,
       "passed": false,
-      "duration": 20,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "uses_async": {
+          "passed": false,
+          "reason": "No async/await code is provided in the output. The AI only requests the code but doesn't provide any refactored example."
+        },
+        "preserves_behavior": {
+          "passed": false,
+          "reason": "No refactored code is present to evaluate whether behavior is preserved. The output is a request for input rather than a solution."
+        },
+        "no_nested_callbacks": {
+          "passed": false,
+          "reason": "No code with callback elimination is demonstrated. The output contains no actual refactoring work."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 13171,
+      "output": "I'd be happy to help refactor callback-based code to use async/await! However, I don't see any code in your message.\n\nCould you please share the code you'd like me to refactor? You can either:\n1. Paste the code directly\n2. Provide the file path if it's in the current project\n\nOnce you share the code, I'll refactor it to use modern async/await syntax.\n"
     },
     {
       "taskId": "eval-003",
       "taskName": "fix_bug",
+      "weight": 1.2,
       "passed": false,
-      "duration": 24,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "bug_fixed": {
+          "passed": false,
+          "reason": "No bug was actually fixed. The AI did not provide corrected code, only asked for clarification about which loop to fix."
+        },
+        "no_new_bugs": {
+          "passed": true,
+          "reason": "No code was provided, so no new bugs could be introduced."
+        },
+        "explains_fix": {
+          "passed": false,
+          "reason": "No explanation of what the off-by-one error was or how to fix it was provided. The AI only requested more information."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 15457,
+      "output": "I'm in `/private/tmp/gepa-eval-6aqPva` which is not the main StackMemory project directory. Could you please:\n\n1. **Show me the specific file and loop** that has the off-by-one error, or\n2. **Describe where the loop is** (file path, function name), or\n3. **Share the code snippet** with the problematic loop\n\nThis will help me quickly identify and fix the exact issue you're referring to.\n"
     },
     {
       "taskId": "eval-004",
       "taskName": "add_feature",
+      "weight": 1.5,
       "passed": false,
-      "duration": 32,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0.5,
+      "criteria": {
+        "has_pagination": {
+          "passed": true,
+          "reason": "Output clearly describes pagination implementation with page parameter and pagination metadata in response"
+        },
+        "has_limit": {
+          "passed": true,
+          "reason": "Output explicitly includes limit parameter with default value of 10 and maximum of 100"
+        },
+        "has_offset": {
+          "passed": false,
+          "reason": "Output uses page-based pagination, not offset-based pagination. No offset parameter is mentioned or implemented"
+        },
+        "backwards_compatible": {
+          "passed": false,
+          "reason": "No actual code implementation provided, only specification. Cannot verify that existing API calls would continue to work without modification. The description doesn't address how pre-existing requests without pagination parameters would be handled"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 28730,
+      "output": "Added pagination to the `/users` endpoint with:\n\n**Query parameters:**\n- `page` (default: 1) - Current page number\n- `limit` (default: 10, max: 100) - Items per page\n\n**Response format:**\n```json\n{\n  \"data\": [...],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 100,\n    \"totalPages\": 10,\n    \"hasNext\": true,\n    \"hasPrev\": false\n  }\n}\n```\n\n**Features:**\n- Default 10 items per page\n- Validates parameters (positive numbers, limit ≤ 100)\n- Returns 400 for invalid inputs\n- Provides pagination metadata for navigation\n\nExample usage:\n- `GET /users?page=1&limit=20`\n- `GET /users?page=2` (uses default limit=10)\n"
     },
     {
       "taskId": "eval-005",
       "taskName": "code_review",
+      "weight": 1.3,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "identifies_security_issue": {
+          "passed": true,
+          "reason": "The output identifies multiple genuine security vulnerabilities: SQL injection, plaintext password comparison, predictable token generation, credential logging, missing session storage, and insecure cookie flags. All are real security issues."
+        },
+        "identifies_performance_issue": {
+          "passed": false,
+          "reason": "The output does not identify or discuss any performance issues. The task requires identifying both security AND performance issues, but only security issues are covered."
+        },
+        "actionable_feedback": {
+          "passed": true,
+          "reason": "The output provides specific, actionable fixes for each identified issue, including code examples showing the problematic code and the corrected version. Each recommendation is concrete and implementable."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 30766,
+      "output": "# PR Review - Critical Security Issues Found\n\n## 🚨 CRITICAL Issues (Must Fix)\n\n### 1. **SQL Injection Vulnerability** (Line 10)\n```typescript\nconst user = await db.query(`SELECT * FROM users WHERE email = '${email}'`);\n```\n**Problem:** Direct string interpolation allows SQL injection attacks. An attacker could use `email = \"' OR '1'='1\"` to bypass authentication.\n\n**Fix:** Revert to parameterized query:\n```typescript\nconst user = await db.query('SELECT * FROM users WHERE email = $1', [email]);\n```\n\n### 2. **Password Storage Vulnerability** (Line 14)\n```typescript\nconst valid = password === user.passwordHash;\n```\n**Problem:** Removed bcrypt comparison, suggesting passwords are stored in plain text or improperly compared. This completely breaks password hashing.\n\n**Fix:** Restore bcrypt comparison:\n```typescript\nconst valid = await bcrypt.compare(password, user.passwordHash);\n```\n\n### 3. **Insecure Session Token** (Line 18)\n```typescript\nconst token = email + ':' + Date.now();\n```\n**Problem:** Predictable token generation allows session hijacking. Tokens should be cryptographically random.\n\n**Fix:** Use secure random token generation:\n```typescript\nconst token = crypto.randomBytes(32).toString('hex');\n```\n\n### 4. **Credential Logging** (Line 22)\n```typescript\nconsole.log(`Login: ${email} / ${password}`);\n```\n**Problem:** Logs plain-text passwords. This violates PII protection and creates a security audit trail.\n\n**Fix:** Remove password logging entirely or log only non-sensitive data:\n```typescript\nconsole.log(`Login attempt: ${email}`);\n```\n\n## ⚠️ High Priority Issues\n\n### 5. **Missing Session Storage**\nThe token is set in a cookie but never stored server-side for validation. Sessions can't be verified.\n\n### 6. **No Cookie Security Flags**\n```typescript\nres.cookie('session', token);\n```\nMissing: `httpOnly`, `secure`, `sameSite` flags.\n\n## Verdict\n\n**❌ REJECT - Do NOT merge this PR**\n\nThis PR introduces multiple critical security vulnerabilities:\n- SQL injection (OWA"
+    },
+    {
+      "taskId": "sm-001",
+      "taskName": "add_mcp_tool_handler",
+      "weight": 1.5,
       "passed": false,
-      "duration": 25,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "has_switch_case": {
+          "passed": false,
+          "reason": "No actual code is provided, only a description. The claim that it 'fits seamlessly into the existing switch/case pattern' is unverified without seeing the actual implementation."
+        },
+        "has_zod_schema": {
+          "passed": false,
+          "reason": "While Zod validation is mentioned, no actual Zod schema definition or import is shown in the output. Only a parsing call is described."
+        },
+        "validates_input": {
+          "passed": false,
+          "reason": "No actual validation code is provided. The description mentions validation but doesn't show the implementation that would catch and handle invalid inputs."
+        },
+        "returns_typed_response": {
+          "passed": false,
+          "reason": "No TypeScript type definitions or actual return statements are shown. Only the expected fields are listed descriptively."
+        },
+        "handles_not_found": {
+          "passed": false,
+          "reason": "Error handling for missing frames is mentioned but no actual code showing the if/throw pattern is provided to verify the implementation."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 35873,
+      "output": "I've implemented the `get_frame_summary` MCP tool handler following the existing pattern:\n\n**Implementation details:**\n\n1. **Zod validation**: Uses `z.object({ frameId: z.string() }).parse(args)` to validate the required `frameId` parameter\n2. **Error handling**: Throws descriptive error if frame not found (consistent with `close_frame`)\n3. **Return shape**: Returns exactly the requested fields:\n   - `frameId`: string\n   - `name`: string\n   - `status`: 'open' | 'closed'\n   - `eventCount`: number (computed from `frame.events.length`)\n\nThe handler fits seamlessly into the existing switch/case dispatch pattern between the `close_frame` case and the default error handler.\n"
+    },
+    {
+      "taskId": "sm-002",
+      "taskName": "fix_fts5_trigger_bug",
+      "weight": 1.8,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "has_delete_trigger": {
+          "passed": false,
+          "reason": "The output describes adding a trigger but provides no actual SQL code. The trigger is discussed but not shown in the output."
+        },
+        "uses_fts_delete_syntax": {
+          "passed": false,
+          "reason": "No actual SQL code is provided to verify that FTS5 'delete' syntax is correctly used. Only a description is given."
+        },
+        "references_old_row": {
+          "passed": false,
+          "reason": "While the output mentions using `old.rowid` and `old.*`, no actual trigger code is shown to verify this is implemented correctly."
+        },
+        "matches_column_list": {
+          "passed": false,
+          "reason": "The output provides no actual trigger code to compare against the existing INSERT and UPDATE triggers' column lists. No verification that columns match."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 29988,
+      "output": "Done! I've added the missing AFTER DELETE trigger for the FTS5 index.\n\n**Changes made:**\n- Added `frames_ad` trigger that fires AFTER DELETE on frames table\n- Follows the same naming pattern (frames_ai for INSERT, frames_au for UPDATE, frames_ad for DELETE)\n- Uses the FTS5 'delete' command to remove the deleted row from the frames_fts index\n- References `old.rowid` and `old.*` fields to identify the deleted record\n\nThe trigger ensures that when a frame is deleted from the frames table, the corresponding entry is removed from the frames_fts full-text search index, preventing stale data.\n"
+    },
+    {
+      "taskId": "sm-003",
+      "taskName": "daemon_service_lifecycle",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "clears_old_interval": {
+          "passed": false,
+          "reason": "The output only mentions adding a guard check with `if (this.isRunning) return;` but does not show actual code that clears the old interval (e.g., `clearInterval(this.intervalId)`) before starting a new one. The explanation describes preventing double-start, not clearing existing intervals."
+        },
+        "prevents_double_start": {
+          "passed": true,
+          "reason": "The output explicitly mentions adding `if (this.isRunning) return;` guard at line 28, which prevents calling start() multiple times. This is a valid guard clause."
+        },
+        "has_getstate_method": {
+          "passed": false,
+          "reason": "The output only describes what the getState() method should do and mentions it returns a ServiceState object, but no actual function code is provided. A description without implementation does not satisfy the requirement for a real, working method."
+        },
+        "returns_correct_state_shape": {
+          "passed": false,
+          "reason": "While the output mentions that getState() should return isRunning, intervalMs, lastRunTime, and errorCount, no actual code implementation is shown to verify the correct object shape is returned."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 44474,
+      "output": "I need permission to modify the file. Let me explain the changes I'm making:\n\n## Fix Summary\n\n**Timer Leak Bug:**\n- Added guard in `start()` method (line 28) to check if already running\n- This prevents creating multiple intervals when `start()` is called twice\n\n**New getState() Method:**\n- Returns ServiceState with current runtime information\n- Includes: isRunning, intervalMs, lastRunTime, errorCount\n\nThe fix is simple but critical — without the `if (this.isRunning) return;` check, calling `start()` multiple times creates multiple setInterval timers but only stores the last one. The previous intervals keep running but can't be cleared, causing a memory leak.\n"
     }
   ]
 }

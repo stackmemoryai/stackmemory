@@ -5,37 +5,194 @@
     {
       "taskId": "eval-001",
       "taskName": "simple_function",
+      "weight": 1,
       "passed": false,
-      "duration": 29,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "has_function": {
+          "passed": false,
+          "reason": "No function is defined or implemented. The AI output only contains a statement about waiting for permission approval."
+        },
+        "handles_edge_cases": {
+          "passed": false,
+          "reason": "No code is present to handle edge cases. Without a function implementation, edge cases cannot be addressed."
+        },
+        "is_tested": {
+          "passed": false,
+          "reason": "No tests are provided. The criterion expects this to be false, but the output contains no code whatsoever to test or not test."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 26808,
+      "output": "Let me wait for permission approval before proceeding.\n"
     },
     {
       "taskId": "eval-002",
       "taskName": "refactor_code",
+      "weight": 1.5,
       "passed": false,
-      "duration": 20,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "uses_async": {
+          "passed": false,
+          "reason": "No async/await code is present in the output. The AI only requests code to be provided without delivering any refactored async/await implementation."
+        },
+        "preserves_behavior": {
+          "passed": false,
+          "reason": "No refactored code exists to evaluate whether behavior is preserved. The output is a request for input rather than a solution."
+        },
+        "no_nested_callbacks": {
+          "passed": false,
+          "reason": "No code transformation was performed. The output contains no callback elimination or async/await restructuring."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 9457,
+      "output": "I'd be happy to help refactor code from callbacks to async/await! However, I don't see any code provided yet. Could you please share the code you'd like me to refactor?\n\nYou can either:\n1. Provide the file path (e.g., `src/path/to/file.ts`)\n2. Paste the code directly\n3. Point me to a specific function or module\n\nOnce you share the code, I'll refactor it to use modern async/await syntax.\n"
     },
     {
       "taskId": "eval-003",
       "taskName": "fix_bug",
+      "weight": 1.2,
       "passed": false,
-      "duration": 19,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "bug_fixed": {
+          "passed": false,
+          "reason": "No code was provided in the output - only empty code blocks. The bug cannot be fixed without actual code."
+        },
+        "no_new_bugs": {
+          "passed": false,
+          "reason": "No code was provided to evaluate for new bugs."
+        },
+        "explains_fix": {
+          "passed": false,
+          "reason": "No explanation was provided. The output is completely empty."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 24117,
+      "output": "\n"
     },
     {
       "taskId": "eval-004",
       "taskName": "add_feature",
-      "passed": false,
-      "duration": 16,
-      "output": "/bin/sh: timeout: command not found\n"
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 0.75,
+      "criteria": {
+        "has_pagination": {
+          "passed": true,
+          "reason": "Pagination is clearly described with page and limit parameters, and response includes pagination metadata object"
+        },
+        "has_limit": {
+          "passed": true,
+          "reason": "Limit parameter is explicitly defined with default of 10 and max of 100"
+        },
+        "has_offset": {
+          "passed": false,
+          "reason": "Output uses page-based pagination, not offset-based. Offset parameter is not mentioned or implemented"
+        },
+        "backwards_compatible": {
+          "passed": true,
+          "reason": "Default values (page=1, limit=10) ensure existing calls without parameters continue to work as before"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 24827,
+      "output": "I've added pagination to the `/users` endpoint with the following features:\n\n**Query Parameters:**\n- `page` (default: 1, min: 1)\n- `limit` (default: 10, min: 1, max: 100)\n\n**Response Format:**\n```json\n{\n  \"data\": [...],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 100,\n    \"totalPages\": 10,\n    \"hasNext\": true,\n    \"hasPrev\": false\n  }\n}\n```\n\n**Usage Examples:**\n- `GET /users` → First 10 users\n- `GET /users?page=2&limit=20` → Users 21-40\n- `GET /users?limit=50` → First 50 users\n\nThe implementation includes:\n- Safe parameter parsing with defaults\n- Bounds checking (limit capped at 100)\n- Comprehensive pagination metadata\n- Navigation helpers (hasNext/hasPrev)\n"
     },
     {
       "taskId": "eval-005",
       "taskName": "code_review",
+      "weight": 1.3,
       "passed": false,
-      "duration": 16,
-      "output": "/bin/sh: timeout: command not found\n"
+      "passRate": 0,
+      "criteria": {
+        "identifies_security_issue": {
+          "passed": false,
+          "reason": "The output does not identify any security issue. It only requests more information about the PR and does not analyze any code for security vulnerabilities."
+        },
+        "identifies_performance_issue": {
+          "passed": false,
+          "reason": "The output does not identify any performance issue. It is a meta-response asking for input rather than an actual code review."
+        },
+        "actionable_feedback": {
+          "passed": false,
+          "reason": "While the output provides reasonable next steps to enable a review, it does not provide any actionable feedback about code issues. It is a request for clarification, not feedback on actual problems."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 15976,
+      "output": "I see this isn't a git repository. Could you please provide:\n\n1. **PR URL** (e.g., GitHub/GitLab link), or\n2. **Branch name** to compare, or\n3. **Changed files** you'd like me to review\n\nAlternatively, if you have a diff file or can paste the PR details, I can review that directly.\n"
+    },
+    {
+      "taskId": "sm-001",
+      "taskName": "add_mcp_tool_handler",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "has_switch_case": {
+          "passed": true,
+          "reason": "Code shows a switch/case statement with 'case' keyword and proper case block syntax"
+        },
+        "has_zod_schema": {
+          "passed": true,
+          "reason": "Zod schema is defined inline: z.object({ frameId: z.string() })"
+        },
+        "validates_input": {
+          "passed": true,
+          "reason": "Input validation is performed via .parse(args) which will throw on invalid input"
+        },
+        "returns_typed_response": {
+          "passed": true,
+          "reason": "Returns an object with all required fields: frameId, name, status, eventCount with appropriate types"
+        },
+        "handles_not_found": {
+          "passed": true,
+          "reason": "Includes explicit null check with error thrown when frame is not found in the frames map"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 34329,
+      "output": "I've added the `get_frame_summary` handler. The implementation:\n\n**Pattern Match:**\n- Uses switch/case dispatch like existing handlers\n- Zod validation: `z.object({ frameId: z.string() }).parse(args)`\n- Error handling: throws if frame not found\n- Returns typed object: `{ frameId, name, status, eventCount }`\n\n**Implementation:**\n```typescript\ncase 'get_frame_summary': {\n  const input = z.object({ frameId: z.string() }).parse(args);\n  const frame = frames.get(input.frameId);\n  if (!frame) throw new Error(`Frame not found: ${input.frameId}`);\n  return {\n    frameId: frame.id,\n    name: frame.name,\n    status: frame.status,\n    eventCount: frame.events.length,\n  };\n}\n```\n\nThe handler validates input, retrieves the frame, and returns the summary with event count derived from the events array length.\n"
+    },
+    {
+      "taskId": "sm-002",
+      "taskName": "fix_fts5_trigger_bug",
+      "weight": 1.8,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "has_delete_trigger": {
+          "passed": false,
+          "reason": "The output only describes/mentions the trigger but does not show the actual SQL code. No real trigger definition is provided."
+        },
+        "uses_fts_delete_syntax": {
+          "passed": false,
+          "reason": "The correct FTS5 delete syntax is described in text but not shown in executable code form. Without actual code, the syntax cannot be verified."
+        },
+        "references_old_row": {
+          "passed": false,
+          "reason": "The output mentions using 'old row values' but provides no actual code demonstrating the use of the OLD keyword in the trigger body."
+        },
+        "matches_column_list": {
+          "passed": false,
+          "reason": "No column list is shown in the output. The AI does not provide code that demonstrates matching the column structure of the INSERT and UPDATE triggers."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 29794,
+      "output": "The missing DELETE trigger has been added following the same pattern as the UPDATE trigger:\n\n**Added:**\n- `frames_ad` (AFTER DELETE) trigger\n- Deletes the corresponding FTS5 entry when a frame is deleted from the frames table\n- Uses the special `'delete'` command with old row values to remove from the FTS5 index\n\nThe trigger follows the FTS5 external content pattern where `INSERT INTO frames_fts(frames_fts, ...) VALUES ('delete', ...)` removes entries from the index.\n"
+    },
+    {
+      "taskId": "sm-003",
+      "taskName": "daemon_service_lifecycle",
+      "weight": 1.5,
+      "passed": false,
+      "duration": 120017,
+      "error": "claude timed out after 120000ms"
     }
   ]
 }

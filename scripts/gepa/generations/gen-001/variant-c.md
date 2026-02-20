@@ -4,9 +4,13 @@
 
 ```
 src/
-  cli/           # CLI entry point
-  core/          # Business logic: context, database, digest, query
-  integrations/  # External: Linear, MCP
+  cli/           # CLI commands and entry point
+  core/          # Core business logic
+    context/     # Frame and context management
+    database/    # Database adapters (SQLite, ParadeDB)
+    digest/      # Digest generation
+    query/       # Query parsing and routing
+  integrations/  # External integrations (Linear, MCP)
   services/      # Business services
   skills/        # Claude Code skills
   utils/         # Shared utilities
@@ -24,53 +28,43 @@ docs/            # Documentation
 
 ## Documentation
 
-Quick reference (agent_docs/):
-- linear_integration.md - Linear sync
-- mcp_server.md - MCP tools
-- database_storage.md - Storage
-- claude_hooks.md - Hooks
+Quick reference (agent_docs/): linear_integration.md | mcp_server.md | database_storage.md | claude_hooks.md
 
-Full docs (docs/):
-- principles.md - Agent programming paradigm
-- architecture.md - Extension model and browser sandbox
-- SPEC.md - Technical specification
-- API_REFERENCE.md - API docs
-- DEVELOPMENT.md - Dev guide
-- SETUP.md - Installation
+Full docs (docs/): principles.md | architecture.md | SPEC.md | API_REFERENCE.md | DEVELOPMENT.md | SETUP.md
 
 ## Commands
 
 ```bash
-npm run build          # Compile TypeScript (esbuild)
-npm run lint           # ESLint check
-npm run lint:fix       # Auto-fix lint issues
-npm test               # Run Vitest (watch)
-npm run test:run       # Run tests once
-npm run linear:sync    # Sync with Linear
-
-stackmemory capture    # Save session state
-stackmemory restore    # Restore from state
+npm run build|lint|lint:fix|test|test:run|linear:sync
+stackmemory capture|restore    # Session state handoff
 ```
+
+## Working Directory
+
+PRIMARY: /Users/jwu/Dev/stackmemory | ALLOWED: All subdirectories | TEMP: /tmp
 
 ## Validation (MUST DO)
 
-After code changes, run all three:
+After code changes:
 1. `npm run lint` - fix errors AND warnings
 2. `npm run test:run` - verify no regressions
 3. `npm run build` - ensure compilation
+4. Run code to verify it works
 
 Test coverage:
 - New features require tests in `src/**/__tests__/`
-- Maintain or improve coverage
+- Maintain or improve coverage (no untested code paths)
 - Critical paths: context management, handoff, Linear sync
+
+Never: Assume success | Skip testing | Use mock data as fallback
 
 ## Git Rules (CRITICAL)
 
-- NEVER use `--no-verify` on git push/commit
+- NEVER use `--no-verify` on commit/push
 - ALWAYS fix lint/test errors before pushing
 - Run `npm run lint && npm run test:run` before pushing
 - Commit format: `type(scope): message`
-- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+- Branch naming: `feature/STA-XXX-desc` | `fix/STA-XXX-desc` | `chore/desc`
 
 ## Security
 
@@ -85,13 +79,9 @@ if (!API_KEY) {
 }
 ```
 
-Environment sources (check in order):
-1. .env file
-2. .env.local
-3. ~/.zshrc
-4. Process environment
+Environment sources (check in order): .env | .env.local | ~/.zshrc | process.env
 
-Block patterns: lin_api_* | lin_oauth_* | sk-* | npm_*
+Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
 
 ## Deploy
 
@@ -105,16 +95,48 @@ git stash pop
 
 # Railway
 railway up
+
+# Pre-publish requires clean git — stash GEPA files first
 ```
+
+## Task Delegation Model
+
+Route effort by complexity:
+
+**AUTOMATE** — Execute immediately, lint+test sufficient:
+- CRUD, boilerplate, formatting, simple transforms
+- Tool handler following existing pattern
+- Config additions (env var, feature flag)
+
+**STANDARD** — Normal workflow, lint+test+build:
+- Features, bug fixes, refactoring
+- Tests, docs, integration wiring
+
+**CAREFUL** — Review approach before implementation:
+- API/schema changes, migrations, auth flows
+- New integration patterns (MCP, webhooks)
+- Changes to frame-manager, sqlite-adapter, daemon lifecycle
+- Error handling chains
+
+**ARCHITECT** — Plan mode required, explore patterns first:
+- New service boundaries, system integrations
+- Performance-critical paths (FTS5, search scoring)
+- Breaking changes to MCP protocol or CLI
+
+**HUMAN** — Explicit approval required:
+- Security decisions, secret handling
+- Irreversible operations (migrations, schema drops)
+- Publishing (npm, Railway)
+
+Quality gates scale with tier — don't over-engineer AUTOMATE, don't under-review CAREFUL.
 
 ## Workflow
 
 - Check .env for API keys before asking
-- Run `npm run linear:sync` after task completion
+- Run npm run linear:sync after task completion
 - Use browser MCP for visual testing
 - Review recent commits and stackmemory.json on session start
-- Use subagents for multi-step tasks
-- Ask 1-3 clarifying questions for complex commands (one at a time)
 - Use TodoWrite for 3+ steps or multiple requests
 - Keep one task in_progress at a time
 - Update task status immediately on completion
+- Ask 1-3 clarifying questions for complex commands (one at a time)

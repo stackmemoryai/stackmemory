@@ -24,7 +24,7 @@
 
   "evals": {
     "directory": "./evals",
-    "minSamplesPerVariant": 5,
+    "minSamplesPerVariant": 8,
     "timeout": 120000,
     "metrics": [
       "task_completion",
@@ -32,6 +32,12 @@
       "instruction_following",
       "efficiency"
     ]
+  },
+
+  "judge": {
+    "model": "claude-haiku-4-5-20251001",
+    "maxOutputTokens": 2000,
+    "timeoutMs": 30000
   },
 
   "scoring": {
