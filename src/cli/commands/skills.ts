@@ -912,6 +912,125 @@ export function createSkillsCommand(): Command {
       }
     });
 
+  // Parallel agent skill commands
+  const agentCmd = skillsCmd
+    .command('agent')
+    .description('Spawn parallel Claude agents in isolated workspaces');
+
+  agentCmd
+    .command('research <question>')
+    .description('Explore codebase and save findings as a frame')
+    .option('--timeout <ms>', 'Agent timeout in milliseconds', '300000')
+    .action(async (question, options) => {
+      const spinner = ora('Spawning research agent...').start();
+      try {
+        const { context } = await initializeSkillContext();
+        const { ParallelAgentSkill } =
+          await import('../../skills/parallel-agent-skill.js');
+        const agentSkill = new ParallelAgentSkill(context);
+        const result = await agentSkill.research(question, {
+          timeout: parseInt(options.timeout),
+        });
+        spinner.stop();
+        if (result.success) {
+          console.log(chalk.green('✓'), result.message);
+          if (result.data?.findings) {
+            console.log(chalk.cyan('\nFindings:\n'));
+            console.log(result.data.findings);
+          }
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        spinner.stop();
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
+  agentCmd
+    .command('maintain <task>')
+    .description('Low-stakes fix, produces a .patch file')
+    .option('--timeout <ms>', 'Agent timeout in milliseconds', '300000')
+    .action(async (task, options) => {
+      const spinner = ora('Spawning maintenance agent...').start();
+      try {
+        const { context } = await initializeSkillContext();
+        const { ParallelAgentSkill } =
+          await import('../../skills/parallel-agent-skill.js');
+        const agentSkill = new ParallelAgentSkill(context);
+        const result = await agentSkill.maintain(task, {
+          timeout: parseInt(options.timeout),
+        });
+        spinner.stop();
+        if (result.success) {
+          console.log(chalk.green('✓'), result.message);
+          if (result.data) {
+            console.log(chalk.cyan('\nPatch Details:'));
+            console.log(`  Files changed: ${result.data.filesChanged}`);
+            console.log(`  Additions: +${result.data.additions}`);
+            console.log(`  Deletions: -${result.data.deletions}`);
+            console.log(chalk.yellow(`\n  ${result.action}`));
+          }
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        spinner.stop();
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
+  agentCmd
+    .command('spec-run <specPath>')
+    .description('Implement a spec on a branch, validate with lint+test+build')
+    .option('--timeout <ms>', 'Agent timeout in milliseconds', '300000')
+    .action(async (specPath, options) => {
+      const spinner = ora('Spawning spec agent...').start();
+      try {
+        const { context } = await initializeSkillContext();
+        const { ParallelAgentSkill } =
+          await import('../../skills/parallel-agent-skill.js');
+        const agentSkill = new ParallelAgentSkill(context);
+        const result = await agentSkill.specRun(specPath, {
+          timeout: parseInt(options.timeout),
+        });
+        spinner.stop();
+        if (result.success) {
+          console.log(chalk.green('✓'), result.message);
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        if (result.data) {
+          console.log(chalk.cyan('\nResults:'));
+          console.log(`  Branch: ${result.data.branch}`);
+          console.log(`  Workspace: ${result.data.workDir}`);
+          const v = result.data.validation;
+          if (v) {
+            console.log(
+              `  Lint: ${v.lint ? chalk.green('pass') : chalk.red('fail')}  ` +
+                `Test: ${v.test ? chalk.green('pass') : chalk.red('fail')}  ` +
+                `Build: ${v.build ? chalk.green('pass') : chalk.red('fail')}`
+            );
+          }
+          if (result.data.diffStat) {
+            console.log(chalk.gray(`\n${result.data.diffStat}`));
+          }
+          if (result.action) {
+            console.log(chalk.yellow(`\n  ${result.action}`));
+          }
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        spinner.stop();
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
   // Help command for skills
   skillsCmd
     .command('help [skill]')
@@ -947,6 +1066,29 @@ Options:
   --verbose            Show detailed output
 `);
             break;
+          case 'agent':
+            console.log(`
+agent — Parallel Agent Skill (Willison Patterns)
+
+Spawn isolated Claude agents in disposable /tmp workspaces.
+
+Subcommands:
+  research <question>     Explore codebase, save findings as a frame
+  maintain <task>         Low-stakes fix, produces a .patch file
+  spec-run <specPath>     Implement spec on branch, validate
+
+Options:
+  --timeout <ms>          Agent timeout (default: 300000)
+
+Examples:
+  stackmemory skills agent research "How does FTS5 search work?"
+  stackmemory skills agent maintain "Fix deprecation warning in webhook.ts"
+  stackmemory skills agent spec-run docs/specs/my-feature.md
+
+Apply patches:  git apply .stackmemory/patches/<file>.patch
+Review specs:   cd /tmp/sm-spec-* && git log --oneline
+`);
+            break;
           default:
             console.log(
               `Unknown skill: ${skill}. Use "stackmemory skills help" to see all available skills.`
@@ -972,8 +1114,9 @@ Options:
         console.log(
           '  spec       - Generate iterative spec docs (one-pager, dev-spec, prompt-plan, agents)'
         );
+        console.log('  linear-run - Execute Linear tasks via RLM orchestrator');
         console.log(
-          '  linear-run - Execute Linear tasks via RLM orchestrator\n'
+          '  agent      - Spawn parallel agents (research, maintain, spec-run)\n'
         );
         console.log(
           chalk.yellow(

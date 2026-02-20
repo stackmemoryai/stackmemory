@@ -1248,6 +1248,27 @@ export class ClaudeSkillsManager {
         }
       }
 
+      case 'agent': {
+        const { ParallelAgentSkill } =
+          await import('./parallel-agent-skill.js');
+        const agentSkill = new ParallelAgentSkill(this.context);
+        const sub = args[0];
+        const agentOpts = { timeout: options?.timeout as number | undefined };
+        switch (sub) {
+          case 'research':
+            return agentSkill.research(args.slice(1).join(' '), agentOpts);
+          case 'maintain':
+            return agentSkill.maintain(args.slice(1).join(' '), agentOpts);
+          case 'spec-run':
+            return agentSkill.specRun(args[1], agentOpts);
+          default:
+            return {
+              success: false,
+              message: `Unknown: agent ${sub}. Use: research|maintain|spec-run`,
+            };
+        }
+      }
+
       case 'linear-run': {
         if (!this.linearTaskRunner) {
           return {
@@ -1286,7 +1307,15 @@ export class ClaudeSkillsManager {
   }
 
   getAvailableSkills(): string[] {
-    const skills = ['handoff', 'checkpoint', 'dig', 'dashboard', 'api', 'spec'];
+    const skills = [
+      'handoff',
+      'checkpoint',
+      'dig',
+      'dashboard',
+      'api',
+      'spec',
+      'agent',
+    ];
     if (this.repoIngestionSkill) {
       skills.push('repo');
     }
@@ -1458,6 +1487,25 @@ Examples:
   /spec dev-spec
   /spec update prompt-plan "Initialize repository and tooling"
   /spec validate prompt-plan
+`;
+
+      case 'agent':
+        return `
+/agent research "How does the FTS5 search work?"
+/agent maintain "Fix the deprecation warning in webhook.ts"
+/agent spec-run docs/specs/my-feature.md
+
+Parallel agent skill (Willison patterns) — spawn isolated Claude agents:
+  research  — Explore codebase, save findings as a frame (read-only)
+  maintain  — Low-stakes fix, produces a .patch file
+  spec-run  — Implement a spec on a branch, validate with lint+test+build
+
+Options:
+  --timeout <ms>  Agent timeout in milliseconds (default: 300000)
+
+Each agent runs in a disposable /tmp workspace (git clone --depth=1).
+Patches: git apply .stackmemory/patches/<file>.patch
+Spec branches: cd /tmp/sm-spec-* && git log --oneline
 `;
 
       case 'linear-run':
