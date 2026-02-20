@@ -1,9 +1,9 @@
 /**
  * Extended Coherence Work Sessions Implementation
- * 
+ *
  * Enables agents to work continuously for hours without performance degradation.
  * Maintains contextual awareness and high-quality output over extended periods.
- * 
+ *
  * Addresses the challenge of AI agents losing coherence after short time periods.
  */
 
@@ -18,18 +18,18 @@ export interface CoherenceMetrics {
   startTime: number;
   currentTime: number;
   duration: number; // in minutes
-  
+
   // Performance indicators
   outputQuality: number; // 0-1 scale
   contextRetention: number; // 0-1 scale
   taskRelevance: number; // 0-1 scale
   progressRate: number; // tasks/hour
-  
+
   // Coherence indicators
   repetitionRate: number; // how often agent repeats itself
   divergenceRate: number; // how often agent goes off-topic
   errorRate: number; // errors per iteration
-  
+
   // State management
   memoryUsage: number; // MB
   contextWindowUsage: number; // percentage
@@ -49,21 +49,21 @@ export interface CoherenceSession {
     estimatedDuration: number; // minutes
     breakpoints: string[]; // natural stopping points
   };
-  
+
   // Session configuration
   config: {
     maxDuration: number; // minutes
     coherenceThreshold: number; // 0-1, below which to intervene
     checkpointInterval: number; // minutes
     refreshStrategy: 'none' | 'checkpoint' | 'context_refresh' | 'full_restart';
-    
+
     // Advanced coherence features
     enableMemoryPalace: boolean; // structured memory system
     enableProgressTracking: boolean; // track incremental progress
     enableAutoRefresh: boolean; // automatic context refresh
     enableHealthMonitoring: boolean; // monitor agent health
   };
-  
+
   // Runtime state
   state: {
     status: 'active' | 'paused' | 'degraded' | 'completed' | 'failed';
@@ -73,7 +73,7 @@ export interface CoherenceSession {
     interventionCount: number;
     refreshCount: number;
   };
-  
+
   // Historical data
   metrics: CoherenceMetrics[];
   interventions: {
@@ -93,7 +93,7 @@ export class ExtendedCoherenceManager {
   private baseDir: string;
   private monitoringInterval?: NodeJS.Timeout;
   private performanceHistory: Map<string, number[]> = new Map();
-  
+
   constructor(baseDir: string = './.coherence-sessions') {
     this.baseDir = baseDir;
   }
@@ -103,13 +103,13 @@ export class ExtendedCoherenceManager {
    */
   async initialize(): Promise<void> {
     await fs.mkdir(this.baseDir, { recursive: true });
-    
+
     // Start monitoring loop
     this.monitoringInterval = setInterval(
       () => this.monitorActiveSessionsHealth(),
       60000 // Check every minute
     );
-    
+
     logger.info('Extended Coherence Manager initialized', {
       baseDir: this.baseDir,
       monitoringEnabled: true,
@@ -130,17 +130,20 @@ export class ExtendedCoherenceManager {
     sessionConfig?: Partial<CoherenceSession['config']>
   ): Promise<string> {
     const sessionId = uuidv4();
-    
+
     // Configure session based on task complexity
-    const defaultConfig = this.generateConfigForComplexity(taskConfig.complexity);
+    const defaultConfig = this.generateConfigForComplexity(
+      taskConfig.complexity
+    );
     const config = { ...defaultConfig, ...sessionConfig };
-    
+
     const session: CoherenceSession = {
       id: sessionId,
       agent: agentConfig,
       task: {
         ...taskConfig,
-        breakpoints: taskConfig.breakpoints || this.generateBreakpoints(taskConfig),
+        breakpoints:
+          taskConfig.breakpoints || this.generateBreakpoints(taskConfig),
       },
       config,
       state: {
@@ -156,13 +159,13 @@ export class ExtendedCoherenceManager {
     };
 
     this.activeSessions.set(sessionId, session);
-    
+
     // Initialize session workspace
     await this.initializeSessionWorkspace(session);
-    
+
     // Start the actual agent work session
     await this.launchAgentSession(session);
-    
+
     logger.info('Extended coherence session started', {
       sessionId,
       agent: agentConfig.role,
@@ -239,17 +242,19 @@ export class ExtendedCoherenceManager {
   /**
    * Assess session coherence and intervene if necessary
    */
-  private async assessSessionCoherence(session: CoherenceSession): Promise<void> {
+  private async assessSessionCoherence(
+    session: CoherenceSession
+  ): Promise<void> {
     const metrics = await this.calculateCoherenceMetrics(session);
     session.metrics.push(metrics);
-    
+
     // Keep only last 10 metrics for performance
     if (session.metrics.length > 10) {
       session.metrics.shift();
     }
 
     const overallCoherence = this.calculateOverallCoherence(metrics);
-    
+
     logger.debug('Session coherence assessment', {
       sessionId: session.id,
       coherence: overallCoherence,
@@ -259,13 +264,18 @@ export class ExtendedCoherenceManager {
 
     // Intervene if coherence drops below threshold
     if (overallCoherence < session.config.coherenceThreshold) {
-      await this.interventeInSession(session, 'coherence_degradation', overallCoherence);
+      await this.interventeInSession(
+        session,
+        'coherence_degradation',
+        overallCoherence
+      );
     }
-    
+
     // Check if checkpoint is due
     const timeSinceCheckpoint = Date.now() - session.state.lastCheckpoint;
-    const checkpointDue = timeSinceCheckpoint > (session.config.checkpointInterval * 60 * 1000);
-    
+    const checkpointDue =
+      timeSinceCheckpoint > session.config.checkpointInterval * 60 * 1000;
+
     if (checkpointDue) {
       await this.checkpointSession(session);
     }
@@ -274,19 +284,27 @@ export class ExtendedCoherenceManager {
   /**
    * Calculate comprehensive coherence metrics
    */
-  private async calculateCoherenceMetrics(session: CoherenceSession): Promise<CoherenceMetrics> {
+  private async calculateCoherenceMetrics(
+    session: CoherenceSession
+  ): Promise<CoherenceMetrics> {
     const now = Date.now();
     const duration = (now - session.metrics[0]?.startTime || now) / (1000 * 60); // minutes
-    
+
     // Load recent agent outputs for analysis
     const recentOutputs = await this.getRecentAgentOutputs(session);
-    
+
     // Calculate various coherence indicators
     const outputQuality = this.assessOutputQuality(recentOutputs);
-    const contextRetention = this.assessContextRetention(recentOutputs, session.task);
+    const contextRetention = this.assessContextRetention(
+      recentOutputs,
+      session.task
+    );
     const taskRelevance = this.assessTaskRelevance(recentOutputs, session.task);
     const repetitionRate = this.calculateRepetitionRate(recentOutputs);
-    const divergenceRate = this.calculateDivergenceRate(recentOutputs, session.task);
+    const divergenceRate = this.calculateDivergenceRate(
+      recentOutputs,
+      session.task
+    );
     const errorRate = this.calculateErrorRate(recentOutputs);
     const progressRate = this.calculateProgressRate(session);
 
@@ -304,7 +322,9 @@ export class ExtendedCoherenceManager {
       errorRate,
       memoryUsage: await this.getMemoryUsage(session),
       contextWindowUsage: await this.getContextWindowUsage(session),
-      stateCheckpoints: session.interventions.filter(i => i.type === 'checkpoint').length,
+      stateCheckpoints: session.interventions.filter(
+        (i) => i.type === 'checkpoint'
+      ).length,
     };
   }
 
@@ -321,12 +341,12 @@ export class ExtendedCoherenceManager {
       divergencePenalty: 0.1, // penalty for divergence
     };
 
-    const baseScore = 
+    const baseScore =
       metrics.outputQuality * weights.outputQuality +
       metrics.contextRetention * weights.contextRetention +
       metrics.taskRelevance * weights.taskRelevance;
-    
-    const penalties = 
+
+    const penalties =
       metrics.repetitionRate * weights.repetitionPenalty +
       metrics.divergenceRate * weights.divergencePenalty;
 
@@ -359,15 +379,15 @@ export class ExtendedCoherenceManager {
       case 'checkpoint':
         await this.checkpointSession(session);
         break;
-        
+
       case 'context_refresh':
         await this.refreshSessionContext(session);
         break;
-        
+
       case 'full_restart':
         await this.restartSession(session);
         break;
-        
+
       default:
         await this.provideGuidance(session, reason);
         intervention.type = 'guidance';
@@ -375,19 +395,19 @@ export class ExtendedCoherenceManager {
 
     session.interventions.push(intervention);
     session.state.interventionCount++;
-    
+
     // Mark session as temporarily degraded
     const previousStatus = session.state.status;
     session.state.status = 'degraded';
-    
+
     // Schedule restoration check
     setTimeout(async () => {
       const newMetrics = await this.calculateCoherenceMetrics(session);
       const newCoherence = this.calculateOverallCoherence(newMetrics);
-      
+
       // Calculate intervention effectiveness
       intervention.effectiveness = Math.max(0, newCoherence - currentCoherence);
-      
+
       if (newCoherence > session.config.coherenceThreshold) {
         session.state.status = 'active';
         logger.info('Session coherence restored', {
@@ -408,7 +428,7 @@ export class ExtendedCoherenceManager {
       session.id,
       `checkpoint-${Date.now()}.json`
     );
-    
+
     const checkpointData = {
       timestamp: Date.now(),
       state: session.state,
@@ -421,7 +441,7 @@ export class ExtendedCoherenceManager {
 
     await fs.writeFile(checkpointPath, JSON.stringify(checkpointData, null, 2));
     session.state.lastCheckpoint = Date.now();
-    
+
     logger.info('Session checkpoint created', {
       sessionId: session.id,
       checkpointPath,
@@ -431,15 +451,17 @@ export class ExtendedCoherenceManager {
   /**
    * Refresh session context to restore coherence
    */
-  private async refreshSessionContext(session: CoherenceSession): Promise<void> {
+  private async refreshSessionContext(
+    session: CoherenceSession
+  ): Promise<void> {
     logger.info('Refreshing session context', { sessionId: session.id });
-    
+
     // Generate context refresh prompt
     const refreshPrompt = await this.generateContextRefreshPrompt(session);
-    
+
     // Apply refresh to the running agent
     await this.applyContextRefresh(session, refreshPrompt);
-    
+
     session.state.refreshCount++;
   }
 
@@ -447,15 +469,17 @@ export class ExtendedCoherenceManager {
    * Restart session from last good checkpoint
    */
   private async restartSession(session: CoherenceSession): Promise<void> {
-    logger.info('Restarting session from checkpoint', { sessionId: session.id });
-    
+    logger.info('Restarting session from checkpoint', {
+      sessionId: session.id,
+    });
+
     // Load last checkpoint
     const checkpoint = await this.loadLatestCheckpoint(session);
-    
+
     if (checkpoint) {
       // Restore session state
       session.state = { ...checkpoint.state };
-      
+
       // Restart agent with checkpoint context
       await this.restartAgentFromCheckpoint(session, checkpoint);
     } else {
@@ -467,10 +491,12 @@ export class ExtendedCoherenceManager {
   /**
    * Initialize workspace for a coherence session
    */
-  private async initializeSessionWorkspace(session: CoherenceSession): Promise<void> {
+  private async initializeSessionWorkspace(
+    session: CoherenceSession
+  ): Promise<void> {
     const sessionDir = path.join(this.baseDir, session.id);
     await fs.mkdir(sessionDir, { recursive: true });
-    
+
     // Create session manifest
     const manifest = {
       sessionId: session.id,
@@ -479,7 +505,7 @@ export class ExtendedCoherenceManager {
       config: session.config,
       createdAt: Date.now(),
     };
-    
+
     await fs.writeFile(
       path.join(sessionDir, 'manifest.json'),
       JSON.stringify(manifest, null, 2)
@@ -491,7 +517,7 @@ export class ExtendedCoherenceManager {
    */
   private async launchAgentSession(session: CoherenceSession): Promise<void> {
     const sessionDir = path.join(this.baseDir, session.id);
-    
+
     // Create enhanced Ralph bridge for extended sessions
     const ralph = new RalphStackMemoryBridge({
       baseDir: sessionDir,
@@ -506,7 +532,7 @@ export class ExtendedCoherenceManager {
     });
 
     // Start the session (non-blocking)
-    ralph.run().catch(error => {
+    ralph.run().catch((error) => {
       logger.error('Extended coherence session failed', {
         sessionId: session.id,
         error: error.message,
@@ -548,13 +574,17 @@ ${session.task.breakpoints.map((bp, i) => `${i + 1}. ${bp}`).join('\n')}
 - Break complex tasks into smaller, manageable chunks
 
 ## Memory Palace (if enabled)
-${session.config.enableMemoryPalace ? `
+${
+  session.config.enableMemoryPalace
+    ? `
 Use structured memory organization:
 - **Project Context**: Overall goals and requirements
 - **Current Status**: What's been completed and what's next
 - **Working Memory**: Current task details and immediate context
 - **Reference Memory**: Important patterns, decisions, and learnings
-` : ''}
+`
+    : ''
+}
 
 ## Success Criteria
 - Complete the task within the allocated time
@@ -567,7 +597,9 @@ Begin your extended coherence work session now.
   }
 
   // Placeholder implementations for helper methods
-  private async getRecentAgentOutputs(session: CoherenceSession): Promise<any[]> {
+  private async getRecentAgentOutputs(
+    session: CoherenceSession
+  ): Promise<any[]> {
     // Implementation to retrieve recent agent outputs
     return [];
   }
@@ -579,7 +611,7 @@ Begin your extended coherence work session now.
 
   private assessContextRetention(outputs: any[], task: any): number {
     // Measure how well agent retains context
-    return 0.7; // placeholder  
+    return 0.7; // placeholder
   }
 
   private assessTaskRelevance(outputs: any[], task: any): number {
@@ -612,7 +644,9 @@ Begin your extended coherence work session now.
     return 150; // MB placeholder
   }
 
-  private async getContextWindowUsage(session: CoherenceSession): Promise<number> {
+  private async getContextWindowUsage(
+    session: CoherenceSession
+  ): Promise<number> {
     // Get context window usage percentage
     return 65; // placeholder
   }
@@ -627,15 +661,22 @@ Begin your extended coherence work session now.
     ];
   }
 
-  private async generateContextSummary(session: CoherenceSession): Promise<string> {
+  private async generateContextSummary(
+    session: CoherenceSession
+  ): Promise<string> {
     return `Session ${session.id} context summary`;
   }
 
-  private async generateContextRefreshPrompt(session: CoherenceSession): Promise<string> {
+  private async generateContextRefreshPrompt(
+    session: CoherenceSession
+  ): Promise<string> {
     return 'Context refresh prompt';
   }
 
-  private async applyContextRefresh(session: CoherenceSession, prompt: string): Promise<void> {
+  private async applyContextRefresh(
+    session: CoherenceSession,
+    prompt: string
+  ): Promise<void> {
     // Apply context refresh to running agent
   }
 
@@ -644,15 +685,23 @@ Begin your extended coherence work session now.
     return null;
   }
 
-  private async restartAgentFromCheckpoint(session: CoherenceSession, checkpoint: any): Promise<void> {
+  private async restartAgentFromCheckpoint(
+    session: CoherenceSession,
+    checkpoint: any
+  ): Promise<void> {
     // Restart agent with checkpoint state
   }
 
-  private async restartAgentFromBeginning(session: CoherenceSession): Promise<void> {
+  private async restartAgentFromBeginning(
+    session: CoherenceSession
+  ): Promise<void> {
     // Restart agent from the beginning
   }
 
-  private async provideGuidance(session: CoherenceSession, reason: string): Promise<void> {
+  private async provideGuidance(
+    session: CoherenceSession,
+    reason: string
+  ): Promise<void> {
     // Provide guidance to help agent refocus
   }
 
@@ -666,15 +715,23 @@ Begin your extended coherence work session now.
     totalInterventions: number;
   } {
     const activeSessions = Array.from(this.activeSessions.values());
-    
+
     return {
-      maxSessionDuration: Math.max(...activeSessions.map(s => s.config.maxDuration)),
-      activeSessionCount: activeSessions.filter(s => s.state.status === 'active').length,
-      averageCoherence: activeSessions.reduce((sum, s) => {
-        const recent = s.metrics.slice(-1)[0];
-        return sum + (recent ? this.calculateOverallCoherence(recent) : 0);
-      }, 0) / activeSessions.length,
-      totalInterventions: activeSessions.reduce((sum, s) => sum + s.interventions.length, 0),
+      maxSessionDuration: Math.max(
+        ...activeSessions.map((s) => s.config.maxDuration)
+      ),
+      activeSessionCount: activeSessions.filter(
+        (s) => s.state.status === 'active'
+      ).length,
+      averageCoherence:
+        activeSessions.reduce((sum, s) => {
+          const recent = s.metrics.slice(-1)[0];
+          return sum + (recent ? this.calculateOverallCoherence(recent) : 0);
+        }, 0) / activeSessions.length,
+      totalInterventions: activeSessions.reduce(
+        (sum, s) => sum + s.interventions.length,
+        0
+      ),
     };
   }
 }

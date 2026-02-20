@@ -12,24 +12,26 @@ import { logger } from '../src/core/monitoring/logger.js';
 async function validateTUIShortcuts() {
   try {
     console.log('🧪 Validating TUI Keyboard Shortcuts...');
-    
+
     const tui = new SwarmTUI();
     await tui.initialize();
-    
+
     // Access the screen object to check key handlers
     const screen = (tui as any).screen;
-    
+
     if (!screen) {
       throw new Error('Screen not initialized');
     }
-    
+
     // Check if key handlers exist
     const keyHandlers = screen._events.key || [];
-    
+
     console.log('📋 Validation Results:');
     console.log(`✅ Screen initialized: ${screen ? 'Yes' : 'No'}`);
-    console.log(`✅ Key handlers registered: ${keyHandlers.length > 0 ? 'Yes' : 'No'}`);
-    
+    console.log(
+      `✅ Key handlers registered: ${keyHandlers.length > 0 ? 'Yes' : 'No'}`
+    );
+
     // Test the help functionality directly
     console.log('\n🔍 Testing Help Function:');
     try {
@@ -38,7 +40,7 @@ async function validateTUIShortcuts() {
     } catch (error: unknown) {
       console.log('❌ Help function failed:', (error as Error).message);
     }
-    
+
     // Test the detect function
     console.log('\n🔍 Testing Detect Function:');
     try {
@@ -47,7 +49,7 @@ async function validateTUIShortcuts() {
     } catch (error: unknown) {
       console.log('❌ Detect function failed:', (error as Error).message);
     }
-    
+
     // Test refresh function
     console.log('\n🔍 Testing Refresh Function:');
     try {
@@ -56,7 +58,7 @@ async function validateTUIShortcuts() {
     } catch (error: unknown) {
       console.log('❌ Refresh function failed:', (error as Error).message);
     }
-    
+
     // Test clear logs function
     console.log('\n🔍 Testing Clear Logs Function:');
     try {
@@ -65,13 +67,12 @@ async function validateTUIShortcuts() {
     } catch (error: unknown) {
       console.log('❌ Clear logs function failed:', (error as Error).message);
     }
-    
+
     // Cleanup
     (tui as any).cleanup();
-    
+
     console.log('\n✅ All TUI shortcut validations passed!');
     console.log('💡 Run scripts/test-tui-shortcuts.ts for interactive testing');
-    
   } catch (error: unknown) {
     logger.error('TUI shortcuts validation failed', error as Error);
     console.error('❌ Validation failed:', (error as Error).message);

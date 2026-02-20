@@ -790,11 +790,11 @@ export class TwoTierStorageSystem {
     data: any,
     priority: 'high' | 'normal'
   ): Promise<void> {
-    this.offlineQueue.push({ 
-      id, 
-      data, 
-      priority, 
-      timestamp: Date.now() 
+    this.offlineQueue.push({
+      id,
+      data,
+      priority,
+      timestamp: Date.now(),
     });
 
     // Persist queue if configured

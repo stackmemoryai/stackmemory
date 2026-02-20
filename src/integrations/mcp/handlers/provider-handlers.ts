@@ -22,6 +22,7 @@ import {
   type BatchRequest,
 } from '../../anthropic/batch-client.js';
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ProviderHandlerDependencies {
   // No external deps required — self-contained
 }

@@ -75,9 +75,10 @@ export class PerformanceOptimizer {
     const startTime = Date.now();
 
     // Compress if enabled
-    const data = this.config.compressionLevel > 0
-      ? await this.compressData(iteration)
-      : iteration;
+    const data =
+      this.config.compressionLevel > 0
+        ? await this.compressData(iteration)
+        : iteration;
 
     if (this.config.asyncSaves) {
       // Add to batch
@@ -138,7 +139,7 @@ export class PerformanceOptimizer {
 
     if (this.config.parallelOperations) {
       // Save in parallel
-      await Promise.all(batch.map(op => this.executeSaveOperation(op)));
+      await Promise.all(batch.map((op) => this.executeSaveOperation(op)));
     } else {
       // Save sequentially
       for (const op of batch) {
@@ -159,7 +160,7 @@ export class PerformanceOptimizer {
     };
 
     const compressed = await gzip(json, compressionOptions);
-    
+
     return {
       compressed: true,
       data: compressed.toString('base64'),
@@ -176,7 +177,7 @@ export class PerformanceOptimizer {
 
     const buffer = Buffer.from(compressed.data, 'base64');
     const decompressed = await gunzip(buffer);
-    
+
     return JSON.parse(decompressed.toString());
   }
 
@@ -208,9 +209,8 @@ export class PerformanceOptimizer {
   getMetrics(): PerformanceMetrics {
     // Update cache hit rate
     const totalCacheAttempts = this.cacheHits + this.cacheMisses;
-    this.metrics.cacheHitRate = totalCacheAttempts > 0
-      ? this.cacheHits / totalCacheAttempts
-      : 0;
+    this.metrics.cacheHitRate =
+      totalCacheAttempts > 0 ? this.cacheHits / totalCacheAttempts : 0;
 
     // Update memory usage
     this.metrics.memoryUsage = process.memoryUsage().heapUsed;
@@ -231,7 +231,7 @@ export class PerformanceOptimizer {
    * Enable/disable strategy
    */
   setStrategyEnabled(strategyName: string, enabled: boolean): void {
-    const strategy = this.strategies.find(s => s.name === strategyName);
+    const strategy = this.strategies.find((s) => s.name === strategyName);
     if (strategy) {
       strategy.enabled = enabled;
       logger.debug('Strategy updated', { name: strategyName, enabled });
@@ -301,7 +301,7 @@ export class PerformanceOptimizer {
     // Start batch timer if not already running
     if (!this.batchTimer) {
       this.batchTimer = setTimeout(() => {
-        this.flushBatch().catch(error => {
+        this.flushBatch().catch((error) => {
           logger.error('Batch flush failed', { error: error.message });
         });
         this.batchTimer = undefined;
@@ -314,7 +314,7 @@ export class PerformanceOptimizer {
         clearTimeout(this.batchTimer);
         this.batchTimer = undefined;
       }
-      this.flushBatch().catch(error => {
+      this.flushBatch().catch((error) => {
         logger.error('Batch flush failed', { error: error.message });
       });
     }
@@ -375,9 +375,9 @@ export class PerformanceOptimizer {
    */
   private getFromCache<T>(key: string): T | undefined {
     const entry = this.cache.get(key);
-    
+
     if (!entry) return undefined;
-    
+
     // Check if expired
     if (entry.expiry && entry.expiry < Date.now()) {
       this.cache.delete(key);
@@ -404,7 +404,7 @@ export class PerformanceOptimizer {
       // Remove oldest entries
       const entries = Array.from(this.cache.entries());
       entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
+
       for (let i = 0; i < 20; i++) {
         this.cache.delete(entries[i][0]);
       }
@@ -417,7 +417,7 @@ export class PerformanceOptimizer {
   private deduplicateData(data: any): any {
     if (Array.isArray(data)) {
       const seen = new Set();
-      return data.filter(item => {
+      return data.filter((item) => {
         const key = JSON.stringify(item);
         if (seen.has(key)) {
           return false;
@@ -434,7 +434,7 @@ export class PerformanceOptimizer {
    */
   private chunkLargeData(data: any): any {
     const json = JSON.stringify(data);
-    
+
     // If data is too large, create chunks
     if (json.length > 100000) {
       // This would implement chunking logic

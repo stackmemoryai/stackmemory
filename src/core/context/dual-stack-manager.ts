@@ -174,14 +174,16 @@ export class DualStackManager {
       if (this.adapter.isConnected()) {
         // Note: This is a temporary workaround - proper schema creation would use adapter methods
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (await (this.adapter as any).execute?.(createStackContextsTable)) ||
+        const adapterAny = this.adapter as any;
+        if (!(await adapterAny.execute?.(createStackContextsTable))) {
           this.executeSchemaQuery(createStackContextsTable);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (await (this.adapter as any).execute?.(createHandoffRequestsTable)) ||
+        }
+        if (!(await adapterAny.execute?.(createHandoffRequestsTable))) {
           this.executeSchemaQuery(createHandoffRequestsTable);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (await (this.adapter as any).execute?.(createStackSyncLogTable)) ||
+        }
+        if (!(await adapterAny.execute?.(createStackSyncLogTable))) {
           this.executeSchemaQuery(createStackSyncLogTable);
+        }
       }
 
       await this.adapter.commitTransaction();
@@ -758,7 +760,6 @@ export class DualStackManager {
     // Copy events
     const events = await this.individualStack.getFrameEvents(frame.frame_id);
     for (const event of events) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await targetStack.addEvent(frame.frame_id, {
         type: event.type,
         text: event.text,
@@ -769,7 +770,6 @@ export class DualStackManager {
     // Copy anchors
     const anchors = await this.individualStack.getFrameAnchors(frame.frame_id);
     for (const anchor of anchors) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await targetStack.addAnchor(frame.frame_id, {
         type: anchor.type,
         text: anchor.text,
@@ -789,7 +789,6 @@ export class DualStackManager {
       sourceFrame.frame_id
     );
     for (const event of sourceEvents) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await targetStack.addEvent(existingFrame.frame_id, {
         type: event.type,
         text: event.text,
@@ -801,7 +800,6 @@ export class DualStackManager {
       sourceFrame.frame_id
     );
     for (const anchor of sourceAnchors) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await targetStack.addAnchor(existingFrame.frame_id, {
         type: anchor.type,
         text: anchor.text,

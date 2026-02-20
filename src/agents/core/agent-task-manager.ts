@@ -73,7 +73,7 @@ export enum AgentType {
   TESTING = 'testing',
   PERFORMANCE = 'performance',
   DOCUMENTATION = 'documentation',
-  REFACTORING = 'refactoring'
+  REFACTORING = 'refactoring',
 }
 
 /**

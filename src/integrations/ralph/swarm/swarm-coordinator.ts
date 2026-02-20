@@ -26,21 +26,33 @@ import {
 } from '../types.js';
 
 export class SwarmCoordinationError extends Error {
-  constructor(message: string, public context?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public context?: Record<string, unknown>
+  ) {
     super(message);
     this.name = 'SwarmCoordinationError';
   }
 }
 
 export class AgentExecutionError extends Error {
-  constructor(message: string, public agentId: string, public taskId: string, public context?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public agentId: string,
+    public taskId: string,
+    public context?: Record<string, unknown>
+  ) {
     super(message);
     this.name = 'AgentExecutionError';
   }
 }
 
 export class TaskAllocationError extends Error {
-  constructor(message: string, public taskId: string, public context?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public taskId: string,
+    public context?: Record<string, unknown>
+  ) {
     super(message);
     this.name = 'TaskAllocationError';
   }
@@ -422,7 +434,9 @@ export class SwarmCoordinator {
   private async executeAgentTask(
     agent: Agent,
     task: SwarmTask,
-    assignment: TaskAllocation['assignments'] extends Map<string, infer T> ? T : any
+    assignment: TaskAllocation['assignments'] extends Map<string, infer T>
+      ? T
+      : any
   ): Promise<void> {
     logger.info(`Agent ${agent.role} starting task: ${task.title}`);
 
@@ -456,7 +470,7 @@ export class SwarmCoordinator {
       // Run the task using worker iterations
       let iteration = 1;
       const maxIterations = this.calculateMaxIterations(task);
-      
+
       while (iteration <= maxIterations) {
         try {
           const result = await ralph.runWorkerIteration();
@@ -1216,12 +1230,17 @@ You are a PROJECT COORDINATOR. Your role is to:
           await fs.rmdir(agent.workingDirectory, { recursive: true });
           logger.debug(`Cleaned up working directory for agent ${agent.id}`);
         } catch (error: unknown) {
-          logger.warn(`Could not clean up directory for agent ${agent.id}`, error as Error);
+          logger.warn(
+            `Could not clean up directory for agent ${agent.id}`,
+            error as Error
+          );
         }
       }
 
       // Clean up git branches
-      await this.gitWorkflowManager.coordinateMerges(Array.from(this.activeAgents.values()));
+      await this.gitWorkflowManager.coordinateMerges(
+        Array.from(this.activeAgents.values())
+      );
 
       // Clear active agents
       this.activeAgents.clear();
@@ -1236,19 +1255,22 @@ You are a PROJECT COORDINATOR. Your role is to:
         coordination: {
           events: [],
           conflicts: [],
-          resolutions: []
+          resolutions: [],
         },
         performance: {
           throughput: 0,
           efficiency: 0,
-          coordination_overhead: 0
-        }
+          coordination_overhead: 0,
+        },
       };
 
       logger.info('Swarm cleanup completed successfully');
     } catch (error: unknown) {
       logger.error('Failed to cleanup completed swarm', error as Error);
-      throw new SwarmCoordinationError('Cleanup failed', { swarmId: this.swarmState.id, error });
+      throw new SwarmCoordinationError('Cleanup failed', {
+        swarmId: this.swarmState.id,
+        error,
+      });
     }
   }
 
@@ -1257,7 +1279,7 @@ You are a PROJECT COORDINATOR. Your role is to:
    */
   async forceCleanup(): Promise<void> {
     logger.warn('Force cleanup initiated');
-    
+
     try {
       if (this.coordinationTimer) {
         clearInterval(this.coordinationTimer);
@@ -1286,16 +1308,22 @@ You are a PROJECT COORDINATOR. Your role is to:
     cleanupRecommended: boolean;
     recommendations: string[];
   } {
-    const workingDirs = Array.from(this.activeAgents.values()).map(a => a.workingDirectory);
+    const workingDirs = Array.from(this.activeAgents.values()).map(
+      (a) => a.workingDirectory
+    );
     const memoryEstimate = this.activeAgents.size * 50; // 50MB per agent estimate
-    const isStale = (Date.now() - this.swarmState.startTime) > 3600000; // 1 hour
-    const hasCompletedTasks = this.swarmState.completedTaskCount > 0 && this.swarmState.activeTaskCount === 0;
-    
+    const isStale = Date.now() - this.swarmState.startTime > 3600000; // 1 hour
+    const hasCompletedTasks =
+      this.swarmState.completedTaskCount > 0 &&
+      this.swarmState.activeTaskCount === 0;
+
     const recommendations: string[] = [];
     let cleanupRecommended = false;
 
     if (isStale) {
-      recommendations.push('Swarm has been running for over 1 hour - consider cleanup');
+      recommendations.push(
+        'Swarm has been running for over 1 hour - consider cleanup'
+      );
       cleanupRecommended = true;
     }
 
@@ -1313,7 +1341,7 @@ You are a PROJECT COORDINATOR. Your role is to:
       workingDirectories: workingDirs,
       memoryEstimate,
       cleanupRecommended,
-      recommendations
+      recommendations,
     };
   }
 

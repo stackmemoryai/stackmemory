@@ -333,7 +333,7 @@ export class ConfigManager {
   get(path: string): any {
     const keys = path.split('.');
     let value: any = this.config;
-    
+
     for (const key of keys) {
       if (value && typeof value === 'object' && key in value) {
         value = value[key];
@@ -341,7 +341,7 @@ export class ConfigManager {
         return undefined;
       }
     }
-    
+
     return value;
   }
 

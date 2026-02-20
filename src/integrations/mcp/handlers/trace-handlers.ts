@@ -21,24 +21,24 @@ export class TraceHandlers {
    */
   async handleGetTraces(args: any): Promise<any> {
     try {
-      const { 
-        limit = 20, 
-        pattern, 
+      const {
+        limit = 20,
+        pattern,
         start_time,
         end_time,
-        include_context = false 
+        include_context = false,
       } = args;
 
       const filters: any = { limit };
-      
+
       if (pattern) {
         filters.pattern = pattern;
       }
-      
+
       if (start_time) {
         filters.startTime = new Date(start_time);
       }
-      
+
       if (end_time) {
         filters.endTime = new Date(end_time);
       }
@@ -57,7 +57,10 @@ export class TraceHandlers {
       }
 
       const tracesSummary = traces.map((trace: any) => {
-        const duration = trace.metadata.endTime && trace.metadata.startTime ? trace.metadata.endTime - trace.metadata.startTime : 'ongoing';
+        const duration =
+          trace.metadata.endTime && trace.metadata.startTime
+            ? trace.metadata.endTime - trace.metadata.startTime
+            : 'ongoing';
         return {
           id: trace.id,
           pattern: trace.compressed?.pattern || 'Unknown',
@@ -68,9 +71,12 @@ export class TraceHandlers {
         };
       });
 
-      const summaryText = tracesSummary.map((t: any) => 
-        `${t.id}: ${t.pattern} (${t.toolCount} tools, ${t.duration}) [${t.status}]`
-      ).join('\n');
+      const summaryText = tracesSummary
+        .map(
+          (t: any) =>
+            `${t.id}: ${t.pattern} (${t.toolCount} tools, ${t.duration}) [${t.status}]`
+        )
+        .join('\n');
 
       const result: any = {
         content: [
@@ -93,7 +99,10 @@ export class TraceHandlers {
 
       return result;
     } catch (error: unknown) {
-      logger.error('Error getting traces', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error getting traces',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -103,10 +112,10 @@ export class TraceHandlers {
    */
   async handleAnalyzeTraces(args: any): Promise<any> {
     try {
-      const { 
-        trace_id, 
+      const {
+        trace_id,
         analysis_type = 'performance',
-        include_recommendations = true 
+        include_recommendations = true,
       } = args;
 
       let analysis;
@@ -160,9 +169,9 @@ export class TraceHandlers {
 
       if (include_recommendations && analysis.recommendations) {
         analysisText += '\n\nRecommendations:\n';
-        analysisText += analysis.recommendations.map((rec: string, i: number) => 
-          `${i + 1}. ${rec}`
-        ).join('\n');
+        analysisText += analysis.recommendations
+          .map((rec: string, i: number) => `${i + 1}. ${rec}`)
+          .join('\n');
       }
 
       return {
@@ -179,7 +188,10 @@ export class TraceHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error analyzing traces', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error analyzing traces',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -189,12 +201,12 @@ export class TraceHandlers {
    */
   async handleStartBrowserDebug(args: any): Promise<any> {
     try {
-      const { 
-        url, 
+      const {
+        url,
         headless = false,
         width = 1280,
         height = 720,
-        capture_screenshots = true 
+        capture_screenshots = true,
       } = args;
 
       if (!url) {
@@ -223,7 +235,10 @@ export class TraceHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error starting browser debug session', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error starting browser debug session',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -239,7 +254,7 @@ export class TraceHandlers {
         throw new Error('Session ID is required');
       }
 
-      // Mock screenshot since method is private  
+      // Mock screenshot since method is private
       const screenshot = { data: 'mock-screenshot-data', format: 'png' };
 
       return {
@@ -262,7 +277,10 @@ export class TraceHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error taking screenshot', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error taking screenshot',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -300,7 +318,10 @@ export class TraceHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error executing script', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error executing script',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -334,7 +355,10 @@ export class TraceHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error stopping browser debug session', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error stopping browser debug session',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -345,7 +369,7 @@ export class TraceHandlers {
       summary: `Analysis of trace ${trace.id}`,
       toolCount: trace.tools.length,
       score: trace.score,
-      patterns: trace.compressed?.pattern || 'Unknown'
+      patterns: trace.compressed?.pattern || 'Unknown',
     };
   }
 
@@ -354,8 +378,13 @@ export class TraceHandlers {
       type: analysisType,
       summary: `Analysis of ${traces.length} recent traces`,
       totalTraces: traces.length,
-      avgScore: traces.length > 0 ? traces.reduce((sum, t) => sum + t.score, 0) / traces.length : 0,
-      commonPatterns: traces.map((t: any) => t.compressed?.pattern).filter(Boolean)
+      avgScore:
+        traces.length > 0
+          ? traces.reduce((sum, t) => sum + t.score, 0) / traces.length
+          : 0,
+      commonPatterns: traces
+        .map((t: any) => t.compressed?.pattern)
+        .filter(Boolean),
     };
   }
 }

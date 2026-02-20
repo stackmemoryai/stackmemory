@@ -48,7 +48,12 @@ export class CodeExecutionHandler {
     workingDirectory?: string;
     timeout?: number;
   }): Promise<ExecutionResult> {
-    const { language, code, workingDirectory, timeout = EXECUTION_TIMEOUT } = params;
+    const {
+      language,
+      code,
+      workingDirectory,
+      timeout = EXECUTION_TIMEOUT,
+    } = params;
 
     // Validate language
     if (!this.allowedLanguages.includes(language.toLowerCase())) {
@@ -72,7 +77,12 @@ export class CodeExecutionHandler {
       await fs.writeFile(tempFile, code, 'utf-8');
 
       // Execute code
-      const result = await this.runCode(language, tempFile, workingDirectory || this.sandboxDir, timeout);
+      const result = await this.runCode(
+        language,
+        tempFile,
+        workingDirectory || this.sandboxDir,
+        timeout
+      );
 
       // Clean up temp file
       await fs.unlink(tempFile).catch(() => {});
@@ -143,14 +153,27 @@ export class CodeExecutionHandler {
         // If output is truncated, save to file
         let outputFile: string | undefined;
         if (truncated) {
-          outputFile = join(this.sandboxDir, `output_${randomBytes(8).toString('hex')}.txt`);
-          await fs.writeFile(outputFile, stdout + '\n---STDERR---\n' + stderr, 'utf-8').catch(() => {});
+          outputFile = join(
+            this.sandboxDir,
+            `output_${randomBytes(8).toString('hex')}.txt`
+          );
+          await fs
+            .writeFile(
+              outputFile,
+              stdout + '\n---STDERR---\n' + stderr,
+              'utf-8'
+            )
+            .catch(() => {});
         }
 
         resolve({
           success: code === 0,
-          stdout: truncated ? stdout.slice(0, MAX_OUTPUT_SIZE) + '\n[Output truncated]' : stdout,
-          stderr: truncated ? stderr.slice(0, MAX_OUTPUT_SIZE) + '\n[Output truncated]' : stderr,
+          stdout: truncated
+            ? stdout.slice(0, MAX_OUTPUT_SIZE) + '\n[Output truncated]'
+            : stdout,
+          stderr: truncated
+            ? stderr.slice(0, MAX_OUTPUT_SIZE) + '\n[Output truncated]'
+            : stderr,
           exitCode: code,
           truncated,
           outputFile,
@@ -225,12 +248,21 @@ export class CodeExecutionHandler {
     const warnings: string[] = [];
     const dangerousPatterns = [
       { pattern: /import\s+os/i, message: 'Importing os module detected' },
-      { pattern: /import\s+subprocess/i, message: 'Subprocess module detected' },
+      {
+        pattern: /import\s+subprocess/i,
+        message: 'Subprocess module detected',
+      },
       { pattern: /exec\s*\(/i, message: 'exec() function detected' },
       { pattern: /eval\s*\(/i, message: 'eval() function detected' },
       { pattern: /__import__/i, message: '__import__ detected' },
-      { pattern: /open\s*\([^)]*['"]\//i, message: 'Absolute path file access detected' },
-      { pattern: /require\s*\([^)]*child_process/i, message: 'child_process module detected' },
+      {
+        pattern: /open\s*\([^)]*['"]\//i,
+        message: 'Absolute path file access detected',
+      },
+      {
+        pattern: /require\s*\([^)]*child_process/i,
+        message: 'child_process module detected',
+      },
       { pattern: /require\s*\([^)]*fs/i, message: 'fs module access detected' },
     ];
 
@@ -296,7 +328,7 @@ export class CodeExecutionHandler {
 export const codeExecutionHandlers = {
   'code.execute': async (params: any) => {
     const handler = new CodeExecutionHandler();
-    
+
     // Validate code before execution
     const validation = handler.validateCode(params.code);
     if (!validation.safe && !params.force) {

@@ -95,11 +95,15 @@ export class UpdateChecker {
     try {
       // Use timeout to prevent hanging on slow network
       const fetchVersion = async () => {
-        const output = execFileSync('npm', ['view', this.PACKAGE_NAME, 'version'], {
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'ignore'],
-          timeout: 5000, // 5 second timeout
-        }).trim();
+        const output = execFileSync(
+          'npm',
+          ['view', this.PACKAGE_NAME, 'version'],
+          {
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'ignore'],
+            timeout: 5000, // 5 second timeout
+          }
+        ).trim();
         return output;
       };
 

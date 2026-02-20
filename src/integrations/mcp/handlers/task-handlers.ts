@@ -3,7 +3,11 @@
  * Handles task creation, updates, and queries
  */
 
-import { LinearTaskManager, TaskPriority, TaskStatus } from '../../../features/tasks/linear-task-manager.js';
+import {
+  LinearTaskManager,
+  TaskPriority,
+  TaskStatus,
+} from '../../../features/tasks/linear-task-manager.js';
 import { logger } from '../../../core/monitoring/logger.js';
 
 export interface TaskHandlerDependencies {
@@ -19,8 +23,14 @@ export class TaskHandlers {
    */
   async handleCreateTask(args: any): Promise<any> {
     try {
-      const { title, description, priority = 'medium', tags = [], parent_id } = args;
-      
+      const {
+        title,
+        description,
+        priority = 'medium',
+        tags = [],
+        parent_id,
+      } = args;
+
       if (!title) {
         throw new Error('Task title is required');
       }
@@ -51,7 +61,10 @@ export class TaskHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error creating task', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error creating task',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -62,7 +75,7 @@ export class TaskHandlers {
   async handleUpdateTaskStatus(args: any): Promise<any> {
     try {
       const { task_id, status, progress } = args;
-      
+
       if (!task_id) {
         throw new Error('Task ID is required');
       }
@@ -72,15 +85,23 @@ export class TaskHandlers {
       }
 
       const validStatus = this.validateStatus(status);
-      
-      await this.deps.taskStore.updateTaskStatus(task_id, validStatus, progress);
+
+      await this.deps.taskStore.updateTaskStatus(
+        task_id,
+        validStatus,
+        progress
+      );
       const task = await this.deps.taskStore.getTask(task_id);
 
       if (!task) {
         throw new Error(`Task not found: ${task_id}`);
       }
 
-      logger.info('Updated task status', { taskId: task_id, status: validStatus, progress });
+      logger.info('Updated task status', {
+        taskId: task_id,
+        status: validStatus,
+        progress,
+      });
 
       return {
         content: [
@@ -96,7 +117,10 @@ export class TaskHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error updating task status', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error updating task status',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -106,25 +130,25 @@ export class TaskHandlers {
    */
   async handleGetActiveTasks(args: any): Promise<any> {
     try {
-      const { 
-        status, 
-        priority, 
-        limit = 20, 
+      const {
+        status,
+        priority,
+        limit = 20,
         include_completed = false,
         tags = [],
-        search 
+        search,
       } = args;
 
       const filters: any = {};
-      
+
       if (status) {
         filters.status = this.validateStatus(status);
       }
-      
+
       if (priority) {
         filters.priority = this.validatePriority(priority);
       }
-      
+
       if (!include_completed) {
         filters.excludeCompleted = true;
       }
@@ -149,11 +173,14 @@ export class TaskHandlers {
         progress: 0,
       }));
 
-      const summaryText = taskSummary.length > 0
-        ? taskSummary.map((t: any) => 
-            `${t.id}: ${t.title} [${t.status}] (${t.priority})`
-          ).join('\n')
-        : 'No tasks found matching criteria';
+      const summaryText =
+        taskSummary.length > 0
+          ? taskSummary
+              .map(
+                (t: any) => `${t.id}: ${t.title} [${t.status}] (${t.priority})`
+              )
+              .join('\n')
+          : 'No tasks found matching criteria';
 
       return {
         content: [
@@ -169,7 +196,10 @@ export class TaskHandlers {
         },
       };
     } catch (error: unknown) {
-      logger.error('Error getting active tasks', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error getting active tasks',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -210,7 +240,10 @@ ${Object.entries(metrics.by_status || {})
         metadata: metrics,
       };
     } catch (error: unknown) {
-      logger.error('Error getting task metrics', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error getting task metrics',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -221,7 +254,7 @@ ${Object.entries(metrics.by_status || {})
   async handleAddTaskDependency(args: any): Promise<any> {
     try {
       const { task_id, depends_on, dependency_type = 'blocks' } = args;
-      
+
       if (!task_id || !depends_on) {
         throw new Error('Both task_id and depends_on are required');
       }
@@ -235,7 +268,11 @@ ${Object.entries(metrics.by_status || {})
         throw new Error('One or both tasks not found');
       }
 
-      logger.info('Added task dependency', { taskId: task_id, dependsOn: depends_on, type: dependency_type });
+      logger.info('Added task dependency', {
+        taskId: task_id,
+        dependsOn: depends_on,
+        type: dependency_type,
+      });
 
       return {
         content: [
@@ -251,7 +288,10 @@ ${Object.entries(metrics.by_status || {})
         },
       };
     } catch (error: unknown) {
-      logger.error('Error adding task dependency', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Error adding task dependency',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -262,11 +302,13 @@ ${Object.entries(metrics.by_status || {})
   private validatePriority(priority: string): TaskPriority {
     const validPriorities: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
     const normalizedPriority = priority.toLowerCase() as TaskPriority;
-    
+
     if (!validPriorities.includes(normalizedPriority)) {
-      throw new Error(`Invalid priority: ${priority}. Must be one of: ${validPriorities.join(', ')}`);
+      throw new Error(
+        `Invalid priority: ${priority}. Must be one of: ${validPriorities.join(', ')}`
+      );
     }
-    
+
     return normalizedPriority;
   }
 
@@ -274,13 +316,23 @@ ${Object.entries(metrics.by_status || {})
    * Validate task status
    */
   private validateStatus(status: string): TaskStatus {
-    const validStatuses: TaskStatus[] = ['pending', 'in_progress', 'blocked', 'completed', 'cancelled'];
-    const normalizedStatus = status.toLowerCase().replace('_', '-') as TaskStatus;
-    
+    const validStatuses: TaskStatus[] = [
+      'pending',
+      'in_progress',
+      'blocked',
+      'completed',
+      'cancelled',
+    ];
+    const normalizedStatus = status
+      .toLowerCase()
+      .replace('_', '-') as TaskStatus;
+
     if (!validStatuses.includes(normalizedStatus)) {
-      throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+      throw new Error(
+        `Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`
+      );
     }
-    
+
     return normalizedStatus;
   }
 }

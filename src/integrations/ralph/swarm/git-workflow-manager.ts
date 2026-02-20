@@ -8,7 +8,10 @@ import { logger } from '../../../core/monitoring/logger.js';
 import { Agent, SwarmTask } from '../types.js';
 
 export class GitWorkflowError extends Error {
-  constructor(message: string, public context?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public context?: Record<string, unknown>
+  ) {
     super(message);
     this.name = 'GitWorkflowError';
   }
@@ -271,7 +274,9 @@ export class GitWorkflowManager {
   // Private helper methods
   private getCurrentBranch(): string {
     try {
-      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+      return execSync('git rev-parse --abbrev-ref HEAD', {
+        encoding: 'utf8',
+      }).trim();
     } catch (error: unknown) {
       logger.warn('Failed to get current branch', error as Error);
       return 'main';
@@ -315,7 +320,9 @@ export class GitWorkflowManager {
       // Check if branch already exists and delete it for clean test runs
       try {
         // First check if this is the current branch
-        const currentBranch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+        const currentBranch = execSync('git branch --show-current', {
+          encoding: 'utf8',
+        }).trim();
         if (currentBranch === branchName) {
           // Switch to main/master before deleting
           try {
@@ -324,32 +331,46 @@ export class GitWorkflowManager {
             execSync('git checkout master', { encoding: 'utf8' });
           }
         }
-        
+
         // Remove any worktrees using this branch
         try {
-          const worktrees = execSync('git worktree list --porcelain', { encoding: 'utf8' });
+          const worktrees = execSync('git worktree list --porcelain', {
+            encoding: 'utf8',
+          });
           const lines = worktrees.split('\n');
           for (let i = 0; i < lines.length; i++) {
-            if (lines[i].startsWith('branch ') && lines[i].includes(branchName)) {
-              const worktreetPath = lines[i-1].replace('worktree ', '');
-              execSync(`git worktree remove --force "${worktreetPath}"`, { encoding: 'utf8' });
-              logger.info(`Removed worktree at ${worktreetPath} for branch ${branchName}`);
+            if (
+              lines[i].startsWith('branch ') &&
+              lines[i].includes(branchName)
+            ) {
+              const worktreetPath = lines[i - 1].replace('worktree ', '');
+              execSync(`git worktree remove --force "${worktreetPath}"`, {
+                encoding: 'utf8',
+              });
+              logger.info(
+                `Removed worktree at ${worktreetPath} for branch ${branchName}`
+              );
             }
           }
         } catch (worktreeError) {
-          logger.warn('Failed to check/remove worktrees', worktreeError as Error);
+          logger.warn(
+            'Failed to check/remove worktrees',
+            worktreeError as Error
+          );
         }
-        
+
         execSync(`git branch -D ${branchName}`, { encoding: 'utf8' });
         logger.info(`Deleted existing branch ${branchName} for fresh start`);
       } catch {
         // Branch doesn't exist, which is fine
       }
-      
+
       execSync(`git checkout -b ${branchName}`, { encoding: 'utf8' });
     } catch (error: unknown) {
       logger.error(`Failed to create branch ${branchName}`, error as Error);
-      throw new GitWorkflowError(`Failed to create branch: ${branchName}`, { branchName });
+      throw new GitWorkflowError(`Failed to create branch: ${branchName}`, {
+        branchName,
+      });
     }
   }
 
@@ -358,7 +379,9 @@ export class GitWorkflowManager {
       execSync(`git checkout ${branchName}`, { encoding: 'utf8' });
     } catch (error: unknown) {
       logger.error(`Failed to checkout branch ${branchName}`, error as Error);
-      throw new GitWorkflowError(`Failed to checkout branch: ${branchName}`, { branchName });
+      throw new GitWorkflowError(`Failed to checkout branch: ${branchName}`, {
+        branchName,
+      });
     }
   }
 

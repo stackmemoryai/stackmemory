@@ -5,7 +5,8 @@
 export const codeExecutionTools = [
   {
     name: 'code.execute',
-    description: 'Execute Python, JavaScript, or TypeScript code in a sandboxed environment',
+    description:
+      'Execute Python, JavaScript, or TypeScript code in a sandboxed environment',
     inputSchema: {
       type: 'object',
       properties: {

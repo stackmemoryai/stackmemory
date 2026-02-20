@@ -96,8 +96,10 @@ export class LinearConfigManager {
    */
   getDefaultConfig(): PersistedSyncConfig {
     // Get stable project identification
-    const projectId = this.isolationManager.getProjectIdentification(this.projectRoot);
-    
+    const projectId = this.isolationManager.getProjectIdentification(
+      this.projectRoot
+    );
+
     return {
       enabled: true,
       interval: 5, // 5 minutes

@@ -13,7 +13,7 @@ export function registerSignupCommand(program: Command): void {
       console.log(chalk.cyan('🚀 StackMemory Hosted Service Signup\n'));
 
       const signupUrl = 'https://stackmemory.ai/signup';
-      
+
       if (options.open !== false) {
         console.log(chalk.gray('Opening signup page in your browser...'));
         try {
@@ -46,12 +46,14 @@ export function registerSignupCommand(program: Command): void {
         const { registerLoginCommand } = await import('./login.js');
         const loginCmd = new Command();
         registerLoginCommand(loginCmd);
-        
+
         // Execute login
         console.log(chalk.cyan('\n🔐 Proceeding to login...\n'));
         await loginCmd.parseAsync(['node', 'stackmemory', 'login']);
       } else {
-        console.log(chalk.gray('\nWhen ready, run: ') + chalk.cyan('stackmemory login'));
+        console.log(
+          chalk.gray('\nWhen ready, run: ') + chalk.cyan('stackmemory login')
+        );
       }
     });
 }

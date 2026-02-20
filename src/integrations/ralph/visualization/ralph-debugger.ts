@@ -14,7 +14,7 @@ import {
   IterationTrace,
   ContextFlowDiagram,
   PerformanceMetrics,
-  DebugReport
+  DebugReport,
 } from '../types.js';
 
 export interface DebuggerConfig {
@@ -37,7 +37,7 @@ export class RalphDebugger {
       generateVisualization: true,
       exportFormat: 'html',
       maxTraceDepth: 50,
-      ...config
+      ...config,
     };
 
     logger.info('Ralph debugger initialized', this.config);
@@ -46,10 +46,13 @@ export class RalphDebugger {
   async initialize(): Promise<void> {
     try {
       await sessionManager.initialize();
-      
+
       const session = await sessionManager.getOrCreateSession({});
       if (session.database) {
-        this.frameManager = new FrameManager(session.database, session.projectId);
+        this.frameManager = new FrameManager(
+          session.database,
+          session.projectId
+        );
       }
 
       logger.info('Debugger initialized successfully');
@@ -62,7 +65,10 @@ export class RalphDebugger {
   /**
    * Start debugging a Ralph loop
    */
-  async startDebugSession(loopId: string, ralphDir: string): Promise<DebugSession> {
+  async startDebugSession(
+    loopId: string,
+    ralphDir: string
+  ): Promise<DebugSession> {
     logger.info('Starting debug session', { loopId, ralphDir });
 
     const session: DebugSession = {
@@ -78,9 +84,9 @@ export class RalphDebugger {
         contextSizes: [],
         averageIterationTime: 0,
         peakMemory: 0,
-        contextEfficiency: 0
+        contextEfficiency: 0,
       },
-      realTimeMonitoring: this.config.enableRealTimeMonitoring
+      realTimeMonitoring: this.config.enableRealTimeMonitoring,
     };
 
     this.activeSessions.set(loopId, session);
@@ -111,9 +117,11 @@ export class RalphDebugger {
       iterationAnalysis: await this.analyzeIterations(session),
       contextAnalysis: await this.analyzeContextFlow(session),
       performanceAnalysis: await this.analyzePerformance(session),
-      visualization: this.config.generateVisualization ? await this.generateVisualization(session) : undefined,
+      visualization: this.config.generateVisualization
+        ? await this.generateVisualization(session)
+        : undefined,
       recommendations: await this.generateRecommendations(session),
-      exportPath: ''
+      exportPath: '',
     };
 
     // Export report
@@ -136,7 +144,7 @@ export class RalphDebugger {
     const timeline = {
       title: `Ralph Loop Timeline: ${loopId}`,
       startTime: session.startTime,
-      iterations: session.iterations.map(iter => ({
+      iterations: session.iterations.map((iter) => ({
         iteration: iter.iteration,
         startTime: iter.startTime,
         endTime: iter.endTime,
@@ -145,14 +153,17 @@ export class RalphDebugger {
         changes: iter.changes?.length || 0,
         errors: iter.errors?.length || 0,
         contextSize: iter.contextSize,
-        phase: iter.phase
+        phase: iter.phase,
       })),
-      totalDuration: session.performance.iterationTimes.reduce((sum, time) => sum + time, 0)
+      totalDuration: session.performance.iterationTimes.reduce(
+        (sum, time) => sum + time,
+        0
+      ),
     };
 
     // Generate HTML visualization
     const html = await this.generateTimelineHTML(timeline);
-    
+
     const timelinePath = path.join('.ralph-debug', `timeline-${loopId}.html`);
     await fs.mkdir(path.dirname(timelinePath), { recursive: true });
     await fs.writeFile(timelinePath, html);
@@ -163,7 +174,9 @@ export class RalphDebugger {
   /**
    * Create context flow diagram
    */
-  async generateContextFlowDiagram(loopId: string): Promise<ContextFlowDiagram> {
+  async generateContextFlowDiagram(
+    loopId: string
+  ): Promise<ContextFlowDiagram> {
     const session = this.activeSessions.get(loopId);
     if (!session) {
       throw new Error(`No debug session found for loop ${loopId}`);
@@ -177,14 +190,14 @@ export class RalphDebugger {
         totalNodes: 0,
         totalEdges: 0,
         avgContextSize: 0,
-        maxContextSize: 0
-      }
+        maxContextSize: 0,
+      },
     };
 
     // Build context flow graph
     for (let i = 0; i < session.iterations.length; i++) {
       const iteration = session.iterations[i];
-      
+
       // Add iteration node
       diagram.nodes.push({
         id: `iter-${iteration.iteration}`,
@@ -195,8 +208,8 @@ export class RalphDebugger {
         metadata: {
           duration: iteration.endTime - iteration.startTime,
           changes: iteration.changes?.length || 0,
-          errors: iteration.errors?.length || 0
-        }
+          errors: iteration.errors?.length || 0,
+        },
       });
 
       // Add edge to next iteration
@@ -206,7 +219,7 @@ export class RalphDebugger {
           from: `iter-${iteration.iteration}`,
           to: `iter-${session.iterations[i + 1].iteration}`,
           type: 'sequence',
-          weight: iteration.contextSize || 1
+          weight: iteration.contextSize || 1,
         });
       }
     }
@@ -214,9 +227,14 @@ export class RalphDebugger {
     diagram.metrics = {
       totalNodes: diagram.nodes.length,
       totalEdges: diagram.edges.length,
-      avgContextSize: session.performance.contextSizes.length > 0 ? 
-        session.performance.contextSizes.reduce((sum, size) => sum + size, 0) / session.performance.contextSizes.length : 0,
-      maxContextSize: Math.max(...session.performance.contextSizes)
+      avgContextSize:
+        session.performance.contextSizes.length > 0
+          ? session.performance.contextSizes.reduce(
+              (sum, size) => sum + size,
+              0
+            ) / session.performance.contextSizes.length
+          : 0,
+      maxContextSize: Math.max(...session.performance.contextSizes),
     };
 
     return diagram;
@@ -247,14 +265,14 @@ export class RalphDebugger {
       // Read current Ralph state
       const statePath = path.join(session.ralphDir, 'state.json');
       const iterationPath = path.join(session.ralphDir, 'iteration.txt');
-      
+
       let currentState: any = {};
       let currentIteration = 0;
 
       try {
         const stateData = await fs.readFile(statePath, 'utf8');
         currentState = JSON.parse(stateData);
-        
+
         const iterData = await fs.readFile(iterationPath, 'utf8');
         currentIteration = parseInt(iterData.trim()) || 0;
       } catch {
@@ -279,11 +297,10 @@ export class RalphDebugger {
         changes: [],
         errors: [],
         memoryUsage: process.memoryUsage().heapUsed,
-        stackTrace: this.captureStackTrace()
+        stackTrace: this.captureStackTrace(),
       };
 
       session.iterations.push(trace);
-
     } catch (error: unknown) {
       logger.debug('Failed to capture iteration trace', error as Error);
     }
@@ -295,7 +312,10 @@ export class RalphDebugger {
   private async updatePerformanceMetrics(session: DebugSession): Promise<void> {
     const currentMemory = process.memoryUsage().heapUsed;
     session.performance.memoryUsage.push(currentMemory);
-    session.performance.peakMemory = Math.max(session.performance.peakMemory, currentMemory);
+    session.performance.peakMemory = Math.max(
+      session.performance.peakMemory,
+      currentMemory
+    );
 
     // Update context sizes
     const contextSize = await this.calculateContextSize(session.ralphDir);
@@ -303,16 +323,22 @@ export class RalphDebugger {
 
     // Calculate averages
     if (session.performance.iterationTimes.length > 0) {
-      session.performance.averageIterationTime = 
-        session.performance.iterationTimes.reduce((sum, time) => sum + time, 0) / 
-        session.performance.iterationTimes.length;
+      session.performance.averageIterationTime =
+        session.performance.iterationTimes.reduce(
+          (sum, time) => sum + time,
+          0
+        ) / session.performance.iterationTimes.length;
     }
 
     // Calculate context efficiency
     if (session.performance.contextSizes.length > 0) {
-      const avgContextSize = session.performance.contextSizes.reduce((sum, size) => sum + size, 0) / 
+      const avgContextSize =
+        session.performance.contextSizes.reduce((sum, size) => sum + size, 0) /
         session.performance.contextSizes.length;
-      session.performance.contextEfficiency = Math.max(0, 1 - (avgContextSize / 10000)); // Assume 10K is max context
+      session.performance.contextEfficiency = Math.max(
+        0,
+        1 - avgContextSize / 10000
+      ); // Assume 10K is max context
     }
   }
 
@@ -321,19 +347,29 @@ export class RalphDebugger {
    */
   private async generateSummary(session: DebugSession): Promise<any> {
     const totalIterations = session.iterations.length;
-    const successfulIterations = session.iterations.filter(i => i.success).length;
-    const totalDuration = session.performance.iterationTimes.reduce((sum, time) => sum + time, 0);
+    const successfulIterations = session.iterations.filter(
+      (i) => i.success
+    ).length;
+    const totalDuration = session.performance.iterationTimes.reduce(
+      (sum, time) => sum + time,
+      0
+    );
 
     return {
       loopId: session.loopId,
       totalIterations,
       successfulIterations,
-      successRate: totalIterations > 0 ? successfulIterations / totalIterations : 0,
+      successRate:
+        totalIterations > 0 ? successfulIterations / totalIterations : 0,
       totalDuration,
       averageIterationTime: session.performance.averageIterationTime,
       peakMemoryUsage: session.performance.peakMemory,
       contextEfficiency: session.performance.contextEfficiency,
-      status: totalIterations > 0 && session.iterations[session.iterations.length - 1].success ? 'completed' : 'in_progress'
+      status:
+        totalIterations > 0 &&
+        session.iterations[session.iterations.length - 1].success
+          ? 'completed'
+          : 'in_progress',
     };
   }
 
@@ -347,29 +383,40 @@ export class RalphDebugger {
     const insights: string[] = [];
 
     // Analyze iteration durations
-    const durations = session.iterations.map(i => i.endTime - i.startTime);
-    const avgDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+    const durations = session.iterations.map((i) => i.endTime - i.startTime);
+    const avgDuration =
+      durations.reduce((sum, d) => sum + d, 0) / durations.length;
 
-    if (durations.some(d => d > avgDuration * 2)) {
+    if (durations.some((d) => d > avgDuration * 2)) {
       patterns.push('Variable iteration times detected');
-      insights.push('Some iterations took significantly longer than average - investigate bottlenecks');
+      insights.push(
+        'Some iterations took significantly longer than average - investigate bottlenecks'
+      );
     }
 
     // Analyze success patterns
-    const consecutiveFailures = this.findConsecutiveFailures(session.iterations);
+    const consecutiveFailures = this.findConsecutiveFailures(
+      session.iterations
+    );
     if (consecutiveFailures.length > 2) {
       patterns.push('Multiple consecutive failures detected');
-      insights.push('Consider adjusting approach or criteria after consecutive failures');
+      insights.push(
+        'Consider adjusting approach or criteria after consecutive failures'
+      );
     }
 
     // Analyze context growth
     if (session.performance.contextSizes.length > 1) {
-      const contextGrowth = session.performance.contextSizes[session.performance.contextSizes.length - 1] - 
-        session.performance.contextSizes[0];
-      
+      const contextGrowth =
+        session.performance.contextSizes[
+          session.performance.contextSizes.length - 1
+        ] - session.performance.contextSizes[0];
+
       if (contextGrowth > 1000) {
         patterns.push('Significant context growth');
-        insights.push('Context is growing rapidly - consider context pruning strategies');
+        insights.push(
+          'Context is growing rapidly - consider context pruning strategies'
+        );
       }
     }
 
@@ -381,11 +428,18 @@ export class RalphDebugger {
    */
   private async analyzeContextFlow(session: DebugSession): Promise<any> {
     return {
-      avgContextSize: session.performance.contextSizes.length > 0 ? 
-        session.performance.contextSizes.reduce((sum, size) => sum + size, 0) / session.performance.contextSizes.length : 0,
+      avgContextSize:
+        session.performance.contextSizes.length > 0
+          ? session.performance.contextSizes.reduce(
+              (sum, size) => sum + size,
+              0
+            ) / session.performance.contextSizes.length
+          : 0,
       maxContextSize: Math.max(...session.performance.contextSizes),
-      contextGrowthRate: this.calculateGrowthRate(session.performance.contextSizes),
-      efficiency: session.performance.contextEfficiency
+      contextGrowthRate: this.calculateGrowthRate(
+        session.performance.contextSizes
+      ),
+      efficiency: session.performance.contextEfficiency,
     };
   }
 
@@ -394,23 +448,30 @@ export class RalphDebugger {
    */
   private async analyzePerformance(session: DebugSession): Promise<any> {
     return {
-      memoryEfficiency: this.calculateMemoryEfficiency(session.performance.memoryUsage),
+      memoryEfficiency: this.calculateMemoryEfficiency(
+        session.performance.memoryUsage
+      ),
       iterationEfficiency: session.performance.averageIterationTime,
       resourceUtilization: {
         cpu: 'N/A', // Would need CPU monitoring
         memory: session.performance.peakMemory,
-        context: session.performance.contextEfficiency
-      }
+        context: session.performance.contextEfficiency,
+      },
     };
   }
 
   /**
    * Generate visualization HTML
    */
-  private async generateVisualization(session: DebugSession): Promise<LoopVisualization> {
+  private async generateVisualization(
+    session: DebugSession
+  ): Promise<LoopVisualization> {
     const htmlContent = await this.generateVisualizationHTML(session);
-    
-    const vizPath = path.join('.ralph-debug', `visualization-${session.loopId}.html`);
+
+    const vizPath = path.join(
+      '.ralph-debug',
+      `visualization-${session.loopId}.html`
+    );
     await fs.mkdir(path.dirname(vizPath), { recursive: true });
     await fs.writeFile(vizPath, htmlContent);
 
@@ -421,40 +482,54 @@ export class RalphDebugger {
       data: {
         iterations: session.iterations,
         performance: session.performance,
-        contextFlow: session.contextFlow
+        contextFlow: session.contextFlow,
       },
       metadata: {
         generatedAt: Date.now(),
         format: 'html',
-        interactive: true
-      }
+        interactive: true,
+      },
     };
   }
 
   /**
    * Generate recommendations
    */
-  private async generateRecommendations(session: DebugSession): Promise<string[]> {
+  private async generateRecommendations(
+    session: DebugSession
+  ): Promise<string[]> {
     const recommendations: string[] = [];
 
     // Performance recommendations
-    if (session.performance.averageIterationTime > 30000) { // > 30 seconds
-      recommendations.push('Consider breaking down complex tasks into smaller iterations');
+    if (session.performance.averageIterationTime > 30000) {
+      // > 30 seconds
+      recommendations.push(
+        'Consider breaking down complex tasks into smaller iterations'
+      );
     }
 
     if (session.performance.contextEfficiency < 0.7) {
-      recommendations.push('Optimize context management - consider using context budgeting');
+      recommendations.push(
+        'Optimize context management - consider using context budgeting'
+      );
     }
 
     // Success rate recommendations
-    const successRate = session.iterations.filter(i => i.success).length / Math.max(1, session.iterations.length);
+    const successRate =
+      session.iterations.filter((i) => i.success).length /
+      Math.max(1, session.iterations.length);
     if (successRate < 0.5) {
-      recommendations.push('Low success rate detected - review task criteria and approach');
+      recommendations.push(
+        'Low success rate detected - review task criteria and approach'
+      );
     }
 
     // Memory recommendations
-    if (session.performance.peakMemory > 500 * 1024 * 1024) { // > 500MB
-      recommendations.push('High memory usage detected - investigate memory leaks');
+    if (session.performance.peakMemory > 500 * 1024 * 1024) {
+      // > 500MB
+      recommendations.push(
+        'High memory usage detected - investigate memory leaks'
+      );
     }
 
     return recommendations;
@@ -466,7 +541,7 @@ export class RalphDebugger {
   private async exportReport(report: DebugReport): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `ralph-debug-${report.loopId}-${timestamp}`;
-    
+
     let content: string;
     let extension: string;
 
@@ -494,7 +569,9 @@ export class RalphDebugger {
   }
 
   // Helper methods
-  private determineIterationPhase(ralphDir: string): 'starting' | 'working' | 'reviewing' | 'completed' {
+  private determineIterationPhase(
+    ralphDir: string
+  ): 'starting' | 'working' | 'reviewing' | 'completed' {
     // Determine current phase based on file states
     return 'working'; // Simplified implementation
   }
@@ -538,19 +615,19 @@ export class RalphDebugger {
 
   private calculateGrowthRate(sizes: number[]): number {
     if (sizes.length < 2) return 0;
-    
+
     const first = sizes[0];
     const last = sizes[sizes.length - 1];
-    
+
     return first > 0 ? (last - first) / first : 0;
   }
 
   private calculateMemoryEfficiency(memoryUsage: number[]): number {
     if (memoryUsage.length < 2) return 1;
-    
+
     const min = Math.min(...memoryUsage);
     const max = Math.max(...memoryUsage);
-    
+
     return max > 0 ? min / max : 1;
   }
 
@@ -573,14 +650,18 @@ export class RalphDebugger {
 <body>
     <h1>${timeline.title}</h1>
     <div class="timeline">
-        ${timeline.iterations.map((iter: any) => `
+        ${timeline.iterations
+          .map(
+            (iter: any) => `
             <div class="iteration ${iter.success ? 'success' : 'failure'}">
                 <h3>Iteration ${iter.iteration}</h3>
                 <p>Duration: ${iter.duration}ms</p>
                 <p>Changes: ${iter.changes} | Errors: ${iter.errors}</p>
                 <p>Context Size: ${iter.contextSize}</p>
             </div>
-        `).join('')}
+        `
+          )
+          .join('')}
     </div>
 </body>
 </html>
@@ -645,7 +726,7 @@ export class RalphDebugger {
 - **Context Efficiency:** ${Math.round(report.performanceAnalysis.resourceUtilization.context * 100)}%
 
 ## Recommendations
-${report.recommendations.map(r => `- ${r}`).join('\n')}
+${report.recommendations.map((r) => `- ${r}`).join('\n')}
     `;
   }
 
@@ -683,7 +764,7 @@ ${report.recommendations.map(r => `- ${r}`).join('\n')}
     <div class="recommendations">
         <h2>Recommendations</h2>
         <ul>
-            ${report.recommendations.map(r => `<li>${r}</li>`).join('')}
+            ${report.recommendations.map((r) => `<li>${r}</li>`).join('')}
         </ul>
     </div>
 </body>

@@ -20,8 +20,12 @@ console.log('  [ ] Esc - Alternative quit (should exit cleanly)');
 console.log('  [ ] Ctrl+C - Force quit (should exit cleanly)');
 console.log('  [ ] r - Refresh data (should show "Manual refresh triggered")');
 console.log('  [ ] h - Show help (should display full help in logs)');
-console.log('  [ ] c - Clear logs (should clear log area and show confirmation)');
-console.log('  [ ] d - Detect swarms (should show registry status and process info)');
+console.log(
+  '  [ ] c - Clear logs (should clear log area and show confirmation)'
+);
+console.log(
+  '  [ ] d - Detect swarms (should show registry status and process info)'
+);
 console.log('  [ ] s - Start swarm help (should show example commands)');
 console.log('  [ ] t - Stop swarm (should show appropriate message)');
 console.log('');
@@ -35,26 +39,25 @@ console.log('');
 console.log('Press Enter to launch TUI...');
 
 // Wait for user input
-await new Promise(resolve => {
+await new Promise((resolve) => {
   process.stdin.once('data', resolve);
 });
 
 async function testTUIShortcuts() {
   try {
     console.log('🚀 Launching TUI for shortcut testing...');
-    
+
     const tui = new SwarmTUI();
-    
+
     // Initialize TUI
     await tui.initialize();
-    
+
     // Start the TUI
     tui.start();
-    
+
     console.log('✅ TUI launched successfully');
     console.log('📝 Test each keyboard shortcut systematically');
     console.log('🏁 Use "q" to quit when testing is complete');
-    
   } catch (error: unknown) {
     logger.error('TUI shortcuts test failed', error as Error);
     console.error('❌ TUI shortcuts test failed:', (error as Error).message);

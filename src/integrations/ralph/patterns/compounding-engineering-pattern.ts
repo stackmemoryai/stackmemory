@@ -1,9 +1,9 @@
 /**
  * Compounding Engineering Pattern Implementation
- * 
+ *
  * Transforms traditional engineering's diminishing returns into cumulative learning.
  * Each feature development improves future development capabilities.
- * 
+ *
  * Core Philosophy: "Make the next feature easier to build from the feature that you just added."
  */
 
@@ -17,7 +17,7 @@ export interface FeatureLearning {
   featureName: string;
   timestamp: number;
   developmentPhase: 'planning' | 'implementation' | 'testing' | 'deployment';
-  
+
   // What worked well
   successes: {
     strategy: string;
@@ -25,7 +25,7 @@ export interface FeatureLearning {
     reusability: 'universal' | 'domain_specific' | 'feature_specific';
     description: string;
   }[];
-  
+
   // What didn't work
   failures: {
     issue: string;
@@ -33,7 +33,7 @@ export interface FeatureLearning {
     solution: string;
     prevention: string;
   }[];
-  
+
   // Emerging patterns
   patterns: {
     name: string;
@@ -41,7 +41,7 @@ export interface FeatureLearning {
     solution: string;
     examples: string[];
   }[];
-  
+
   // Agent improvements
   agentLearnings: {
     commonMistakes: string[];
@@ -49,7 +49,7 @@ export interface FeatureLearning {
     toolUsagePatterns: string[];
     coordinationInsights: string[];
   };
-  
+
   // Automation opportunities
   automationOpportunities: {
     task: string;
@@ -67,7 +67,7 @@ export interface CompoundedKnowledge {
     testing: FeatureLearning[];
     deployment: FeatureLearning[];
   };
-  
+
   // Distilled wisdom
   bestPractices: {
     category: string;
@@ -75,12 +75,12 @@ export interface CompoundedKnowledge {
     evidence: string[];
     confidence: number;
   }[];
-  
+
   // Generated artifacts
   automatedHooks: string[];
   specializedAgents: string[];
   customCommands: string[];
-  
+
   // Metrics
   metrics: {
     developmentVelocityTrend: number[];
@@ -98,7 +98,7 @@ export class CompoundingEngineeringManager {
   private knowledgeBase: CompoundedKnowledge;
   private baseDir: string;
   private projectId: string;
-  
+
   constructor(baseDir: string = './.compounding', projectId?: string) {
     this.baseDir = baseDir;
     this.projectId = projectId || 'default';
@@ -145,11 +145,11 @@ export class CompoundingEngineeringManager {
     userFeedback?: string
   ): Promise<string> {
     const learningId = uuidv4();
-    
-    logger.info('Capturing feature learning', { 
-      featureName, 
+
+    logger.info('Capturing feature learning', {
+      featureName,
       learningId,
-      agentCount: agentOutputs.length 
+      agentCount: agentOutputs.length,
     });
 
     // Analyze session for learnings
@@ -163,13 +163,13 @@ export class CompoundingEngineeringManager {
 
     // Store the learning
     await this.storeLearning(learning);
-    
+
     // Update compounded knowledge
     await this.updateCompoundedKnowledge(learning);
-    
+
     // Generate new artifacts if patterns emerge
     await this.generateArtifacts();
-    
+
     return learningId;
   }
 
@@ -185,16 +185,16 @@ export class CompoundingEngineeringManager {
   ): Promise<FeatureLearning> {
     // Analyze what worked well
     const successes = this.identifySuccesses(sessionData, agentOutputs);
-    
+
     // Analyze failures and resolutions
     const failures = this.identifyFailures(sessionData, agentOutputs);
-    
+
     // Extract emerging patterns
     const patterns = this.extractPatterns(sessionData, agentOutputs);
-    
+
     // Analyze agent behavior
     const agentLearnings = this.analyzeAgentBehavior(agentOutputs);
-    
+
     // Identify automation opportunities
     const automationOpportunities = this.identifyAutomationOpportunities(
       sessionData,
@@ -309,7 +309,9 @@ export class CompoundingEngineeringManager {
 
     // Code structure patterns
     if (sessionData.codeStructure) {
-      const structurePattern = this.analyzeCodeStructurePattern(sessionData.codeStructure);
+      const structurePattern = this.analyzeCodeStructurePattern(
+        sessionData.codeStructure
+      );
       if (structurePattern) {
         patterns.push(structurePattern);
       }
@@ -321,7 +323,9 @@ export class CompoundingEngineeringManager {
   /**
    * Analyze agent behavior for improvements
    */
-  private analyzeAgentBehavior(agentOutputs: any[]): FeatureLearning['agentLearnings'] {
+  private analyzeAgentBehavior(
+    agentOutputs: any[]
+  ): FeatureLearning['agentLearnings'] {
     const commonMistakes = [];
     const effectivePrompts = [];
     const toolUsagePatterns = [];
@@ -397,17 +401,21 @@ export class CompoundingEngineeringManager {
   /**
    * Update compounded knowledge with new learning
    */
-  private async updateCompoundedKnowledge(learning: FeatureLearning): Promise<void> {
+  private async updateCompoundedKnowledge(
+    learning: FeatureLearning
+  ): Promise<void> {
     // Add to appropriate category
-    this.knowledgeBase.learningsByCategory[learning.developmentPhase].push(learning);
+    this.knowledgeBase.learningsByCategory[learning.developmentPhase].push(
+      learning
+    );
     this.knowledgeBase.totalFeatures++;
 
     // Update best practices
     await this.updateBestPractices(learning);
-    
+
     // Update metrics
     await this.updateMetrics(learning);
-    
+
     // Save updated knowledge
     await this.saveKnowledge();
   }
@@ -418,10 +426,10 @@ export class CompoundingEngineeringManager {
   private async generateArtifacts(): Promise<void> {
     // Generate hooks from automation opportunities
     await this.generateHooks();
-    
+
     // Generate specialized agents from patterns
     await this.generateSpecializedAgents();
-    
+
     // Generate custom commands from repeated tasks
     await this.generateCustomCommands();
   }
@@ -430,10 +438,12 @@ export class CompoundingEngineeringManager {
    * Generate automation hooks
    */
   private async generateHooks(): Promise<void> {
-    const allOpportunities = Object.values(this.knowledgeBase.learningsByCategory)
+    const allOpportunities = Object.values(
+      this.knowledgeBase.learningsByCategory
+    )
       .flat()
-      .flatMap(learning => learning.automationOpportunities)
-      .filter(opp => opp.implementation === 'hook');
+      .flatMap((learning) => learning.automationOpportunities)
+      .filter((opp) => opp.implementation === 'hook');
 
     const hookCounts = new Map<string, number>();
     for (const opp of allOpportunities) {
@@ -455,9 +465,9 @@ export class CompoundingEngineeringManager {
   private async createHook(task: string): Promise<void> {
     const hookName = task.replace(/\s+/g, '-').toLowerCase();
     const hookPath = path.join(this.baseDir, 'hooks', `${hookName}.ts`);
-    
+
     await fs.mkdir(path.dirname(hookPath), { recursive: true });
-    
+
     const hookContent = `
 /**
  * Auto-generated hook for: ${task}
@@ -479,7 +489,7 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
    */
   private async loadExistingKnowledge(): Promise<void> {
     const knowledgePath = path.join(this.baseDir, 'knowledge.json');
-    
+
     try {
       const content = await fs.readFile(knowledgePath, 'utf-8');
       this.knowledgeBase = JSON.parse(content);
@@ -509,15 +519,16 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
     learningVelocity: number;
     knowledgeReuse: number;
   } {
-    const totalLearnings = Object.values(this.knowledgeBase.learningsByCategory)
-      .flat().length;
-    
-    const automationLevel = this.knowledgeBase.automatedHooks.length / 
-                           Math.max(totalLearnings, 1);
-    
-    const recentLearnings = totalLearnings > 5 ? 
-      totalLearnings / 5 : totalLearnings;
-    
+    const totalLearnings = Object.values(
+      this.knowledgeBase.learningsByCategory
+    ).flat().length;
+
+    const automationLevel =
+      this.knowledgeBase.automatedHooks.length / Math.max(totalLearnings, 1);
+
+    const recentLearnings =
+      totalLearnings > 5 ? totalLearnings / 5 : totalLearnings;
+
     return {
       totalFeatures: this.knowledgeBase.totalFeatures,
       automationLevel,
@@ -533,7 +544,9 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
     return 'low';
   }
 
-  private assessReusability(output: any): 'universal' | 'domain_specific' | 'feature_specific' {
+  private assessReusability(
+    output: any
+  ): 'universal' | 'domain_specific' | 'feature_specific' {
     if (output.pattern === 'generic') return 'universal';
     if (output.domain) return 'domain_specific';
     return 'feature_specific';
@@ -543,7 +556,9 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
     return `Add validation for: ${error.type || 'unknown error type'}`;
   }
 
-  private inferDevelopmentPhase(sessionData: any): 'planning' | 'implementation' | 'testing' | 'deployment' {
+  private inferDevelopmentPhase(
+    sessionData: any
+  ): 'planning' | 'implementation' | 'testing' | 'deployment' {
     if (sessionData.phase) return sessionData.phase;
     if (sessionData.testsRun) return 'testing';
     if (sessionData.codeGenerated) return 'implementation';
@@ -555,7 +570,7 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
       name: 'Multi-agent coordination',
       context: `${agentOutputs.length} agents worked together`,
       solution: 'Successful multi-agent coordination pattern',
-      examples: agentOutputs.map(a => a.role || 'unknown'),
+      examples: agentOutputs.map((a) => a.role || 'unknown'),
     };
   }
 
@@ -583,9 +598,9 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
     for (const success of learning.successes) {
       if (success.impact === 'high' && success.reusability === 'universal') {
         const existing = this.knowledgeBase.bestPractices.find(
-          bp => bp.practice === success.strategy
+          (bp) => bp.practice === success.strategy
         );
-        
+
         if (existing) {
           existing.evidence.push(learning.featureName);
           existing.confidence = Math.min(existing.confidence + 0.1, 1.0);
@@ -605,7 +620,7 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
     // Update development velocity trend
     const velocityScore = learning.successes.length - learning.failures.length;
     this.knowledgeBase.metrics.developmentVelocityTrend.push(velocityScore);
-    
+
     // Keep only last 10 measurements
     if (this.knowledgeBase.metrics.developmentVelocityTrend.length > 10) {
       this.knowledgeBase.metrics.developmentVelocityTrend.shift();

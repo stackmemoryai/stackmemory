@@ -41,16 +41,16 @@ export class ContextBudgetManager {
    */
   estimateTokens(text: string): number {
     if (!text) return 0;
-    
+
     // More accurate estimation based on common patterns
     const baseTokens = text.length * this.TOKEN_CHAR_RATIO;
-    
+
     // Adjust for code content (typically more dense)
     const codeMultiplier = this.detectCodeContent(text) ? 1.2 : 1.0;
-    
+
     // Adjust for JSON content (typically less dense)
     const jsonMultiplier = this.detectJsonContent(text) ? 0.9 : 1.0;
-    
+
     return Math.ceil(baseTokens * codeMultiplier * jsonMultiplier);
   }
 
@@ -59,11 +59,11 @@ export class ContextBudgetManager {
    */
   allocateBudget(context: IterationContext): IterationContext {
     const currentTokens = this.calculateCurrentTokens(context);
-    
+
     if (currentTokens <= this.config.maxTokens) {
-      logger.debug('Context within budget', { 
-        used: currentTokens, 
-        max: this.config.maxTokens 
+      logger.debug('Context within budget', {
+        used: currentTokens,
+        max: this.config.maxTokens,
       });
       return context;
     }
@@ -100,7 +100,7 @@ export class ContextBudgetManager {
     };
 
     compressed.tokenCount = this.calculateCurrentTokens(compressed);
-    
+
     logger.debug('Context compressed', {
       original: context.tokenCount,
       compressed: compressed.tokenCount,
@@ -113,7 +113,11 @@ export class ContextBudgetManager {
   /**
    * Get current token usage statistics
    */
-  getUsage(): { used: number; available: number; categories: Record<string, number> } {
+  getUsage(): {
+    used: number;
+    available: number;
+    categories: Record<string, number>;
+  } {
     const categories: Record<string, number> = {};
     let totalUsed = 0;
 
@@ -134,7 +138,7 @@ export class ContextBudgetManager {
    */
   private calculateCurrentTokens(context: IterationContext): number {
     this.tokenUsage.clear();
-    
+
     const taskTokens = this.estimateTokens(JSON.stringify(context.task));
     const historyTokens = this.estimateTokens(JSON.stringify(context.history));
     const envTokens = this.estimateTokens(JSON.stringify(context.environment));
@@ -156,14 +160,18 @@ export class ContextBudgetManager {
     currentTokens: number
   ): IterationContext {
     const reductionRatio = this.config.maxTokens / currentTokens;
-    
+
     // Determine phase based on iteration number
     const phase = this.determinePhase(context.task.currentIteration);
-    
+
     // Adjust weights based on phase
     const adjustedWeights = this.getPhaseAdjustedWeights(phase);
-    
-    return this.applyWeightedReduction(context, reductionRatio, adjustedWeights);
+
+    return this.applyWeightedReduction(
+      context,
+      reductionRatio,
+      adjustedWeights
+    );
   }
 
   /**
@@ -174,7 +182,11 @@ export class ContextBudgetManager {
     currentTokens: number
   ): IterationContext {
     const reductionRatio = this.config.maxTokens / currentTokens;
-    return this.applyWeightedReduction(context, reductionRatio, this.config.priorityWeights);
+    return this.applyWeightedReduction(
+      context,
+      reductionRatio,
+      this.config.priorityWeights
+    );
   }
 
   /**
@@ -190,7 +202,9 @@ export class ContextBudgetManager {
     // Reduce history based on weight
     if (weights.recentWork < 1.0) {
       const keepCount = Math.ceil(
-        context.history.recentIterations.length * reductionRatio * weights.recentWork
+        context.history.recentIterations.length *
+          reductionRatio *
+          weights.recentWork
       );
       reduced.history = {
         ...context.history,
@@ -209,7 +223,9 @@ export class ContextBudgetManager {
     // Reduce memory frames based on weight
     if (weights.dependencies < 1.0) {
       const keepCount = Math.ceil(
-        context.memory.relevantFrames.length * reductionRatio * weights.dependencies
+        context.memory.relevantFrames.length *
+          reductionRatio *
+          weights.dependencies
       );
       reduced.memory = {
         ...context.memory,
@@ -231,7 +247,9 @@ export class ContextBudgetManager {
       ...task,
       description: this.truncateWithEllipsis(task.description, 500),
       criteria: task.criteria.slice(0, 5), // Keep top 5 criteria
-      feedback: task.feedback ? this.truncateWithEllipsis(task.feedback, 300) : undefined,
+      feedback: task.feedback
+        ? this.truncateWithEllipsis(task.feedback, 300)
+        : undefined,
     };
   }
 
@@ -243,13 +261,13 @@ export class ContextBudgetManager {
       ...history,
       recentIterations: history.recentIterations
         .slice(-5) // Keep last 5 iterations
-        .map(iter => ({
+        .map((iter) => ({
           ...iter,
           summary: this.truncateWithEllipsis(iter.summary, 100),
         })),
       gitCommits: history.gitCommits
         .slice(-10) // Keep last 10 commits
-        .map(commit => ({
+        .map((commit) => ({
           ...commit,
           message: this.truncateWithEllipsis(commit.message, 80),
           files: commit.files.slice(0, 5), // Keep top 5 files
@@ -262,7 +280,9 @@ export class ContextBudgetManager {
   /**
    * Compress environment context
    */
-  private compressEnvironmentContext(env: EnvironmentContext): EnvironmentContext {
+  private compressEnvironmentContext(
+    env: EnvironmentContext
+  ): EnvironmentContext {
     return {
       ...env,
       dependencies: this.compressObject(env.dependencies, 20), // Keep top 20 deps
@@ -278,12 +298,12 @@ export class ContextBudgetManager {
       ...memory,
       relevantFrames: memory.relevantFrames.slice(0, 5), // Keep top 5 frames
       decisions: memory.decisions
-        .filter(d => d.impact !== 'low') // Remove low impact decisions
+        .filter((d) => d.impact !== 'low') // Remove low impact decisions
         .slice(-5), // Keep last 5
       patterns: memory.patterns
-        .filter(p => p.successRate > 0.7) // Keep successful patterns only
+        .filter((p) => p.successRate > 0.7) // Keep successful patterns only
         .slice(0, 3), // Keep top 3
-      blockers: memory.blockers.filter(b => !b.resolved), // Keep unresolved only
+      blockers: memory.blockers.filter((b) => !b.resolved), // Keep unresolved only
     };
   }
 
@@ -299,7 +319,9 @@ export class ContextBudgetManager {
   /**
    * Get phase-adjusted weights
    */
-  private getPhaseAdjustedWeights(phase: 'early' | 'middle' | 'late'): Record<string, number> {
+  private getPhaseAdjustedWeights(
+    phase: 'early' | 'middle' | 'late'
+  ): Record<string, number> {
     switch (phase) {
       case 'early':
         // Early phase: Focus on task understanding
@@ -336,7 +358,7 @@ export class ContextBudgetManager {
       /import\s+.*from/,
       /\{[\s\S]*\}/,
     ];
-    return codePatterns.some(pattern => pattern.test(text));
+    return codePatterns.some((pattern) => pattern.test(text));
   }
 
   /**
@@ -362,15 +384,18 @@ export class ContextBudgetManager {
   /**
    * Compress object by keeping only top N entries
    */
-  private compressObject(obj: Record<string, any>, maxEntries: number): Record<string, any> {
+  private compressObject(
+    obj: Record<string, any>,
+    maxEntries: number
+  ): Record<string, any> {
     const entries = Object.entries(obj);
     if (entries.length <= maxEntries) return obj;
-    
+
     const compressed: Record<string, any> = {};
     entries.slice(0, maxEntries).forEach(([key, value]) => {
       compressed[key] = value;
     });
-    
+
     return compressed;
   }
 }

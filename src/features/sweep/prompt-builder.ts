@@ -103,7 +103,7 @@ export function trimContentAroundCursor(
   // Center window around cursor
   const halfWindow = Math.floor(windowSize / 2);
   let start = Math.max(0, cursorLine - halfWindow);
-  let end = Math.min(lines.length, start + windowSize);
+  const end = Math.min(lines.length, start + windowSize);
 
   // Adjust if we hit the end
   if (end === lines.length) {
@@ -127,7 +127,7 @@ export function parseCompletion(
   windowEnd: number
 ): { lines: string[]; startLine: number; endLine: number } | null {
   // Strip trailing stop tokens
-  let text = completionText
+  const text = completionText
     .replace(/<\|file_sep\|>$/, '')
     .replace(/<\/s>$/, '')
     .trimEnd();

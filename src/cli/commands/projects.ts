@@ -7,7 +7,7 @@
 import { Command } from 'commander';
 import { ProjectManager } from '../../core/projects/project-manager.js';
 import chalk from 'chalk';
-// @ts-ignore - No types available for cli-table3
+// @ts-expect-error - No types available for cli-table3
 import Table from 'cli-table3';
 
 export function registerProjectCommands(program: Command): void {

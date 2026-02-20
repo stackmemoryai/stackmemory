@@ -870,7 +870,7 @@ export class FrameHandoffManager {
     }
 
     // Simple implementation - in a real system this would use WebSockets or Server-Sent Events
-    const self = this;
+    const activeHandoffs = this.activeHandoffs;
     return {
       async *[Symbol.asyncIterator]() {
         let lastStatus = progress.status;
@@ -879,7 +879,7 @@ export class FrameHandoffManager {
           lastStatus !== 'failed' &&
           lastStatus !== 'cancelled'
         ) {
-          const currentProgress = self.activeHandoffs.get(requestId);
+          const currentProgress = activeHandoffs.get(requestId);
           if (currentProgress && currentProgress.status !== lastStatus) {
             lastStatus = currentProgress.status;
             yield currentProgress;

@@ -110,9 +110,9 @@ export class ClearSurvival {
   async getContextUsage(): Promise<ContextUsage> {
     try {
       const frames = await this.frameManager.getAllFrames();
-      const activeFrames = frames.filter(f => f.status === 'open').length;
+      const activeFrames = frames.filter((f) => f.status === 'open').length;
       const sessionId = await this.dbManager.getCurrentSessionId();
-      
+
       // Estimate based on frame count (simplified)
       const estimatedTokens = frames.length * 100; // Rough estimate
       const maxTokens = 10000; // Approximate max context
@@ -122,7 +122,7 @@ export class ClearSurvival {
         totalFrames: frames.length,
         activeFrames,
         sessionCount: 1,
-        percentageUsed
+        percentageUsed,
       };
     } catch (error) {
       // Fallback for testing or when DB is not available
@@ -130,7 +130,7 @@ export class ClearSurvival {
         totalFrames: 50,
         activeFrames: 3,
         sessionCount: 2,
-        percentageUsed: 25
+        percentageUsed: 25,
       };
     }
   }

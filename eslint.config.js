@@ -52,7 +52,6 @@ export default [
       '*.js',
       '*.min.js',
       '*.bundle.js',
-      'src/integrations/',
       'scripts/merge-linear-duplicates.ts',
       '**/*.test.ts',
       '**/__tests__/**',

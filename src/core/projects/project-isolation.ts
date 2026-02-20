@@ -33,7 +33,7 @@ export class ProjectIsolationManager {
    */
   getProjectIdentification(projectRoot: string): ProjectIdentification {
     const cacheKey = projectRoot;
-    
+
     if (this.projectCache.has(cacheKey)) {
       return this.projectCache.get(cacheKey)!;
     }
@@ -42,16 +42,27 @@ export class ProjectIsolationManager {
       // Get git remote URL
       const remoteUrl = this.getGitRemoteUrl(projectRoot);
       const gitInfo = this.parseGitRemote(remoteUrl);
-      
+
       // Create stable project ID from git remote
-      const projectId = this.createStableProjectId(gitInfo.organization, gitInfo.repository);
-      
+      const projectId = this.createStableProjectId(
+        gitInfo.organization,
+        gitInfo.repository
+      );
+
       // Create workspace filter (stable across sessions)
-      const workspaceFilter = this.createWorkspaceFilter(gitInfo.organization, gitInfo.repository, projectRoot);
-      
+      const workspaceFilter = this.createWorkspaceFilter(
+        gitInfo.organization,
+        gitInfo.repository,
+        projectRoot
+      );
+
       // Determine Linear configuration
-      const linearConfig = this.getLinearConfiguration(gitInfo.organization, gitInfo.repository, projectRoot);
-      
+      const linearConfig = this.getLinearConfiguration(
+        gitInfo.organization,
+        gitInfo.repository,
+        projectRoot
+      );
+
       const identification: ProjectIdentification = {
         projectId,
         organization: gitInfo.organization,
@@ -70,10 +81,12 @@ export class ProjectIsolationManager {
       });
 
       return identification;
-
     } catch (error) {
       // Fallback for non-git projects
-      logger.warn('Could not determine git remote, using fallback identification', { error });
+      logger.warn(
+        'Could not determine git remote, using fallback identification',
+        { error }
+      );
       const fallback = this.createFallbackIdentification(projectRoot);
       this.projectCache.set(cacheKey, fallback);
       return fallback;
@@ -98,7 +111,7 @@ export class ProjectIsolationManager {
         encoding: 'utf8',
         timeout: 5000,
       });
-      
+
       return result.trim();
     } catch (error) {
       throw new Error(`Failed to get git remote URL: ${error}`);
@@ -127,7 +140,10 @@ export class ProjectIsolationManager {
   /**
    * Parse git remote URL to extract organization and repository
    */
-  private parseGitRemote(remoteUrl: string): { organization: string; repository: string } {
+  private parseGitRemote(remoteUrl: string): {
+    organization: string;
+    repository: string;
+  } {
     // Handle GitHub URLs (https and ssh)
     let match = remoteUrl.match(/github\.com[/:]([\w-]+)\/([\w-]+)(?:\.git)?/);
     if (match) {
@@ -152,7 +168,10 @@ export class ProjectIsolationManager {
   /**
    * Create stable project ID from organization and repository
    */
-  private createStableProjectId(organization: string, repository: string): string {
+  private createStableProjectId(
+    organization: string,
+    repository: string
+  ): string {
     const content = `${organization}/${repository}`;
     const hash = createHash('sha256').update(content).digest('hex');
     return `proj-${hash.substring(0, 12)}`;
@@ -161,10 +180,14 @@ export class ProjectIsolationManager {
   /**
    * Create stable workspace filter using git root folder name
    */
-  private createWorkspaceFilter(organization: string, repository: string, projectRoot: string): string {
+  private createWorkspaceFilter(
+    organization: string,
+    repository: string,
+    projectRoot: string
+  ): string {
     // Get dynamic project name from git root
     const projectName = this.getProjectNameFromGitRoot(projectRoot);
-    
+
     // Use project name as primary filter, with organization fallback for uniqueness
     return `${projectName}:${organization}`;
   }
@@ -172,16 +195,25 @@ export class ProjectIsolationManager {
   /**
    * Get Linear configuration based on project
    */
-  private getLinearConfiguration(organization: string, repository: string, projectRoot?: string): {
+  private getLinearConfiguration(
+    organization: string,
+    repository: string,
+    projectRoot?: string
+  ): {
     teamId?: string;
     organization?: string;
     prefix: string;
   } {
     // Get dynamic project name from git root
-    const projectName = projectRoot ? this.getProjectNameFromGitRoot(projectRoot) : repository;
-    
+    const projectName = projectRoot
+      ? this.getProjectNameFromGitRoot(projectRoot)
+      : repository;
+
     // Project-specific Linear configurations
-    const projectConfigs: Record<string, { teamId?: string; organization?: string; prefix: string }> = {
+    const projectConfigs: Record<
+      string,
+      { teamId?: string; organization?: string; prefix: string }
+    > = {
       'jonathanpeterwu/stackmemory': {
         teamId: process.env.LINEAR_TEAM_ID || 'stackmemory',
         organization: process.env.LINEAR_ORGANIZATION || 'stackmemoryai',
@@ -218,7 +250,9 @@ export class ProjectIsolationManager {
   /**
    * Create fallback identification for non-git projects
    */
-  private createFallbackIdentification(projectRoot: string): ProjectIdentification {
+  private createFallbackIdentification(
+    projectRoot: string
+  ): ProjectIdentification {
     const folderName = projectRoot.split('/').pop() || 'unknown';
     const projectId = this.createStableProjectId('local', folderName);
 
@@ -239,7 +273,7 @@ export class ProjectIsolationManager {
   validateProjectIsolation(projectRoot: string): boolean {
     try {
       const identification = this.getProjectIdentification(projectRoot);
-      
+
       // Check that we have required fields
       if (!identification.projectId || !identification.workspaceFilter) {
         return false;

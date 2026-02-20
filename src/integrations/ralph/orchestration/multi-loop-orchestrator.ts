@@ -15,7 +15,7 @@ import {
   ParallelExecution,
   TaskBreakdown,
   ExecutionPlan,
-  OrchestrationResult
+  OrchestrationResult,
 } from '../types.js';
 
 export interface OrchestrationConfig {
@@ -39,7 +39,7 @@ export class MultiLoopOrchestrator {
       enableAdaptivePlanning: true,
       sharedContextEnabled: true,
       fallbackStrategy: 'sequential',
-      ...config
+      ...config,
     };
 
     logger.info('Multi-loop orchestrator initialized', this.config);
@@ -51,7 +51,10 @@ export class MultiLoopOrchestrator {
 
       const session = await sessionManager.getOrCreateSession({});
       if (session.database) {
-        this.frameManager = new FrameManager(session.database, session.projectId);
+        this.frameManager = new FrameManager(
+          session.database,
+          session.projectId
+        );
       }
 
       logger.info('Orchestrator initialized successfully');
@@ -65,8 +68,8 @@ export class MultiLoopOrchestrator {
    * Break down complex task into manageable loops
    */
   async orchestrateComplexTask(
-    description: string, 
-    criteria: string[], 
+    description: string,
+    criteria: string[],
     options?: {
       maxLoops?: number;
       forceSequential?: boolean;
@@ -76,15 +79,16 @@ export class MultiLoopOrchestrator {
     logger.info('Orchestrating complex task', {
       task: description.substring(0, 100),
       criteriaCount: criteria.length,
-      maxLoops: options?.maxLoops || this.config.maxConcurrentLoops
+      maxLoops: options?.maxLoops || this.config.maxConcurrentLoops,
     });
 
     const orchestrationId = uuidv4();
 
     try {
       // 1. Break down task into subtasks
-      const breakdown = options?.customBreakdown || 
-        await this.analyzeAndBreakdownTask(description, criteria);
+      const breakdown =
+        options?.customBreakdown ||
+        (await this.analyzeAndBreakdownTask(description, criteria));
 
       // 2. Create execution plan
       const executionPlan = await this.createExecutionPlan(breakdown, options);
@@ -104,7 +108,7 @@ export class MultiLoopOrchestrator {
         status: 'planning',
         startTime: Date.now(),
         loops: new Map(),
-        sharedContext: {}
+        sharedContext: {},
       };
 
       this.activeTasks.set(orchestrationId, orchestratedTask);
@@ -116,11 +120,10 @@ export class MultiLoopOrchestrator {
         orchestrationId,
         status: result.success ? 'success' : 'failure',
         loopsExecuted: result.completedLoops.length,
-        duration: Date.now() - orchestratedTask.startTime
+        duration: Date.now() - orchestratedTask.startTime,
       });
 
       return result;
-
     } catch (error: unknown) {
       logger.error('Orchestration failed', error as Error);
       throw error;
@@ -143,19 +146,24 @@ export class MultiLoopOrchestrator {
       tasks: tasks,
       startTime: Date.now(),
       results: new Map(),
-      sharedState: coordination?.sharedState || {}
+      sharedState: coordination?.sharedState || {},
     };
 
-    const promises = tasks.map(task => this.executeParallelTask(task, execution));
-    
+    const promises = tasks.map((task) =>
+      this.executeParallelTask(task, execution)
+    );
+
     try {
       await Promise.allSettled(promises);
 
       execution.endTime = Date.now();
-      execution.status = Array.from(execution.results.values()).every(r => r.success) ? 'success' : 'partial';
+      execution.status = Array.from(execution.results.values()).every(
+        (r) => r.success
+      )
+        ? 'success'
+        : 'partial';
 
       return execution;
-
     } catch (error: unknown) {
       logger.error('Parallel execution failed', error as Error);
       execution.status = 'failed';
@@ -173,24 +181,26 @@ export class MultiLoopOrchestrator {
   ): Promise<TaskBreakdown[]> {
     // Intelligent task breakdown using patterns and heuristics
     const complexity = this.assessTaskComplexity(description);
-    
+
     if (complexity.score < 5) {
       // Simple task - no breakdown needed
-      return [{
-        id: uuidv4(),
-        title: description,
-        description,
-        criteria: criteria,
-        priority: 1,
-        estimatedIterations: 3,
-        dependencies: [],
-        type: 'single'
-      }];
+      return [
+        {
+          id: uuidv4(),
+          title: description,
+          description,
+          criteria: criteria,
+          priority: 1,
+          estimatedIterations: 3,
+          dependencies: [],
+          type: 'single',
+        },
+      ];
     }
 
     // Complex task - break down by patterns
     const subtasks: TaskBreakdown[] = [];
-    
+
     // Pattern 1: Setup/Foundation tasks
     if (this.needsSetup(description)) {
       subtasks.push({
@@ -201,7 +211,7 @@ export class MultiLoopOrchestrator {
         priority: 1,
         estimatedIterations: 2,
         dependencies: [],
-        type: 'setup'
+        type: 'setup',
       });
     }
 
@@ -212,11 +222,15 @@ export class MultiLoopOrchestrator {
         id: uuidv4(),
         title: 'Core Implementation',
         description: coreTask,
-        criteria: criteria.filter(c => c.toLowerCase().includes('function') || c.toLowerCase().includes('implement')),
+        criteria: criteria.filter(
+          (c) =>
+            c.toLowerCase().includes('function') ||
+            c.toLowerCase().includes('implement')
+        ),
         priority: 2,
         estimatedIterations: 5,
         dependencies: subtasks.length > 0 ? [subtasks[0].id] : [],
-        type: 'implementation'
+        type: 'implementation',
       });
     }
 
@@ -226,11 +240,12 @@ export class MultiLoopOrchestrator {
         id: uuidv4(),
         title: 'Testing Implementation',
         description: 'Create comprehensive tests',
-        criteria: criteria.filter(c => c.toLowerCase().includes('test')),
+        criteria: criteria.filter((c) => c.toLowerCase().includes('test')),
         priority: 3,
         estimatedIterations: 3,
-        dependencies: subtasks.length > 0 ? [subtasks[subtasks.length - 1].id] : [],
-        type: 'testing'
+        dependencies:
+          subtasks.length > 0 ? [subtasks[subtasks.length - 1].id] : [],
+        type: 'testing',
       });
     }
 
@@ -240,24 +255,28 @@ export class MultiLoopOrchestrator {
         id: uuidv4(),
         title: 'Documentation',
         description: 'Create documentation and examples',
-        criteria: criteria.filter(c => c.toLowerCase().includes('doc')),
+        criteria: criteria.filter((c) => c.toLowerCase().includes('doc')),
         priority: 4,
         estimatedIterations: 2,
         dependencies: [],
-        type: 'documentation'
+        type: 'documentation',
       });
     }
 
-    return subtasks.length > 0 ? subtasks : [{
-      id: uuidv4(),
-      title: description,
-      description,
-      criteria,
-      priority: 1,
-      estimatedIterations: Math.min(8, Math.max(3, complexity.score)),
-      dependencies: [],
-      type: 'single'
-    }];
+    return subtasks.length > 0
+      ? subtasks
+      : [
+          {
+            id: uuidv4(),
+            title: description,
+            description,
+            criteria,
+            priority: 1,
+            estimatedIterations: Math.min(8, Math.max(3, complexity.score)),
+            dependencies: [],
+            type: 'single',
+          },
+        ];
   }
 
   /**
@@ -270,7 +289,7 @@ export class MultiLoopOrchestrator {
     const plan: ExecutionPlan = {
       phases: [],
       totalEstimatedTime: 0,
-      parallelizable: !options?.forceSequential && breakdown.length > 1
+      parallelizable: !options?.forceSequential && breakdown.length > 1,
     };
 
     if (options?.forceSequential || !this.canExecuteInParallel(breakdown)) {
@@ -279,7 +298,7 @@ export class MultiLoopOrchestrator {
         id: `phase-${index + 1}`,
         tasks: [task],
         dependencies: index > 0 ? [`phase-${index}`] : [],
-        parallelExecution: false
+        parallelExecution: false,
       }));
     } else {
       // Group tasks by dependencies for parallel execution
@@ -288,7 +307,9 @@ export class MultiLoopOrchestrator {
     }
 
     plan.totalEstimatedTime = plan.phases.reduce(
-      (sum, phase) => sum + Math.max(...phase.tasks.map(t => t.estimatedIterations)) * 30000, // 30s per iteration
+      (sum, phase) =>
+        sum +
+        Math.max(...phase.tasks.map((t) => t.estimatedIterations)) * 30000, // 30s per iteration
       0
     );
 
@@ -298,48 +319,58 @@ export class MultiLoopOrchestrator {
   /**
    * Execute the orchestration plan
    */
-  private async executeOrchestration(task: OrchestratedTask): Promise<OrchestrationResult> {
+  private async executeOrchestration(
+    task: OrchestratedTask
+  ): Promise<OrchestrationResult> {
     const result: OrchestrationResult = {
       orchestrationId: task.id,
       success: false,
       completedLoops: [],
       failedLoops: [],
       totalDuration: 0,
-      insights: []
+      insights: [],
     };
 
     try {
       task.status = 'executing';
 
       for (const phase of task.executionPlan.phases) {
-        logger.info(`Executing phase ${phase.id} with ${phase.tasks.length} tasks`);
+        logger.info(
+          `Executing phase ${phase.id} with ${phase.tasks.length} tasks`
+        );
 
         if (phase.parallelExecution && phase.tasks.length > 1) {
           // Parallel execution
           const parallelResult = await this.executeParallelLoops(phase.tasks);
-          
+
           for (const [taskId, taskResult] of parallelResult.results) {
             if (taskResult.success) {
               result.completedLoops.push(taskResult.loopId);
             } else {
-              result.failedLoops.push({ loopId: taskResult.loopId, error: taskResult.error || 'Unknown error' });
+              result.failedLoops.push({
+                loopId: taskResult.loopId,
+                error: taskResult.error || 'Unknown error',
+              });
             }
           }
         } else {
           // Sequential execution
           for (const phaseTask of phase.tasks) {
             const loopResult = await this.executeTaskLoop(phaseTask, task);
-            
+
             if (loopResult.success) {
               result.completedLoops.push(loopResult.loopId);
-              
+
               // Share learnings with other tasks
               if (this.config.sharedContextEnabled) {
                 await this.updateSharedContext(task, loopResult);
               }
             } else {
-              result.failedLoops.push({ loopId: loopResult.loopId, error: loopResult.error || 'Unknown error' });
-              
+              result.failedLoops.push({
+                loopId: loopResult.loopId,
+                error: loopResult.error || 'Unknown error',
+              });
+
               // Handle failure based on strategy
               if (this.config.fallbackStrategy === 'abort') {
                 throw new Error(`Task failed: ${loopResult.error}`);
@@ -357,7 +388,6 @@ export class MultiLoopOrchestrator {
       result.insights = this.generateOrchestrationInsights(task, result);
 
       return result;
-
     } catch (error: unknown) {
       task.status = 'failed';
       result.success = false;
@@ -378,12 +408,12 @@ export class MultiLoopOrchestrator {
       const bridge = new RalphStackMemoryBridge({
         baseDir: `.ralph-${taskBreakdown.id}`,
         maxIterations: taskBreakdown.estimatedIterations * 2, // Allow extra iterations
-        useStackMemory: true
+        useStackMemory: true,
       });
 
       await bridge.initialize({
         task: taskBreakdown.description,
-        criteria: taskBreakdown.criteria.join('\n')
+        criteria: taskBreakdown.criteria.join('\n'),
       });
 
       // Store loop reference
@@ -391,7 +421,7 @@ export class MultiLoopOrchestrator {
       orchestratedTask.loops.set(taskBreakdown.id, {
         bridge,
         status: 'running',
-        startTime: Date.now()
+        startTime: Date.now(),
       });
 
       // Run the loop
@@ -407,10 +437,9 @@ export class MultiLoopOrchestrator {
       this.activeLoops.delete(taskBreakdown.id);
 
       return { success: true, loopId: taskBreakdown.id };
-
     } catch (error: unknown) {
       logger.error(`Task loop failed: ${taskBreakdown.title}`, error as Error);
-      
+
       const loopInfo = orchestratedTask.loops.get(taskBreakdown.id);
       if (loopInfo) {
         loopInfo.status = 'failed';
@@ -420,7 +449,11 @@ export class MultiLoopOrchestrator {
 
       this.activeLoops.delete(taskBreakdown.id);
 
-      return { success: false, loopId: taskBreakdown.id, error: (error as Error).message };
+      return {
+        success: false,
+        loopId: taskBreakdown.id,
+        error: (error as Error).message,
+      };
     }
   }
 
@@ -436,20 +469,23 @@ export class MultiLoopOrchestrator {
         id: execution.id,
         description: `Parallel task: ${task.title}`,
         breakdown: [task],
-        executionPlan: { phases: [], totalEstimatedTime: 0, parallelizable: false },
+        executionPlan: {
+          phases: [],
+          totalEstimatedTime: 0,
+          parallelizable: false,
+        },
         status: 'executing',
         startTime: execution.startTime,
         loops: new Map(),
-        sharedContext: execution.sharedState
+        sharedContext: execution.sharedState,
       });
 
       execution.results.set(task.id, result);
-
     } catch (error: unknown) {
       execution.results.set(task.id, {
         success: false,
         loopId: task.id,
-        error: (error as Error).message
+        error: (error as Error).message,
       });
     }
   }
@@ -463,7 +499,10 @@ export class MultiLoopOrchestrator {
   ): Promise<void> {
     // Extract learnings from completed loop and share with other active loops
     // This would integrate with StackMemory's shared context layer
-    logger.debug('Updating shared context', { orchestrationId: orchestratedTask.id, loopId: loopResult.loopId });
+    logger.debug('Updating shared context', {
+      orchestrationId: orchestratedTask.id,
+      loopId: loopResult.loopId,
+    });
   }
 
   /**
@@ -476,74 +515,115 @@ export class MultiLoopOrchestrator {
     const insights: string[] = [];
 
     // Performance insights
-    const avgLoopDuration = Array.from(task.loops.values())
-      .filter(l => l.endTime && l.startTime)
-      .map(l => l.endTime! - l.startTime)
-      .reduce((sum, duration) => sum + duration, 0) / task.loops.size;
+    const avgLoopDuration =
+      Array.from(task.loops.values())
+        .filter((l) => l.endTime && l.startTime)
+        .map((l) => l.endTime! - l.startTime)
+        .reduce((sum, duration) => sum + duration, 0) / task.loops.size;
 
     if (avgLoopDuration > 0) {
-      insights.push(`Average loop duration: ${Math.round(avgLoopDuration / 1000)}s`);
+      insights.push(
+        `Average loop duration: ${Math.round(avgLoopDuration / 1000)}s`
+      );
     }
 
     // Success rate insights
-    const successRate = result.completedLoops.length / (result.completedLoops.length + result.failedLoops.length);
+    const successRate =
+      result.completedLoops.length /
+      (result.completedLoops.length + result.failedLoops.length);
     insights.push(`Success rate: ${Math.round(successRate * 100)}%`);
 
     // Complexity insights
     if (task.breakdown.length > 3) {
-      insights.push('Complex task benefited from breakdown into multiple loops');
+      insights.push(
+        'Complex task benefited from breakdown into multiple loops'
+      );
     }
 
     return insights;
   }
 
   // Helper methods for task analysis
-  private assessTaskComplexity(description: string): { score: number; factors: string[] } {
+  private assessTaskComplexity(description: string): {
+    score: number;
+    factors: string[];
+  } {
     const factors: string[] = [];
     let score = 1;
 
-    if (description.length > 200) { score += 2; factors.push('long description'); }
-    if (description.includes('and')) { score += 1; factors.push('multiple requirements'); }
-    if (description.toLowerCase().includes('test')) { score += 2; factors.push('testing required'); }
-    if (description.toLowerCase().includes('document')) { score += 1; factors.push('documentation needed'); }
-    if (description.toLowerCase().includes('refactor')) { score += 3; factors.push('refactoring complexity'); }
+    if (description.length > 200) {
+      score += 2;
+      factors.push('long description');
+    }
+    if (description.includes('and')) {
+      score += 1;
+      factors.push('multiple requirements');
+    }
+    if (description.toLowerCase().includes('test')) {
+      score += 2;
+      factors.push('testing required');
+    }
+    if (description.toLowerCase().includes('document')) {
+      score += 1;
+      factors.push('documentation needed');
+    }
+    if (description.toLowerCase().includes('refactor')) {
+      score += 3;
+      factors.push('refactoring complexity');
+    }
 
     return { score, factors };
   }
 
   private needsSetup(description: string): boolean {
-    const setupKeywords = ['project', 'initialize', 'setup', 'scaffold', 'create structure'];
-    return setupKeywords.some(keyword => description.toLowerCase().includes(keyword));
+    const setupKeywords = [
+      'project',
+      'initialize',
+      'setup',
+      'scaffold',
+      'create structure',
+    ];
+    return setupKeywords.some((keyword) =>
+      description.toLowerCase().includes(keyword)
+    );
   }
 
   private needsTesting(criteria: string[]): boolean {
-    return criteria.some(c => c.toLowerCase().includes('test'));
+    return criteria.some((c) => c.toLowerCase().includes('test'));
   }
 
   private needsDocumentation(criteria: string[]): boolean {
-    return criteria.some(c => c.toLowerCase().includes('doc'));
+    return criteria.some((c) => c.toLowerCase().includes('doc'));
   }
 
   private extractCoreTask(description: string): string | null {
     // Extract the main implementation task from description
     const sentences = description.split('.');
-    return sentences.find(s => s.toLowerCase().includes('implement') || s.toLowerCase().includes('create') || s.toLowerCase().includes('add')) || null;
+    return (
+      sentences.find(
+        (s) =>
+          s.toLowerCase().includes('implement') ||
+          s.toLowerCase().includes('create') ||
+          s.toLowerCase().includes('add')
+      ) || null
+    );
   }
 
   private canExecuteInParallel(breakdown: TaskBreakdown[]): boolean {
     // Check if tasks can be executed in parallel based on dependencies
-    return breakdown.some(task => task.dependencies.length === 0);
+    return breakdown.some((task) => task.dependencies.length === 0);
   }
 
   private groupTasksByDependencies(breakdown: TaskBreakdown[]): any[] {
     // Group tasks into phases based on dependencies
     const phases: any[] = [];
     const processed = new Set<string>();
-    
+
     while (processed.size < breakdown.length) {
-      const readyTasks = breakdown.filter(task => 
-        !processed.has(task.id) && 
-        task.dependencies.every(dep => processed.has(dep))
+      const readyTasks = breakdown.filter(
+        (task) =>
+          !processed.has(task.id) &&
+          task.dependencies.every((dep) => processed.has(dep))
       );
 
       if (readyTasks.length === 0) break; // Circular dependency
@@ -552,10 +632,10 @@ export class MultiLoopOrchestrator {
         id: `phase-${phases.length + 1}`,
         tasks: readyTasks,
         dependencies: phases.length > 0 ? [`phase-${phases.length}`] : [],
-        parallelExecution: readyTasks.length > 1
+        parallelExecution: readyTasks.length > 1,
       });
 
-      readyTasks.forEach(task => processed.add(task.id));
+      readyTasks.forEach((task) => processed.add(task.id));
     }
 
     return phases;
@@ -564,7 +644,7 @@ export class MultiLoopOrchestrator {
   private validateDependencies(plan: ExecutionPlan): string[] {
     const errors: string[] = [];
     const allTaskIds = new Set(
-      plan.phases.flatMap(phase => phase.tasks.map(task => task.id))
+      plan.phases.flatMap((phase) => phase.tasks.map((task) => task.id))
     );
 
     for (const phase of plan.phases) {

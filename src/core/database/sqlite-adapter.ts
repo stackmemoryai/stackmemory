@@ -360,9 +360,10 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     if (!this.db || !this.embeddingProvider) return;
 
     try {
-      // Try to load sqlite-vec extension
+      // Try to load sqlite-vec extension (dynamic require for optional native dep)
       let sqliteVec;
       try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         sqliteVec = require('sqlite-vec');
       } catch {
         logger.info('sqlite-vec not installed, vector search disabled');

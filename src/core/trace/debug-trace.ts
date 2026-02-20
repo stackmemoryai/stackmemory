@@ -506,7 +506,8 @@ export function Trace(type: TraceEntry['type'] = 'function') {
 
 // Decorator for tracing entire classes
 export function TraceClass(type: TraceEntry['type'] = 'function') {
-  return function <T extends { new (...args: any[]): {} }>(constructor: T) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function <T extends { new (...args: any[]): object }>(constructor: T) {
     const prototype = constructor.prototype;
     const propertyNames = Object.getOwnPropertyNames(prototype);
 
