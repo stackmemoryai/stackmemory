@@ -18,13 +18,14 @@ const HOOKS_DIR = path.join(os.homedir(), '.claude', 'hooks');
 
 describe('hook-installer', () => {
   describe('CANONICAL_HOOKS', () => {
-    it('defines all 4 core hooks', () => {
-      expect(CANONICAL_HOOKS).toHaveLength(4);
+    it('defines all 5 core hooks', () => {
+      expect(CANONICAL_HOOKS).toHaveLength(5);
       const names = CANONICAL_HOOKS.map((h) => h.scriptName);
       expect(names).toContain('session-rescue.sh');
       expect(names).toContain('stop-checkpoint.js');
       expect(names).toContain('chime-on-stop.sh');
       expect(names).toContain('auto-checkpoint.js');
+      expect(names).toContain('cord-trace.js');
     });
 
     it('all core hooks are required', () => {

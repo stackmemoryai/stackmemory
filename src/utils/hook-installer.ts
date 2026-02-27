@@ -54,6 +54,14 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     commandPrefix: 'node',
     required: true,
   },
+  {
+    scriptName: 'cord-trace.js',
+    eventType: 'PostToolUse',
+    matcher: 'mcp__.*__cord_(spawn|fork|complete|ask|tree)',
+    timeout: 2,
+    commandPrefix: 'node',
+    required: true,
+  },
 ];
 
 /** Script names that should be removed from settings (dead/deprecated hooks) */

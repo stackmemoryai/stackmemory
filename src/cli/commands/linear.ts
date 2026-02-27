@@ -387,6 +387,16 @@ export function registerLinearCommands(parent: Command) {
             config
           );
 
+          if (!syncEngine.isConfigured) {
+            console.log(
+              chalk.gray(
+                'ℹ Linear API key not configured — skipping sync. Set LINEAR_API_KEY or run "stackmemory linear setup".'
+              )
+            );
+            db.close();
+            return;
+          }
+
           console.log(chalk.yellow('🔄 Syncing with Linear...'));
 
           if (options.dryRun) {

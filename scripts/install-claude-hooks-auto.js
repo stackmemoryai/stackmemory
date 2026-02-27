@@ -81,6 +81,14 @@ try {
       commandPrefix: 'node',
       required: true,
     },
+    {
+      scriptName: 'cord-trace.js',
+      eventType: 'PostToolUse',
+      matcher: 'mcp__.*__cord_(spawn|fork|complete|ask|tree)',
+      timeout: 2,
+      commandPrefix: 'node',
+      required: true,
+    },
   ];
 
   const DEAD_HOOKS = ['sms-response-handler.js'];

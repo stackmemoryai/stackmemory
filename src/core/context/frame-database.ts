@@ -227,6 +227,32 @@ export class FrameDatabase {
         INSERT OR IGNORE INTO schema_version (version) VALUES (1);
       `);
 
+      // Cord task orchestration table (dependency DAG for multi-agent coordination)
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS cord_tasks (
+          task_id TEXT PRIMARY KEY,
+          parent_id TEXT,
+          project_id TEXT NOT NULL,
+          run_id TEXT NOT NULL,
+          goal TEXT NOT NULL,
+          prompt TEXT NOT NULL DEFAULT '',
+          result TEXT,
+          status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending','active','completed','blocked','asked')),
+          context_mode TEXT NOT NULL DEFAULT 'spawn'
+            CHECK (context_mode IN ('spawn','fork','ask')),
+          blocked_by TEXT NOT NULL DEFAULT '[]',
+          depth INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          completed_at INTEGER,
+          FOREIGN KEY (parent_id) REFERENCES cord_tasks(task_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_cord_tasks_project ON cord_tasks(project_id);
+        CREATE INDEX IF NOT EXISTS idx_cord_tasks_parent ON cord_tasks(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_cord_tasks_status ON cord_tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_cord_tasks_project_status ON cord_tasks(project_id, status);
+      `);
+
       logger.info('Frame database schema initialized');
     } catch (error: unknown) {
       throw new DatabaseError(

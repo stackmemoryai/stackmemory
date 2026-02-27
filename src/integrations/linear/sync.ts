@@ -58,12 +58,13 @@ export interface TaskMapping {
 
 export class LinearSyncEngine {
   private taskStore: LinearTaskManager;
-  private linearClient: LinearClient;
+  private linearClient!: LinearClient;
   private authManager: LinearAuthManager;
   private config: SyncConfig;
   private mappings: Map<string, TaskMapping> = new Map();
   private projectRoot: string;
   private mappingsPath: string;
+  private _isConfigured: boolean = true;
 
   constructor(
     taskStore: LinearTaskManager,
@@ -93,10 +94,9 @@ export class LinearSyncEngine {
       // Fall back to OAuth tokens
       const tokens = this.authManager.loadTokens();
       if (!tokens) {
-        throw new IntegrationError(
-          'Linear API key or authentication tokens not found. Set LINEAR_API_KEY environment variable or run "stackmemory linear setup" first.',
-          ErrorCode.LINEAR_SYNC_FAILED
-        );
+        logger.info('Linear API key not configured — skipping Linear sync');
+        this._isConfigured = false;
+        return;
       }
 
       this.linearClient = new LinearClient({
@@ -113,6 +113,13 @@ export class LinearSyncEngine {
   }
 
   /**
+   * Check if Linear credentials are available
+   */
+  get isConfigured(): boolean {
+    return this._isConfigured;
+  }
+
+  /**
    * Update sync configuration
    */
   updateConfig(newConfig: Partial<SyncConfig>): void {
@@ -123,6 +130,15 @@ export class LinearSyncEngine {
    * Perform bi-directional sync
    */
   async sync(): Promise<SyncResult> {
+    if (!this._isConfigured) {
+      return {
+        success: true,
+        synced: { toLinear: 0, fromLinear: 0, updated: 0 },
+        conflicts: [],
+        errors: [],
+      };
+    }
+
     if (!this.config.enabled) {
       return {
         success: false,

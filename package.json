@@ -1,6 +1,6 @@
 {
   "name": "@stackmemoryai/stackmemory",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Project-scoped memory for AI coding tools. Durable context across sessions with MCP integration, frames, smart retrieval, Claude Code skills, and automatic hooks.",
   "engines": {
     "node": ">=20.0.0",
@@ -121,6 +121,7 @@
     "daemon:status": "node dist/cli/index.js daemon status",
     "sync:start": "node scripts/background-sync-manager.js",
     "sync:setup": "./scripts/setup-background-sync.sh",
+    "eval:cord": "npx tsx scripts/evals/cord-vs-flat-eval.ts",
     "prepare": "echo 'Prepare step completed'",
     "verify:dist": "node scripts/verify-dist.cjs",
     "test:smoke-db": "bash scripts/smoke-init-db.sh",
