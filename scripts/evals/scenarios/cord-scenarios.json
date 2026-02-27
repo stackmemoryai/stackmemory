@@ -1,0 +1,147 @@
+[
+  {
+    "id": "feature-profile-editor",
+    "name": "Feature: User Profile Editor",
+    "description": "4-step pipeline: validate schema -> build API endpoints -> create UI components -> write tests",
+    "type": "feature_dev",
+    "complexity": "medium",
+    "steps": [
+      { "id": "validate", "action": "Validate user profile schema and permissions model" },
+      { "id": "api", "action": "Build CRUD API endpoints for user profiles", "depends_on": ["validate"] },
+      { "id": "ui", "action": "Create React profile editor components", "depends_on": ["api"] },
+      { "id": "tests", "action": "Write integration tests for profile CRUD flow", "depends_on": ["api", "ui"] }
+    ],
+    "cord_transcript": [
+      { "tool": "cord_spawn", "args": { "goal": "Validate user profile schema", "prompt": "Review existing User model, define profile fields (name, bio, avatar, settings), check RBAC permissions" } },
+      { "tool": "cord_complete", "args": { "task_id": "T1", "result": "Schema: {name: string, bio: string(500), avatar: url, settings: {theme, notifications}}. RBAC: owner can edit all, admin can edit any, viewer read-only." } },
+      { "tool": "cord_spawn", "args": { "goal": "Build profile API endpoints", "prompt": "REST endpoints: GET/PUT /api/profile/:id, PATCH /api/profile/:id/settings", "blocked_by": ["T1"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T2", "result": "Endpoints implemented: GET /api/profile/:id (200/404), PUT /api/profile/:id (200/400/403), PATCH /api/profile/:id/settings (200/400). Validation middleware added." } },
+      { "tool": "cord_spawn", "args": { "goal": "Create profile UI components", "prompt": "React components: ProfileEditor, AvatarUpload, SettingsPanel", "blocked_by": ["T2"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T3", "result": "Components: ProfileEditor (form with validation), AvatarUpload (drag-drop + crop), SettingsPanel (toggle switches). All use profile API hooks." } },
+      { "tool": "cord_spawn", "args": { "goal": "Write integration tests", "prompt": "Test profile CRUD flow end-to-end", "blocked_by": ["T2", "T3"] } },
+      { "tool": "cord_tree", "args": { "include_results": true } }
+    ],
+    "flat_transcript": [
+      { "tool": "create_task", "args": { "title": "Validate user profile schema", "description": "Review existing User model, define profile fields" } },
+      { "tool": "update_task_status", "args": { "task_id": "T1", "status": "completed", "notes": "Schema: {name, bio, avatar, settings}. RBAC: owner/admin/viewer." } },
+      { "tool": "create_task", "args": { "title": "Build profile API endpoints", "description": "REST endpoints. Schema from T1: {name: string, bio: string(500), avatar: url, settings: {theme, notifications}}. RBAC: owner can edit all, admin can edit any." } },
+      { "tool": "update_task_status", "args": { "task_id": "T2", "status": "completed", "notes": "GET/PUT/PATCH endpoints done" } },
+      { "tool": "create_task", "args": { "title": "Create profile UI components", "description": "ProfileEditor, AvatarUpload, SettingsPanel. API endpoints from T2: GET/PUT /profile/:id, PATCH /profile/:id/settings" } },
+      { "tool": "update_task_status", "args": { "task_id": "T3", "status": "completed", "notes": "Components done" } },
+      { "tool": "create_task", "args": { "title": "Write integration tests", "description": "Test CRUD flow. Must manually reference T2 and T3 results." } },
+      { "tool": "list_tasks", "args": {} }
+    ]
+  },
+  {
+    "id": "debug-memory-leak",
+    "name": "Debug: Memory Leak Investigation",
+    "description": "Parallel investigation (profiler + log analysis) then fix + verify",
+    "type": "complex_debug",
+    "complexity": "high",
+    "steps": [
+      { "id": "profiler", "action": "Run heap profiler to identify leak source" },
+      { "id": "logs", "action": "Analyze server logs for memory growth pattern" },
+      { "id": "fix", "action": "Implement fix based on profiler + log findings", "depends_on": ["profiler", "logs"] },
+      { "id": "verify", "action": "Verify fix with load test", "depends_on": ["fix"] }
+    ],
+    "cord_transcript": [
+      { "tool": "cord_spawn", "args": { "goal": "Run heap profiler", "prompt": "Take heap snapshots at 1min intervals, identify objects with growing retention" } },
+      { "tool": "cord_spawn", "args": { "goal": "Analyze server logs", "prompt": "Search for RSS growth, GC pressure, unclosed connections in last 24h logs" } },
+      { "tool": "cord_complete", "args": { "task_id": "T1", "result": "Heap profiler: EventEmitter listeners on WebSocket connections never removed. 150 leaked listeners after 1h. Source: src/ws/handler.ts:47 missing removeListener in disconnect." } },
+      { "tool": "cord_complete", "args": { "task_id": "T2", "result": "Logs: RSS grows 2MB/min under 100 concurrent connections. GC runs every 30s but old-gen keeps growing. Correlates with WS reconnection spikes at :00/:30 marks." } },
+      { "tool": "cord_spawn", "args": { "goal": "Fix memory leak", "prompt": "Fix the WebSocket listener leak", "blocked_by": ["T1", "T2"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T3", "result": "Fixed: Added removeAllListeners() in ws disconnect handler. Also added maxListeners warning at 10. RSS now stable at 180MB under load." } },
+      { "tool": "cord_spawn", "args": { "goal": "Verify fix with load test", "prompt": "Run 1h soak test with 200 connections", "blocked_by": ["T3"] } },
+      { "tool": "cord_tree", "args": { "include_results": true } }
+    ],
+    "flat_transcript": [
+      { "tool": "create_task", "args": { "title": "Run heap profiler", "description": "Take heap snapshots" } },
+      { "tool": "create_task", "args": { "title": "Analyze server logs", "description": "Search for memory growth patterns" } },
+      { "tool": "update_task_status", "args": { "task_id": "T1", "status": "completed", "notes": "Leaked EventEmitter listeners on WS" } },
+      { "tool": "update_task_status", "args": { "task_id": "T2", "status": "completed", "notes": "RSS grows 2MB/min" } },
+      { "tool": "create_task", "args": { "title": "Fix memory leak", "description": "Based on T1 (listeners leak) and T2 (RSS growth). Must manually copy results here." } },
+      { "tool": "list_tasks", "args": {} },
+      { "tool": "update_task_status", "args": { "task_id": "T3", "status": "completed", "notes": "Fixed removeAllListeners" } },
+      { "tool": "create_task", "args": { "title": "Verify fix", "description": "Run soak test. Depends on T3 fix." } },
+      { "tool": "list_tasks", "args": {} }
+    ]
+  },
+  {
+    "id": "refactor-auth-migration",
+    "name": "Refactor: Auth System Migration",
+    "description": "Nested decomposition: audit -> design -> parallel impl (JWT + session) -> migrate -> test",
+    "type": "refactor",
+    "complexity": "very_high",
+    "steps": [
+      { "id": "audit", "action": "Audit current auth system usage across codebase" },
+      { "id": "design", "action": "Design new auth architecture", "depends_on": ["audit"] },
+      { "id": "impl-jwt", "action": "Implement JWT token service", "depends_on": ["design"] },
+      { "id": "impl-session", "action": "Implement session migration layer", "depends_on": ["design"] },
+      { "id": "migrate", "action": "Run data migration", "depends_on": ["impl-jwt", "impl-session"] },
+      { "id": "test", "action": "Run full auth regression suite", "depends_on": ["migrate"] }
+    ],
+    "cord_transcript": [
+      { "tool": "cord_spawn", "args": { "goal": "Audit current auth system", "prompt": "Find all session-based auth usage: middleware, login flows, token refresh, logout" } },
+      { "tool": "cord_complete", "args": { "task_id": "T1", "result": "47 files use session auth. 12 middleware functions. 3 login flows (web, mobile, API). Session stored in Redis with 24h TTL." } },
+      { "tool": "cord_spawn", "args": { "goal": "Design new auth architecture", "prompt": "Design JWT + refresh token system", "blocked_by": ["T1"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T2", "result": "Architecture: JWT access (15min) + refresh (7d) in httpOnly cookie. Middleware: verifyJWT -> extractUser. Migration: dual-mode period (2 weeks) accepting both session and JWT." } },
+      { "tool": "cord_fork", "args": { "goal": "Implement JWT token service", "prompt": "Build JWT sign/verify/refresh", "blocked_by": ["T2"], "parent_id": "T2" } },
+      { "tool": "cord_fork", "args": { "goal": "Implement session migration layer", "prompt": "Build session-to-JWT converter", "blocked_by": ["T2"], "parent_id": "T2" } },
+      { "tool": "cord_complete", "args": { "task_id": "T3", "result": "JWT service: sign(payload, 15min), verify(token), refresh(refreshToken, 7d). RS256 key rotation support." } },
+      { "tool": "cord_complete", "args": { "task_id": "T4", "result": "Migration layer: detectAuthType(req) -> session|jwt. convertSession(sessionId) -> {accessToken, refreshToken}. Dual-mode middleware." } },
+      { "tool": "cord_spawn", "args": { "goal": "Run data migration", "prompt": "Migrate active sessions to JWT", "blocked_by": ["T3", "T4"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T5", "result": "Migration complete: 15,000 active sessions converted. 99.7% success rate. 45 sessions expired during migration (expected)." } },
+      { "tool": "cord_spawn", "args": { "goal": "Run auth regression suite", "prompt": "Full test coverage", "blocked_by": ["T5"] } },
+      { "tool": "cord_tree", "args": { "include_results": true } }
+    ],
+    "flat_transcript": [
+      { "tool": "create_task", "args": { "title": "Audit current auth", "description": "Find session auth usage" } },
+      { "tool": "update_task_status", "args": { "task_id": "T1", "status": "completed" } },
+      { "tool": "create_task", "args": { "title": "Design new auth", "description": "JWT system. Audit found 47 files, 12 middleware, 3 login flows." } },
+      { "tool": "update_task_status", "args": { "task_id": "T2", "status": "completed" } },
+      { "tool": "create_task", "args": { "title": "Implement JWT service", "description": "Build JWT. Design: access 15min, refresh 7d, RS256." } },
+      { "tool": "create_task", "args": { "title": "Implement session migration", "description": "Build converter. Design: dual-mode 2 weeks." } },
+      { "tool": "update_task_status", "args": { "task_id": "T3", "status": "completed" } },
+      { "tool": "update_task_status", "args": { "task_id": "T4", "status": "completed" } },
+      { "tool": "create_task", "args": { "title": "Run migration", "description": "Depends on T3 and T4. Must check both are done." } },
+      { "tool": "list_tasks", "args": {} },
+      { "tool": "update_task_status", "args": { "task_id": "T5", "status": "completed" } },
+      { "tool": "create_task", "args": { "title": "Run regression tests", "description": "Depends on T5." } },
+      { "tool": "list_tasks", "args": {} }
+    ]
+  },
+  {
+    "id": "hotfix-production-error",
+    "name": "Hotfix: Production Error",
+    "description": "Decision point (rollback vs fix-forward?) then execute chosen approach",
+    "type": "bug_fix",
+    "complexity": "high",
+    "steps": [
+      { "id": "diagnose", "action": "Diagnose production error from logs and monitoring" },
+      { "id": "decide", "action": "Decision: rollback or fix-forward?", "depends_on": ["diagnose"] },
+      { "id": "execute", "action": "Execute chosen approach", "depends_on": ["decide"] },
+      { "id": "verify", "action": "Verify production is healthy", "depends_on": ["execute"] }
+    ],
+    "cord_transcript": [
+      { "tool": "cord_spawn", "args": { "goal": "Diagnose production error", "prompt": "Check error logs, Sentry alerts, and metrics dashboards" } },
+      { "tool": "cord_complete", "args": { "task_id": "T1", "result": "Error: NullPointerException in PaymentService.processRefund() since deploy v2.14.0 (2h ago). Affects 12% of refund requests. Root cause: missing null check on optional coupon field added in v2.14.0." } },
+      { "tool": "cord_ask", "args": { "question": "Rollback or fix-forward for PaymentService NPE?", "options": ["rollback to v2.13.9 (safe, 5min downtime)", "fix-forward with null check patch (risky, 0 downtime)"], "blocked_by": ["T1"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T2", "result": "fix-forward: the coupon field is needed for new feature launching tomorrow, rollback would block it" } },
+      { "tool": "cord_spawn", "args": { "goal": "Patch PaymentService with null check", "prompt": "Add null check for coupon field in processRefund()", "blocked_by": ["T2"] } },
+      { "tool": "cord_complete", "args": { "task_id": "T3", "result": "Patched: Added optional chaining on coupon?.discountAmount in processRefund(). Deploy v2.14.1 pushed. Error rate dropped to 0%." } },
+      { "tool": "cord_spawn", "args": { "goal": "Verify production health", "prompt": "Check error rate, refund success rate, monitoring dashboards", "blocked_by": ["T3"] } },
+      { "tool": "cord_tree", "args": { "include_results": true } }
+    ],
+    "flat_transcript": [
+      { "tool": "create_task", "args": { "title": "Diagnose production error", "description": "Check logs and monitoring" } },
+      { "tool": "update_task_status", "args": { "task_id": "T1", "status": "completed", "notes": "NPE in PaymentService since v2.14.0" } },
+      { "tool": "create_task", "args": { "title": "Decision: rollback or fix-forward?", "description": "Options: 1) rollback v2.13.9 (5min downtime) 2) fix-forward null check (0 downtime). Diagnosis: missing null check on coupon field." } },
+      { "tool": "list_tasks", "args": {} },
+      { "tool": "update_task_status", "args": { "task_id": "T2", "status": "completed", "notes": "fix-forward chosen" } },
+      { "tool": "create_task", "args": { "title": "Patch PaymentService", "description": "Add null check. Decision was fix-forward. Must manually copy diagnosis context." } },
+      { "tool": "update_task_status", "args": { "task_id": "T3", "status": "completed" } },
+      { "tool": "create_task", "args": { "title": "Verify production", "description": "Check health after patch" } },
+      { "tool": "list_tasks", "args": {} }
+    ]
+  }
+]

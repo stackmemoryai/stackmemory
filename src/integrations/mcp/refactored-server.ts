@@ -21,6 +21,7 @@ import { LinearSyncEngine, DEFAULT_SYNC_CONFIG } from '../linear/sync.js';
 import { BrowserMCPIntegration } from '../../features/browser/browser-mcp.js';
 import { TraceDetector } from '../../core/trace/trace-detector.js';
 import { LLMContextRetrieval } from '../../core/retrieval/index.js';
+import { SQLiteAdapter } from '../../core/database/sqlite-adapter.js';
 import { ConfigManager } from '../../core/config/config-manager.js';
 import { logger } from '../../core/monitoring/logger.js';
 
@@ -70,6 +71,7 @@ class StackMemoryMCP {
   private browserMCP!: BrowserMCPIntegration;
   private traceDetector!: TraceDetector;
   private contextRetrieval!: LLMContextRetrieval;
+  private dbAdapter!: SQLiteAdapter;
   private configManager!: ConfigManager;
   private toolScoringMiddleware!: ToolScoringMiddleware;
 
@@ -98,6 +100,9 @@ class StackMemoryMCP {
 
     const dbPath = join(dbDir, 'context.db');
     this.db = new Database(dbPath);
+
+    // SQLiteAdapter for team tools (shares the same DB file via WAL)
+    this.dbAdapter = new SQLiteAdapter(this.projectId, { dbPath });
 
     logger.info('Database initialized', { dbPath });
   }
@@ -192,6 +197,7 @@ class StackMemoryMCP {
       linearSync: this.linearSync,
       traceDetector: this.traceDetector,
       browserMCP: this.browserMCP,
+      dbAdapter: this.dbAdapter,
     };
 
     this.handlerFactory = new MCPHandlerFactory(dependencies);
@@ -360,6 +366,8 @@ class StackMemoryMCP {
   async start(): Promise<void> {
     try {
       // Initialize components
+      await this.dbAdapter.connect();
+      await this.dbAdapter.initializeSchema();
       await this.frameManager.initialize();
 
       // Start server
@@ -393,6 +401,10 @@ class StackMemoryMCP {
       try {
         if (this.browserMCP) {
           await this.browserMCP.cleanup();
+        }
+
+        if (this.dbAdapter) {
+          await this.dbAdapter.disconnect();
         }
 
         if (this.db) {
