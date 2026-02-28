@@ -25,7 +25,6 @@ export class MCPToolDefinitions {
       ...this.getTraceTools(),
       ...this.getDiscoveryTools(),
       ...this.getEditTools(),
-      ...this.getGraphitiTools(),
       ...this.getTeamTools(),
       ...this.getCordTools(),
     ];
@@ -298,30 +297,6 @@ export class MCPToolDefinitions {
           properties: {},
         },
       },
-      {
-        name: 'add_task_dependency',
-        description: 'Add dependency between tasks',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            task_id: {
-              type: 'string',
-              description: 'Task that depends on another',
-            },
-            depends_on: {
-              type: 'string',
-              description: 'Task that must be completed first',
-            },
-            dependency_type: {
-              type: 'string',
-              enum: ['blocks', 'related', 'subtask'],
-              default: 'blocks',
-              description: 'Type of dependency',
-            },
-          },
-          required: ['task_id', 'depends_on'],
-        },
-      },
     ];
   }
 
@@ -434,7 +409,8 @@ export class MCPToolDefinitions {
     return [
       {
         name: 'get_traces',
-        description: 'Get execution traces with optional filtering',
+        description:
+          'Get execution traces with optional filtering. Set analyze=true to run pattern analysis instead of listing traces.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -462,29 +438,20 @@ export class MCPToolDefinitions {
               default: false,
               description: 'Include full trace context',
             },
-          },
-        },
-      },
-      {
-        name: 'analyze_traces',
-        description: 'Analyze trace patterns for insights',
-        inputSchema: {
-          type: 'object',
-          properties: {
+            analyze: {
+              type: 'boolean',
+              default: false,
+              description: 'Run analysis on traces instead of listing them',
+            },
             trace_id: {
               type: 'string',
-              description: 'Specific trace to analyze',
+              description: 'Specific trace to analyze (requires analyze=true)',
             },
             analysis_type: {
               type: 'string',
               enum: ['performance', 'patterns', 'errors'],
               default: 'performance',
-              description: 'Type of analysis to perform',
-            },
-            include_recommendations: {
-              type: 'boolean',
-              default: true,
-              description: 'Include optimization recommendations',
+              description: 'Type of analysis (requires analyze=true)',
             },
           },
         },
@@ -737,59 +704,6 @@ export class MCPToolDefinitions {
   }
 
   /**
-   * Graphiti knowledge graph tools
-   */
-  getGraphitiTools(): MCPToolDefinition[] {
-    return [
-      {
-        name: 'graphiti_status',
-        description:
-          'Check Graphiti temporal knowledge graph connection status',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-      {
-        name: 'graphiti_query',
-        description:
-          'Query the Graphiti temporal knowledge graph for entities, relations, and episodes',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: 'Semantic text query',
-            },
-            entityTypes: {
-              type: 'array',
-              items: { type: 'string' },
-              description:
-                'Entity types to filter (e.g., ["Person", "File", "Issue"])',
-            },
-            validFrom: {
-              type: 'number',
-              description: 'Start of time window (epoch ms)',
-            },
-            validTo: {
-              type: 'number',
-              description: 'End of time window (epoch ms)',
-            },
-            maxHops: {
-              type: 'number',
-              description: 'Graph traversal depth (default 2)',
-            },
-            k: {
-              type: 'number',
-              description: 'Top-k results (default 20)',
-            },
-          },
-        },
-      },
-    ];
-  }
-
-  /**
    * Multi-agent team collaboration tools
    */
   private getTeamTools(): MCPToolDefinition[] {
@@ -1027,7 +941,6 @@ export class MCPToolDefinitions {
       | 'trace'
       | 'discovery'
       | 'edit'
-      | 'graphiti'
       | 'team'
       | 'cord'
   ): MCPToolDefinition[] {
@@ -1044,8 +957,6 @@ export class MCPToolDefinitions {
         return this.getDiscoveryTools();
       case 'edit':
         return this.getEditTools();
-      case 'graphiti':
-        return this.getGraphitiTools();
       case 'team':
         return this.getTeamTools();
       case 'cord':

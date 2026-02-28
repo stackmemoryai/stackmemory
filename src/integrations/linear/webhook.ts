@@ -7,7 +7,6 @@ import { logger } from '../../core/monitoring/logger.js';
 import { IntegrationError, ErrorCode } from '../../core/errors/index.js';
 import { LinearSyncEngine } from './sync.js';
 import { LinearTaskManager } from '../../features/tasks/linear-task-manager.js';
-import type { LinearGraphitiBridge } from '../graphiti/linear-graphiti-bridge.js';
 import crypto from 'crypto';
 // Type-safe environment variable access
 function getEnv(key: string, defaultValue?: string): string {
@@ -68,7 +67,6 @@ export interface LinearWebhookPayload {
 export class LinearWebhookHandler {
   private syncEngine?: LinearSyncEngine;
   private taskStore?: LinearTaskManager;
-  private graphitiBridge?: LinearGraphitiBridge;
   private webhookSecret?: string;
 
   constructor(webhookSecret?: string) {
@@ -87,13 +85,6 @@ export class LinearWebhookHandler {
    */
   setTaskStore(taskStore: LinearTaskManager): void {
     this.taskStore = taskStore;
-  }
-
-  /**
-   * Set the Graphiti bridge for knowledge graph sync
-   */
-  setGraphitiBridge(bridge: LinearGraphitiBridge): void {
-    this.graphitiBridge = bridge;
   }
 
   /**
@@ -183,17 +174,6 @@ export class LinearWebhookHandler {
         break;
       default:
         logger.warn(`Unknown webhook action: ${payload.action}`);
-    }
-
-    // Fire-and-forget Graphiti bridge
-    if (this.graphitiBridge) {
-      this.graphitiBridge.processWebhook(payload).catch((err) => {
-        logger.debug('Linear-Graphiti bridge error', {
-          action: payload.action,
-          identifier: payload.data.identifier,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
     }
   }
 

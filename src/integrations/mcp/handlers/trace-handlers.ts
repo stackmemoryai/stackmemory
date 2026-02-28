@@ -20,6 +20,11 @@ export class TraceHandlers {
    * Get traces with optional filtering
    */
   async handleGetTraces(args: any): Promise<any> {
+    // Delegate to analyze if flag set
+    if (args.analyze) {
+      return this.handleAnalyzeTraces(args);
+    }
+
     try {
       const {
         limit = 20,

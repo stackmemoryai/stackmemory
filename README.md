@@ -10,14 +10,17 @@ Lossless, project-scoped memory for AI coding tools.
 StackMemory is a **production-ready memory runtime** for AI coding tools that preserves full project context across sessions:
 
 - **Zero-config setup** — `stackmemory init` just works
-- **25 MCP tools** for Claude Code integration
-- **Full Linear integration** with bidirectional sync
+- **32 MCP tools** for Claude Code integration (context, tasks, Linear, traces, discovery, cord, team)
+- **FTS5 full-text search** with BM25 scoring and hybrid retrieval
+- **Full Linear integration** with bidirectional sync and OAuth/API key support
 - **Context persistence** that survives `/clear` operations
 - **Hierarchical frame organization** (nested call stack model)
+- **Multi-wrapper support** — `claude-sm`, `codex-sm`, `opencode-sm` with auto context loading
 - **Skills system** with `/spec` and `/linear-run` for Claude Code
 - **Automatic hooks** for task tracking, Linear sync, and spec progress
 - **Memory monitor daemon** with automatic capture/clear on RAM pressure
-- **652 tests passing** with comprehensive coverage
+- **Auto-save service** for periodic context persistence
+- **Comprehensive test coverage** across all core modules
 
 Instead of a linear chat log, StackMemory organizes memory as a **call stack** of scoped work (frames), with intelligent LLM-driven retrieval and team collaboration features.
 
@@ -50,13 +53,14 @@ Tools forget decisions and constraints between sessions. StackMemory makes conte
 
 ## Features
 
-- **MCP tools** for Claude Code: 25 tools across context, tasks, Linear, traces, and discovery
+- **MCP tools** for Claude Code: 36 tools across context, tasks, Linear, traces, discovery, cord, and team
+- **FTS5 search**: full-text search with BM25 scoring, hybrid retrieval, and smart thresholds
 - **Skills**: `/spec` (iterative spec generation), `/linear-run` (task execution via RLM)
-- **Hooks**: automatic context save, task tracking, Linear sync, PROMPT_PLAN updates
+- **Hooks**: automatic context save, task tracking, Linear sync, PROMPT_PLAN updates, cord tracing
 - **Prompt Forge**: watches CLAUDE.md and AGENTS.md for prompt optimization (GEPA)
 - **Safe branches**: worktree isolation with `--worktree` or `-w`
 - **Persistent context**: frames, anchors, decisions, retrieval
-- **Integrations**: Linear, DiffMem, Browser MCP
+- **Integrations**: Linear (API key + OAuth), DiffMem, Browser MCP, log-mcp (log analysis)
 
 ---
 

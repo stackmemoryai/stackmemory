@@ -130,11 +130,6 @@ export class MCPHandlerFactory {
         return this.taskHandlers.handleGetActiveTasks.bind(this.taskHandlers);
       case 'get_task_metrics':
         return this.taskHandlers.handleGetTaskMetrics.bind(this.taskHandlers);
-      case 'add_task_dependency':
-        return this.taskHandlers.handleAddTaskDependency.bind(
-          this.taskHandlers
-        );
-
       // Linear handlers
       case 'linear_sync':
         return this.linearHandlers.handleLinearSync.bind(this.linearHandlers);
@@ -152,8 +147,6 @@ export class MCPHandlerFactory {
       // Trace handlers
       case 'get_traces':
         return this.traceHandlers.handleGetTraces.bind(this.traceHandlers);
-      case 'analyze_traces':
-        return this.traceHandlers.handleAnalyzeTraces.bind(this.traceHandlers);
       case 'start_browser_debug':
         return this.traceHandlers.handleStartBrowserDebug.bind(
           this.traceHandlers
@@ -232,7 +225,6 @@ export class MCPHandlerFactory {
       'update_task_status',
       'get_active_tasks',
       'get_task_metrics',
-      'add_task_dependency',
 
       // Linear tools
       'linear_sync',
@@ -242,7 +234,6 @@ export class MCPHandlerFactory {
 
       // Trace tools
       'get_traces',
-      'analyze_traces',
       'start_browser_debug',
       'take_screenshot',
       'execute_script',

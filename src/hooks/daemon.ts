@@ -14,7 +14,6 @@ import {
 import { join, extname, relative } from 'path';
 import { spawn } from 'child_process';
 import { loadConfig, HooksConfig } from './config.js';
-import { GraphitiHooks } from './graphiti-hooks.js';
 import {
   hookEmitter,
   HookEventData,
@@ -196,19 +195,6 @@ function registerBuiltinHandlers(): void {
   hookEmitter.registerHandler('file_change', handleFileChange);
   hookEmitter.registerHandler('suggestion_ready', handleSuggestionReady);
   hookEmitter.registerHandler('error', handleError);
-
-  // Optional: register Graphiti hooks if configured
-  try {
-    if (
-      process.env.GRAPHITI_ENDPOINT ||
-      process.env.GRAPHITI_ENABLED === 'true'
-    ) {
-      const graphiti = new GraphitiHooks();
-      graphiti.register(hookEmitter);
-    }
-  } catch {
-    // avoid crashing the daemon on optional integration failures
-  }
 
   hookEmitter.on('*', () => {
     state.eventsProcessed++;
