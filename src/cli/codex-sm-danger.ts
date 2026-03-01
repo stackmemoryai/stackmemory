@@ -14,7 +14,10 @@ import * as path from 'path';
 const codexSmPath = path.join(__dirname, 'codex-sm.js');
 
 // Prepend the danger flag to all args
-const args = ['--dangerously-skip-permissions', ...process.argv.slice(2)];
+const args = [
+  '--dangerously-bypass-approvals-and-sandbox',
+  ...process.argv.slice(2),
+];
 
 // Spawn codex-sm with the danger flag
 const child = spawn('node', [codexSmPath, ...args], {
