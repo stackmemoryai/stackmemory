@@ -18,20 +18,23 @@ const HOOKS_DIR = path.join(os.homedir(), '.claude', 'hooks');
 
 describe('hook-installer', () => {
   describe('CANONICAL_HOOKS', () => {
-    it('defines all 5 core hooks', () => {
-      expect(CANONICAL_HOOKS).toHaveLength(5);
+    it('defines all 6 hooks', () => {
+      expect(CANONICAL_HOOKS).toHaveLength(6);
       const names = CANONICAL_HOOKS.map((h) => h.scriptName);
       expect(names).toContain('session-rescue.sh');
       expect(names).toContain('stop-checkpoint.js');
       expect(names).toContain('chime-on-stop.sh');
       expect(names).toContain('auto-checkpoint.js');
       expect(names).toContain('cord-trace.js');
+      expect(names).toContain('theory-capture.js');
     });
 
-    it('all core hooks are required', () => {
-      for (const hook of CANONICAL_HOOKS) {
-        expect(hook.required).toBe(true);
-      }
+    it('core hooks are required, optional hooks are not', () => {
+      const required = CANONICAL_HOOKS.filter((h) => h.required);
+      const optional = CANONICAL_HOOKS.filter((h) => !h.required);
+      expect(required).toHaveLength(5);
+      expect(optional).toHaveLength(1);
+      expect(optional[0].scriptName).toBe('theory-capture.js');
     });
 
     it('js hooks have node commandPrefix', () => {

@@ -430,6 +430,32 @@ class ClaudeSM {
     }
   }
 
+  private getTheoryContent(): string | null {
+    try {
+      let root: string;
+      try {
+        root = execSync('git rev-parse --show-toplevel', {
+          encoding: 'utf-8',
+          timeout: 5000,
+        }).trim();
+      } catch {
+        root = process.cwd();
+      }
+      const theoryPath = path.join(root, 'THEORY.MD');
+      if (fs.existsSync(theoryPath)) {
+        const content = fs.readFileSync(theoryPath, 'utf8').trim();
+        if (content.length > 0) {
+          return content.length > 4000
+            ? content.substring(0, 4000) + '\n\n[...truncated]'
+            : content;
+        }
+      }
+    } catch {
+      // Silent — theory loading is optional
+    }
+    return null;
+  }
+
   private getHandoffContent(): string | null {
     if (!this.config.contextEnabled) return null;
 
@@ -881,16 +907,23 @@ class ClaudeSM {
 
     // ── Session Injection ─────────────────────────────────────────
     let initialInput = '';
-    const handoffContent = this.getHandoffContent();
-    if (handoffContent) {
-      // Only inject if not resuming an existing conversation
-      const hasResume =
-        claudeArgs.includes('--continue') ||
-        claudeArgs.some((a) => a === '--resume');
-      if (!hasResume) {
-        // Load into input text area via PTY bracketed paste (not auto-sent)
+    const hasResume =
+      claudeArgs.includes('--continue') ||
+      claudeArgs.some((a) => a === '--resume');
+
+    if (!hasResume) {
+      const handoffContent = this.getHandoffContent();
+      if (handoffContent) {
         initialInput = handoffContent;
         console.log(chalk.gray('   Handoff context ready'));
+      }
+
+      const theoryContent = this.getTheoryContent();
+      if (theoryContent) {
+        initialInput +=
+          (initialInput ? '\n\n---\n\n' : '') +
+          `## Operating Theory (THEORY.MD)\n\n${theoryContent}`;
+        console.log(chalk.gray('   Theory context loaded'));
       }
     }
 

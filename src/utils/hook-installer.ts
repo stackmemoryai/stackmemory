@@ -62,6 +62,14 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     commandPrefix: 'node',
     required: true,
   },
+  {
+    scriptName: 'theory-capture.js',
+    eventType: 'PostToolUse',
+    matcher: 'Edit|Write|MultiEdit',
+    timeout: 2,
+    commandPrefix: 'node',
+    required: false,
+  },
 ];
 
 /** Script names that should be removed from settings (dead/deprecated hooks) */
