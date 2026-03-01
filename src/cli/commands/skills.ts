@@ -1031,6 +1031,109 @@ export function createSkillsCommand(): Command {
       }
     });
 
+  // Theory skill commands
+  const theoryCmd = skillsCmd
+    .command('theory')
+    .description('Maintain a living THEORY.MD at repo root');
+
+  theoryCmd
+    .command('show')
+    .description('Display current THEORY.MD content')
+    .action(async () => {
+      try {
+        const { context } = await initializeSkillContext();
+        const { TheorySkill } = await import('../../skills/theory-skill.js');
+        const skill = new TheorySkill(context);
+        const result = skill.show();
+        if (result.success) {
+          console.log(result.message);
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
+  theoryCmd
+    .command('init <problem>')
+    .description('Create THEORY.MD with scaffold sections')
+    .action(async (problem) => {
+      try {
+        const { context } = await initializeSkillContext();
+        const { TheorySkill } = await import('../../skills/theory-skill.js');
+        const skill = new TheorySkill(context);
+        const result = skill.init(problem);
+        if (result.success) {
+          console.log(chalk.green('✓'), result.message);
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
+  theoryCmd
+    .command('update <content>')
+    .description('Overwrite THEORY.MD with new content')
+    .action(async (content) => {
+      try {
+        const { context } = await initializeSkillContext();
+        const { TheorySkill } = await import('../../skills/theory-skill.js');
+        const skill = new TheorySkill(context);
+        const result = skill.update(content);
+        if (result.success) {
+          console.log(chalk.green('✓'), result.message);
+          if (result.data?.warnings?.length > 0) {
+            result.data.warnings.forEach((w: string) => {
+              console.log(chalk.yellow(`  ⚠ ${w}`));
+            });
+          }
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
+  theoryCmd
+    .command('status')
+    .description('Show THEORY.MD metadata')
+    .action(async () => {
+      try {
+        const { context } = await initializeSkillContext();
+        const { TheorySkill } = await import('../../skills/theory-skill.js');
+        const skill = new TheorySkill(context);
+        const result = skill.status();
+        if (result.success) {
+          console.log(chalk.cyan('THEORY.MD Status:'));
+          if (result.data?.exists) {
+            console.log(`  Lines: ${result.data.lineCount}`);
+            console.log(
+              `  Sections: ${result.data.sections?.length}/${result.data.totalSections}`
+            );
+            console.log(`  Last modified: ${result.data.lastModified}`);
+          } else {
+            console.log(chalk.gray('  Not found'));
+          }
+        } else {
+          console.log(chalk.red('✗'), result.message);
+        }
+        await context.database.disconnect();
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), (error as Error).message);
+        process.exit(1);
+      }
+    });
+
   // Help command for skills
   skillsCmd
     .command('help [skill]')
@@ -1089,6 +1192,27 @@ Apply patches:  git apply .stackmemory/patches/<file>.patch
 Review specs:   cd /tmp/sm-spec-* && git log --oneline
 `);
             break;
+          case 'theory':
+            console.log(`
+theory — Living Operating Theory Document
+
+Maintains a THEORY.MD at repo root: a narrative capturing your problem
+thesis, mental model, strategy, discoveries, and open questions.
+
+Subcommands:
+  show                     Display current THEORY.MD
+  init <problem>           Create THEORY.MD with scaffold sections
+  update <content>         Overwrite THEORY.MD (validates, warns on anti-patterns)
+  status                   Show metadata (lines, sections, last modified)
+
+Examples:
+  stackmemory skills theory init "Build context-aware memory for AI agents"
+  stackmemory skills theory show
+  stackmemory skills theory status
+
+Based on Theorist by @blader (MIT).
+`);
+            break;
           default:
             console.log(
               `Unknown skill: ${skill}. Use "stackmemory skills help" to see all available skills.`
@@ -1116,7 +1240,10 @@ Review specs:   cd /tmp/sm-spec-* && git log --oneline
         );
         console.log('  linear-run - Execute Linear tasks via RLM orchestrator');
         console.log(
-          '  agent      - Spawn parallel agents (research, maintain, spec-run)\n'
+          '  agent      - Spawn parallel agents (research, maintain, spec-run)'
+        );
+        console.log(
+          '  theory     - Maintain a living THEORY.MD (show, init, update, status)\n'
         );
         console.log(
           chalk.yellow(

@@ -512,6 +512,7 @@ describe('Claude Skills', () => {
         'api',
         'spec',
         'agent',
+        'theory',
       ]);
     });
 

@@ -1180,6 +1180,26 @@ export class ClaudeSkillsManager {
         }
       }
 
+      case 'theory': {
+        const { TheorySkill } = await import('./theory-skill.js');
+        const theorySkill = new TheorySkill(this.context);
+        switch (args[0]) {
+          case 'show':
+            return theorySkill.show();
+          case 'update':
+            return theorySkill.update(args.slice(1).join(' '));
+          case 'init':
+            return theorySkill.init(args.slice(1).join(' '));
+          case 'status':
+            return theorySkill.status();
+          default:
+            return {
+              success: false,
+              message: 'Usage: theory show|init|update|status',
+            };
+        }
+      }
+
       case 'linear-run': {
         if (!this.linearTaskRunner) {
           return {
@@ -1226,6 +1246,7 @@ export class ClaudeSkillsManager {
       'api',
       'spec',
       'agent',
+      'theory',
     ];
     if (this.rlmOrchestrator) {
       skills.push('rlm', 'lint');
@@ -1392,6 +1413,23 @@ Options:
 Each agent runs in a disposable /tmp workspace (git clone --depth=1).
 Patches: git apply .stackmemory/patches/<file>.patch
 Spec branches: cd /tmp/sm-spec-* && git log --oneline
+`;
+
+      case 'theory':
+        return `
+/theory show
+/theory init "<problem statement>"
+/theory update "<full content>"
+/theory status
+
+Maintain a living THEORY.MD at repo root — a narrative operating theory:
+  show   — Display current THEORY.MD content
+  init   — Create THEORY.MD with scaffold sections
+  update — Overwrite THEORY.MD (validates length, warns on anti-patterns)
+  status — Show metadata: exists, line count, sections, last modified
+
+Sections: Problem, Operating Theory, Strategy, Key Discoveries, Open Questions
+Based on Theorist by @blader (MIT).
 `;
 
       case 'linear-run':
