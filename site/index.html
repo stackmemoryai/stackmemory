@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StackMemory — Lossless memory for AI coding tools</title>
+  <meta name="description" content="Lossless, project-scoped memory for AI coding tools. Durable context across sessions with MCP tools, FTS5 search, Linear sync, and automatic hooks.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .code-block { position: relative; }
+    .code-block button {
+      position: absolute; top: 0.5rem; right: 0.5rem;
+      opacity: 0; transition: opacity 150ms;
+    }
+    .code-block:hover button { opacity: 1; }
+  </style>
+</head>
+<body class="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 antialiased">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 backdrop-blur bg-white/80 dark:bg-neutral-950/80 border-b border-neutral-200 dark:border-neutral-800">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="#" class="font-semibold text-base tracking-tight">StackMemory</a>
+      <nav class="flex items-center gap-5 text-sm">
+        <a href="#features" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Features</a>
+        <a href="#quickstart" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Quick Start</a>
+        <a href="https://github.com/stackmemoryai/stackmemory" target="_blank" rel="noopener" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors underline underline-offset-2">GitHub</a>
+        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" target="_blank" rel="noopener" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors underline underline-offset-2">npm</a>
+        <button id="theme-toggle" class="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" aria-label="Toggle theme">
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6">
+
+    <!-- Hero -->
+    <section class="py-20 md:py-28">
+      <h1 class="text-3xl md:text-4xl font-semibold tracking-tight leading-tight max-w-2xl">
+        Lossless, project-scoped memory for AI coding tools.
+      </h1>
+      <p class="mt-4 text-neutral-600 dark:text-neutral-400 text-base leading-relaxed max-w-xl">
+        StackMemory preserves full project context across sessions. Instead of a linear chat log, it organizes memory as a call stack of scoped work with intelligent retrieval.
+      </p>
+      <div class="mt-8 code-block">
+        <pre class="bg-neutral-100 dark:bg-neutral-800 rounded-lg px-5 py-4 text-sm font-mono inline-block overflow-x-auto max-w-full"><code>npm install -g @stackmemoryai/stackmemory</code></pre>
+        <button onclick="navigator.clipboard.writeText('npm install -g @stackmemoryai/stackmemory')" class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 bg-neutral-200 dark:bg-neutral-700 rounded px-2 py-1">Copy</button>
+      </div>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory"><img src="https://img.shields.io/npm/v/@stackmemoryai/stackmemory" alt="npm version"></a>
+        <a href="https://github.com/stackmemoryai/stackmemory/actions/workflows/test-shared-context.yml"><img src="https://github.com/stackmemoryai/stackmemory/actions/workflows/test-shared-context.yml/badge.svg?branch=main" alt="Tests"></a>
+        <a href="https://codecov.io/gh/stackmemoryai/stackmemory"><img src="https://codecov.io/gh/stackmemoryai/stackmemory/branch/main/graph/badge.svg" alt="Coverage"></a>
+      </div>
+    </section>
+
+    <!-- Why -->
+    <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Why StackMemory</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400 italic">Memory is storage. Context is a compiled view.</p>
+      <div class="mt-8 grid gap-6 md:grid-cols-3">
+        <div>
+          <h3 class="font-semibold text-sm">Context survives sessions</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Decisions, constraints, and progress persist across <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">/clear</code> operations and session restarts.</p>
+        </div>
+        <div>
+          <h3 class="font-semibold text-sm">Call-stack organization</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Nested frames with importance scoring. Only the active path is "hot" — the rest stays accessible but quiet.</p>
+        </div>
+        <div>
+          <h3 class="font-semibold text-sm">Zero-config</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed"><code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">stackmemory init</code> just works. No database setup, no cloud account, no configuration files.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Features</h2>
+      <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">32 MCP Tools</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Context, tasks, Linear, traces, discovery, cord, and team tools for Claude Code integration.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">FTS5 Search</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Full-text search with BM25 scoring, hybrid retrieval, and smart thresholds. Finds what matters.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Linear Integration</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Bidirectional sync with API key and OAuth support. Tasks flow between Linear and your coding session.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Automatic Hooks</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Context save, task tracking, Linear sync, and PROMPT_PLAN progress — all automatic, non-blocking.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Wrapper Scripts</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed"><code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">claude-sm</code>, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">codex-sm</code>, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">opencode-sm</code> — launch your tool with context pre-loaded.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Skills System</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed"><code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">/spec</code> for iterative specs, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">/linear-run</code> for task execution via RLM orchestration.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section id="quickstart" class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Quick Start</h2>
+      <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">Requires Node &ge; 20</p>
+      <div class="mt-6 code-block">
+        <pre class="bg-neutral-100 dark:bg-neutral-800 rounded-lg px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-neutral-500"># Install globally</span>
+npm install -g @stackmemoryai/stackmemory
+
+<span class="text-neutral-500"># Initialize in your project</span>
+cd your-project
+stackmemory init
+
+<span class="text-neutral-500"># Configure Claude Code integration</span>
+stackmemory setup-mcp
+
+<span class="text-neutral-500"># Verify everything works</span>
+stackmemory doctor</code></pre>
+        <button onclick="navigator.clipboard.writeText('npm install -g @stackmemoryai/stackmemory\ncd your-project\nstackmemory init\nstackmemory setup-mcp\nstackmemory doctor')" class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 bg-neutral-200 dark:bg-neutral-700 rounded px-2 py-1">Copy</button>
+      </div>
+      <p class="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Restart Claude Code and StackMemory MCP tools will be available.</p>
+    </section>
+
+    <!-- Core Concepts -->
+    <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Core Concepts</h2>
+      <div class="mt-6 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-neutral-200 dark:border-neutral-800">
+              <th class="text-left py-3 pr-6 font-semibold">Concept</th>
+              <th class="text-left py-3 font-semibold">Meaning</th>
+            </tr>
+          </thead>
+          <tbody class="text-neutral-600 dark:text-neutral-400">
+            <tr class="border-b border-neutral-100 dark:border-neutral-800/50">
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">Frame</td>
+              <td class="py-3">A scoped unit of work, like a function call. Can span multiple turns and sessions.</td>
+            </tr>
+            <tr class="border-b border-neutral-100 dark:border-neutral-800/50">
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">Call Stack</td>
+              <td class="py-3">Nested frames. Only the active path is "hot" — the rest stays accessible.</td>
+            </tr>
+            <tr class="border-b border-neutral-100 dark:border-neutral-800/50">
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">Event</td>
+              <td class="py-3">Append-only record: message, tool call, or decision.</td>
+            </tr>
+            <tr class="border-b border-neutral-100 dark:border-neutral-800/50">
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">Digest</td>
+              <td class="py-3">Structured return value when a frame closes.</td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">Anchor</td>
+              <td class="py-3">Pinned fact — DECISION, CONSTRAINT, or INTERFACE.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Integrations -->
+    <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Integrations</h2>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">Claude Code</span>
+        <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">Codex</span>
+        <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">OpenCode</span>
+        <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">Linear</span>
+        <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">MCP Protocol</span>
+        <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">Browser MCP</span>
+      </div>
+      <p class="mt-4 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+        Runs as an MCP server. Editors call StackMemory on each interaction to fetch a compiled context bundle — editors don't store memory themselves.
+      </p>
+    </section>
+
+    <!-- Who is this for -->
+    <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Who is this for</h2>
+      <div class="mt-6 grid gap-4 sm:grid-cols-2">
+        <div class="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-900">
+          <p class="font-semibold text-sm">Solo dev using Claude Code</p>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Keep decisions, constraints, and progress across sessions.</p>
+        </div>
+        <div class="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-900">
+          <p class="font-semibold text-sm">Team using AI coding tools</p>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Share project context across agents and teammates.</p>
+        </div>
+        <div class="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-900">
+          <p class="font-semibold text-sm">AI-first startup</p>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Ship faster with persistent memory and automatic Linear sync.</p>
+        </div>
+        <div class="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-900">
+          <p class="font-semibold text-sm">Open-source maintainer</p>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Onboard contributors and AI agents with durable project knowledge.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-neutral-200 dark:border-neutral-800 mt-8">
+    <div class="max-w-5xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-neutral-500 dark:text-neutral-400">
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">GitHub</a>
+        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">npm</a>
+        <a href="https://github.com/stackmemoryai/stackmemory/blob/main/docs/cli.md" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">Docs</a>
+      </div>
+      <p>BSL 1.1 &mdash; converts to MIT after 4 years</p>
+    </div>
+  </footer>
+
+  <!-- Theme toggle -->
+  <script>
+    const html = document.documentElement;
+    const toggle = document.getElementById('theme-toggle');
+    const stored = localStorage.getItem('theme');
+
+    if (stored === 'light' || (!stored && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+      html.classList.remove('dark');
+    }
+
+    toggle.addEventListener('click', () => {
+      html.classList.toggle('dark');
+      localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+    });
+  </script>
+</body>
+</html>
