@@ -472,8 +472,8 @@ export const defaultModelConfigs: Record<ModelTier, ModelConfig[]> = {
     {
       tier: 'oracle',
       provider: 'claude',
-      model: 'claude-3-opus-20240229',
-      costPerToken: 0.015, // $15/1M input tokens
+      model: 'claude-sonnet-4-5-20250929',
+      costPerToken: 0.003, // $3/1M input tokens
       capabilities: [
         'strategic_planning',
         'complex_reasoning',
@@ -488,8 +488,8 @@ export const defaultModelConfigs: Record<ModelTier, ModelConfig[]> = {
     {
       tier: 'worker',
       provider: 'claude',
-      model: 'claude-3-5-haiku-20241022',
-      costPerToken: 0.00025, // $0.25/1M input tokens
+      model: 'claude-haiku-4-5-20251001',
+      costPerToken: 0.0008, // $0.80/1M input tokens
       capabilities: [
         'code_implementation',
         'unit_testing',

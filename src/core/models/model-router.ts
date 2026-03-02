@@ -48,16 +48,14 @@ export const MODEL_TOKEN_LIMITS: Record<string, number> = {
   'claude-sonnet-4-5-20250929': 200000,
   'claude-haiku-4-5-20251001': 200000,
   'claude-sonnet-4-20250514': 200000,
-  // Claude 3.x
+  // Claude 3.x (legacy, still functional)
   'claude-3-5-sonnet-20241022': 200000,
   'claude-3-5-haiku-20241022': 200000,
-  'claude-3-opus-20240229': 200000,
   // OpenAI
   'gpt-4o': 128000,
-  'gpt-4-turbo': 128000,
-  'gpt-4': 8192,
-  o1: 200000,
+  'gpt-4o-mini': 128000,
   'o3-mini': 200000,
+  'o4-mini': 200000,
   // Qwen
   'qwen3-max-2025-01-23': 128000,
   // Cerebras

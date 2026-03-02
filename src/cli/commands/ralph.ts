@@ -454,13 +454,13 @@ export function createRalphCommand(): Command {
     .argument('<project>', 'Project description for Oracle planning')
     .option(
       '--oracle <model>',
-      'Oracle model (default: claude-3-opus)',
-      'claude-3-opus-20240229'
+      'Oracle model (default: claude-sonnet-4-5)',
+      'claude-sonnet-4-5-20250929'
     )
     .option(
       '--workers <models>',
       'Comma-separated worker models',
-      'claude-3-5-haiku-20241022'
+      'claude-haiku-4-5-20251001'
     )
     .option('--budget <amount>', 'Cost budget in USD', '10.0')
     .option('--max-workers <count>', 'Maximum worker agents', '5')
