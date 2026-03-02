@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+  <!-- Terminal window -->
+  <rect width="640" height="420" rx="8" fill="#1a1a1a"/>
+  <!-- Title bar -->
+  <rect width="640" height="32" rx="8" fill="#262626"/>
+  <rect y="24" width="640" height="8" fill="#262626"/>
+  <circle cx="20" cy="16" r="6" fill="#ef4444"/>
+  <circle cx="40" cy="16" r="6" fill="#eab308"/>
+  <circle cx="60" cy="16" r="6" fill="#22c55e"/>
+  <text x="280" y="20" fill="#737373" text-anchor="middle" font-size="12">Terminal</text>
+
+  <!-- Line 1: install -->
+  <text x="16" y="60" fill="#6ee7b7">$</text>
+  <text x="28" y="60" fill="#e5e5e5"> npm install -g @stackmemoryai/stackmemory</text>
+  <text x="16" y="80" fill="#737373">added 42 packages in 3.2s</text>
+
+  <!-- Line 2: init -->
+  <text x="16" y="110" fill="#6ee7b7">$</text>
+  <text x="28" y="110" fill="#e5e5e5"> stackmemory init</text>
+  <text x="16" y="130" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="130" fill="#a3a3a3"> Created .stackmemory/</text>
+  <text x="16" y="150" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="150" fill="#a3a3a3"> Initialized SQLite database</text>
+  <text x="16" y="170" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="170" fill="#a3a3a3"> FTS5 search index ready</text>
+
+  <!-- Line 3: setup-mcp -->
+  <text x="16" y="200" fill="#6ee7b7">$</text>
+  <text x="28" y="200" fill="#e5e5e5"> stackmemory setup-mcp</text>
+  <text x="16" y="220" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="220" fill="#a3a3a3"> Added StackMemory to Claude Code MCP config</text>
+  <text x="16" y="240" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="240" fill="#a3a3a3"> 32 MCP tools available</text>
+
+  <!-- Line 4: doctor -->
+  <text x="16" y="270" fill="#6ee7b7">$</text>
+  <text x="28" y="270" fill="#e5e5e5"> stackmemory doctor</text>
+  <text x="16" y="290" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="290" fill="#a3a3a3"> Database: OK</text>
+  <text x="16" y="310" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="310" fill="#a3a3a3"> MCP server: OK</text>
+  <text x="16" y="330" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="330" fill="#a3a3a3"> FTS5 search: OK</text>
+  <text x="16" y="350" fill="#22c55e">&#x2713;</text>
+  <text x="30" y="350" fill="#a3a3a3"> Hooks: installed</text>
+
+  <!-- Ready message -->
+  <text x="16" y="390" fill="#6ee7b7" font-weight="bold">Ready! Restart Claude Code to use StackMemory.</text>
+</svg>

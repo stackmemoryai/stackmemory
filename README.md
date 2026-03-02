@@ -5,7 +5,11 @@
 [![Coverage](https://codecov.io/gh/stackmemoryai/stackmemory/branch/main/graph/badge.svg)](https://codecov.io/gh/stackmemoryai/stackmemory)
 [![npm version](https://img.shields.io/npm/v/@stackmemoryai/stackmemory)](https://www.npmjs.com/package/@stackmemoryai/stackmemory)
 
-Lossless, project-scoped memory for AI coding tools.
+Lossless, project-scoped memory for AI coding tools. **[Website](https://stackmemoryai.github.io/stackmemory/)** | **[MCP Tools](https://stackmemoryai.github.io/stackmemory/tools.html)** | **[Getting Started](./docs/GETTING_STARTED.md)**
+
+<p align="center">
+  <img src="site/demo.svg" alt="StackMemory setup demo" width="560">
+</p>
 
 StackMemory is a **production-ready memory runtime** for AI coding tools that preserves full project context across sessions:
 
@@ -351,6 +355,8 @@ See [docs/cli.md](https://github.com/stackmemoryai/stackmemory/blob/main/docs/cl
 
 ## Documentation
 
+- [Getting Started](./docs/GETTING_STARTED.md) — Quick start guide (5 minutes)
+- [MCP Tools Reference](https://stackmemoryai.github.io/stackmemory/tools.html) — All 32 MCP tools
 - [CLI Reference](./docs/cli.md) — Full command reference
 - [Setup Guide](./docs/SETUP.md) — Advanced setup options
 - [Development Guide](./docs/DEVELOPMENT.md) — Contributing and development

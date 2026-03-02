@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <!-- Stack icon -->
+  <rect x="80" y="220" width="120" height="24" rx="4" fill="#525252"/>
+  <rect x="80" y="260" width="120" height="24" rx="4" fill="#737373"/>
+  <rect x="80" y="300" width="120" height="24" rx="4" fill="#a3a3a3"/>
+  <!-- Title -->
+  <text x="240" y="270" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="600" fill="#f5f5f5">StackMemory</text>
+  <!-- Tagline -->
+  <text x="240" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#a3a3a3">Lossless, project-scoped memory for AI coding tools</text>
+  <!-- Features row -->
+  <text x="80" y="440" font-family="ui-monospace, monospace" font-size="16" fill="#737373">32 MCP Tools  |  FTS5 Search  |  Linear Sync  |  Claude / Codex / OpenCode</text>
+  <!-- Install command -->
+  <rect x="80" y="480" width="550" height="44" rx="6" fill="#1a1a1a"/>
+  <text x="100" y="508" font-family="ui-monospace, monospace" font-size="16" fill="#a3a3a3">$ npm install -g @stackmemoryai/stackmemory</text>
+</svg>

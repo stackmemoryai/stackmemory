@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Tools Reference — StackMemory</title>
+  <meta name="description" content="Complete reference for StackMemory's 32 MCP tools: context management, task tracking, Linear integration, discovery, traces, team collaboration, and cord orchestration.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:title" content="StackMemory MCP Tools Reference">
+  <meta property="og:description" content="32 MCP tools for AI coding context management.">
+  <meta property="og:url" content="https://stackmemoryai.github.io/stackmemory/tools.html">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+</head>
+<body class="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 antialiased">
+
+  <header class="sticky top-0 z-50 backdrop-blur bg-white/80 dark:bg-neutral-950/80 border-b border-neutral-200 dark:border-neutral-800">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-semibold text-base tracking-tight">StackMemory</a>
+      <nav class="flex items-center gap-5 text-sm">
+        <a href="index.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Home</a>
+        <a href="compare.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Compare</a>
+        <a href="changelog.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Changelog</a>
+        <button id="theme-toggle" class="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" aria-label="Toggle theme">
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-16">
+    <h1 class="text-3xl font-semibold tracking-tight">MCP Tools Reference</h1>
+    <p class="mt-3 text-neutral-600 dark:text-neutral-400 text-sm">32 tools across 8 categories. All available via MCP protocol in Claude Code, Codex, and OpenCode.</p>
+
+    <!-- TOC -->
+    <nav class="mt-8 flex flex-wrap gap-2 text-sm">
+      <a href="#context" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Context (6)</a>
+      <a href="#tasks" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Tasks (4)</a>
+      <a href="#linear" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Linear (4)</a>
+      <a href="#traces" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Traces (5)</a>
+      <a href="#discovery" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Discovery (4)</a>
+      <a href="#edit" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Edit (1)</a>
+      <a href="#team" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Team (3)</a>
+      <a href="#cord" class="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">Cord (5)</a>
+    </nav>
+
+    <!-- Context Tools -->
+    <section id="context" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Context Management</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Core tools for reading and writing project context.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">get_context</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get current project context and active frame information.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">query?: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">limit?: number</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">add_decision</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Record a decision, constraint, or important information.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">content: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">type: "decision" | "constraint" | "learning"</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">start_frame</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Start a new frame (task/subtask) on the call stack.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">name: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">type?: "task" | "subtask" | "tool_scope" | "review" | "write" | "debug"</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">close_frame</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Close current or specified frame with optional summary.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">frameId?: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">summary?: string</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">add_anchor</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Add an important fact or decision anchor to current frame.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">type: "FACT" | "DECISION" | "CONSTRAINT" | "INTERFACE_CONTRACT" | "TODO" | "RISK"</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">text: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">priority?: 1-10</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">get_hot_stack</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get current hot stack of active frames.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">max_events?: number</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Task Tools -->
+    <section id="tasks" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Task Management</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Create, track, and analyze tasks within your project.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">create_task</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Create a new task with optional priority, tags, and parent.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">title: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">priority?: "low" | "medium" | "high" | "critical"</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">tags?: string[]</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">update_task_status</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Update task status and progress percentage.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">task_id: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">status: "pending" | "in-progress" | "blocked" | "completed" | "cancelled"</code>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">get_active_tasks</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get active tasks with filtering by status, priority, tags, or search.</p>
+        </div>
+
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">get_task_metrics</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get task analytics — completion rates, velocity, and distribution.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Linear Tools -->
+    <section id="linear" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Linear Integration</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Bidirectional sync with Linear for issue tracking.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">linear_sync</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Sync tasks with Linear issues. Supports both, from_linear, or to_linear directions.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">linear_update_task</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Update a Linear issue directly — status, assignee, priority, labels.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">linear_get_tasks</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get issues from Linear with filtering by team, assignee, state, or search.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">linear_status</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get Linear integration status — connection health, sync state, last sync time.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trace Tools -->
+    <section id="traces" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Traces &amp; Debugging</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Execution traces, browser debugging, and performance analysis.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">get_traces</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get execution traces with filtering and optional pattern analysis (performance, patterns, errors).</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">start_browser_debug</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Start a browser debugging session at a URL with optional headless mode and screenshot capture.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">take_screenshot</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Take a screenshot in an active browser session. Supports CSS selectors and full-page capture.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">execute_script</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Execute JavaScript in a browser session with argument passing.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">stop_browser_debug</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Stop an active browser debugging session.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Discovery Tools -->
+    <section id="discovery" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Discovery &amp; Search</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Find relevant files and search across all project context.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">sm_discover</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Discover relevant files based on current context. Extracts keywords from active frames and searches codebase.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">sm_related_files</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Find files related to a specific file or concept. Maps dependencies and connections.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">sm_session_summary</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get a summary of the current session — active tasks, recent files, decisions made.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">sm_search</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Search across all StackMemory context — frames, events, decisions, and tasks.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Edit Tools -->
+    <section id="edit" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Edit</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Fuzzy file editing as a fallback for whitespace mismatches.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">sm_edit</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Fuzzy file edit with four-tier matching: exact, whitespace-normalized, indentation-insensitive, and line-level fuzzy (Levenshtein). Fallback when the editor's built-in edit fails.</p>
+          <div class="mt-2 text-xs text-neutral-500">
+            <span class="font-semibold">Params:</span>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">file_path: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">old_string: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">new_string: string</code>
+            <code class="ml-1 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">threshold?: number</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team Tools -->
+    <section id="team" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Team Collaboration</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Multi-agent context sharing across sessions and teammates.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">team_context_get</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Get context from other agents working on the same project. Returns recent frames and shared anchors.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">team_context_share</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Share context with other agents. Creates a high-priority anchor visible to team_context_get.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">team_search</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Search across all agents' context in the project using full-text search.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cord Tools -->
+    <section id="cord" class="mt-12">
+      <h2 class="text-lg font-semibold tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-2">Cord Orchestration</h2>
+      <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Task decomposition with context scoping for multi-agent workflows.</p>
+
+      <div class="mt-4 space-y-6">
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">cord_spawn</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Create a subtask with clean context (spawn). Child sees only its prompt and completed blocker results.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">cord_fork</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Create a subtask with full sibling context (fork). Child sees blocker results AND completed sibling results.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">cord_complete</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Mark a cord task as completed with a result. Automatically unblocks dependent tasks.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">cord_ask</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Create an ask task — a question that blocks dependent tasks until answered.</p>
+        </div>
+        <div class="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-mono text-sm font-semibold">cord_tree</h3>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">View the cord task tree. Shows active, blocked, and completed tasks with context scoping.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-neutral-200 dark:border-neutral-800 mt-8">
+    <div class="max-w-5xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-neutral-500 dark:text-neutral-400">
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">GitHub</a>
+        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">npm</a>
+      </div>
+      <p>BSL 1.1 &mdash; converts to MIT after 4 years</p>
+    </div>
+  </footer>
+
+  <script>
+    const html = document.documentElement;
+    const toggle = document.getElementById('theme-toggle');
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || (!stored && window.matchMedia('(prefers-color-scheme: light)').matches)) html.classList.remove('dark');
+    toggle.addEventListener('click', () => { html.classList.toggle('dark'); localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light'); });
+  </script>
+</body>
+</html>

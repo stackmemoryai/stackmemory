@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Changelog — StackMemory</title>
+  <meta name="description" content="StackMemory release history and changelog.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+</head>
+<body class="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 antialiased">
+
+  <header class="sticky top-0 z-50 backdrop-blur bg-white/80 dark:bg-neutral-950/80 border-b border-neutral-200 dark:border-neutral-800">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-semibold text-base tracking-tight">StackMemory</a>
+      <nav class="flex items-center gap-5 text-sm">
+        <a href="index.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Home</a>
+        <a href="tools.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">MCP Tools</a>
+        <a href="compare.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Compare</a>
+        <button id="theme-toggle" class="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" aria-label="Toggle theme">
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-16">
+    <h1 class="text-3xl font-semibold tracking-tight">Changelog</h1>
+    <p class="mt-3 text-neutral-600 dark:text-neutral-400 text-sm">Release history for <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" class="underline underline-offset-2">@stackmemoryai/stackmemory</a></p>
+
+    <div class="mt-10 space-y-12">
+
+      <!-- Current -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.2.6</h2>
+          <span class="text-xs text-neutral-500 font-mono">current</span>
+          <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">latest</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Landing page with GitHub Pages deployment</li>
+          <li>Remove deprecated model references, update to current models</li>
+          <li>Theory skill for living THEORY.MD</li>
+          <li>Auto-capture THEORY.MD into medium-term storage</li>
+          <li>Fix codex-sm danger flag name</li>
+        </ul>
+      </section>
+
+      <!-- 1.2.5 -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.2.5</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-02-27</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Remove graphiti integration, merge analyze_traces, drop add_task_dependency</li>
+          <li>Cord/team MCP handlers, auto-save service, and evals</li>
+          <li>Comprehensive tests for 5 modules at 0% coverage</li>
+          <li>Fix glob expansion and auto-fix formatting across codebase</li>
+        </ul>
+      </section>
+
+      <!-- 1.2.3 -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.2.3</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-02-22</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Incremental GC with importance scoring and protection rules</li>
+          <li>Guard against rm -rf in hooks and source code</li>
+          <li>Remove ChromaDB integration entirely</li>
+          <li>Comprehensive frame manager test suite</li>
+        </ul>
+      </section>
+
+      <!-- 1.2.2 -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.2.2</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-02-20</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Parallel agent skill and expanded skill registry</li>
+          <li>Graphiti knowledge graph hooks and session summary</li>
+          <li>Greptile MCP integration for AI code review</li>
+          <li>Deploy instructions for npm publish and Railway</li>
+        </ul>
+      </section>
+
+      <!-- 1.2.1 -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.2.1</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-02-16</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Auto-install Claude Code hooks on session start</li>
+          <li>Dependency updates (semver-safe)</li>
+          <li>Fix flaky clear --status integration tests</li>
+        </ul>
+      </section>
+
+      <!-- 1.1.1 -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.1.1</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-02-12</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>6 trigger-based feedback loops with engine + CLI</li>
+          <li>Auto-compact at 95% of model token limit</li>
+          <li>Fix hooks: source nvm in pre-commit and pre-push</li>
+          <li>Multi-provider routing with sensitive content guard</li>
+        </ul>
+      </section>
+
+      <!-- 1.0.0 -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">1.0.0</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-02-10</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Stable release</li>
+          <li>Unified FrameDatabase and SQLiteAdapter schema</li>
+          <li>Reduce as-any casts by 25% (276 to 206) across 10 core modules</li>
+          <li>Remove stubs, dead scripts, stale docs, reduce tarball</li>
+          <li>SWE-bench harness benchmarks with baselines</li>
+          <li>sm_edit fuzzy MCP tool for whitespace-tolerant edits</li>
+        </ul>
+      </section>
+
+      <!-- 0.5.x -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">0.5.x</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-01 &mdash; 2026-02</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>FTS5 full-text search with BM25 scoring</li>
+          <li>Advanced agentic patterns (Oracle/Worker, Compounding Engineering)</li>
+          <li>Build command validation and codex integration improvements</li>
+          <li>Memory monitor daemon with RAM pressure detection</li>
+        </ul>
+      </section>
+
+      <!-- 0.4.x -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">0.4.x</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-01</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>TUI monitoring for Ralph swarms</li>
+          <li>Ralph Swarm multi-agent orchestration system</li>
+        </ul>
+      </section>
+
+      <!-- 0.3.x -->
+      <section>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-lg font-semibold">0.3.x</h2>
+          <span class="text-xs text-neutral-500 font-mono">2026-01</span>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <li>Initial public release</li>
+          <li>Core frame management and call stack model</li>
+          <li>SQLite adapter with context persistence</li>
+          <li>Claude Code MCP integration</li>
+          <li>Linear sync with API key support</li>
+          <li>Wrapper scripts (claude-sm, codex-sm, opencode-sm)</li>
+        </ul>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="border-t border-neutral-200 dark:border-neutral-800 mt-8">
+    <div class="max-w-5xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-neutral-500 dark:text-neutral-400">
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">GitHub</a>
+        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">npm</a>
+      </div>
+      <p>BSL 1.1 &mdash; converts to MIT after 4 years</p>
+    </div>
+  </footer>
+
+  <script>
+    const html = document.documentElement;
+    const toggle = document.getElementById('theme-toggle');
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || (!stored && window.matchMedia('(prefers-color-scheme: light)').matches)) html.classList.remove('dark');
+    toggle.addEventListener('click', () => { html.classList.toggle('dark'); localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light'); });
+  </script>
+</body>
+</html>

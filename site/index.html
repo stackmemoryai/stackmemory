@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StackMemory — Lossless memory for AI coding tools</title>
   <meta name="description" content="Lossless, project-scoped memory for AI coding tools. Durable context across sessions with MCP tools, FTS5 search, Linear sync, and automatic hooks.">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="StackMemory — Lossless memory for AI coding tools">
+  <meta property="og:description" content="Project-scoped memory runtime that preserves full context across sessions. 32 MCP tools, FTS5 search, Linear sync, Claude/Codex/OpenCode wrappers.">
+  <meta property="og:url" content="https://stackmemoryai.github.io/stackmemory/">
+  <meta property="og:image" content="https://stackmemoryai.github.io/stackmemory/og-image.png">
+  <meta property="og:site_name" content="StackMemory">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="StackMemory — Lossless memory for AI coding tools">
+  <meta name="twitter:description" content="Project-scoped memory runtime that preserves full context across sessions. 32 MCP tools, FTS5 search, Linear sync.">
+  <meta name="twitter:image" content="https://stackmemoryai.github.io/stackmemory/og-image.png">
+
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -37,9 +52,10 @@
       <a href="#" class="font-semibold text-base tracking-tight">StackMemory</a>
       <nav class="flex items-center gap-5 text-sm">
         <a href="#features" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Features</a>
-        <a href="#quickstart" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Quick Start</a>
+        <a href="tools.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Tools</a>
+        <a href="compare.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Compare</a>
+        <a href="changelog.html" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Changelog</a>
         <a href="https://github.com/stackmemoryai/stackmemory" target="_blank" rel="noopener" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors underline underline-offset-2">GitHub</a>
-        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" target="_blank" rel="noopener" class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors underline underline-offset-2">npm</a>
         <button id="theme-toggle" class="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" aria-label="Toggle theme">
           <svg id="icon-sun" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           <svg id="icon-moon" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
@@ -66,6 +82,11 @@
         <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory"><img src="https://img.shields.io/npm/v/@stackmemoryai/stackmemory" alt="npm version"></a>
         <a href="https://github.com/stackmemoryai/stackmemory/actions/workflows/test-shared-context.yml"><img src="https://github.com/stackmemoryai/stackmemory/actions/workflows/test-shared-context.yml/badge.svg?branch=main" alt="Tests"></a>
         <a href="https://codecov.io/gh/stackmemoryai/stackmemory"><img src="https://codecov.io/gh/stackmemoryai/stackmemory/branch/main/graph/badge.svg" alt="Coverage"></a>
+      </div>
+
+      <!-- Terminal demo -->
+      <div class="mt-10">
+        <img src="demo.svg" alt="StackMemory setup demo" class="rounded-lg shadow-lg max-w-xl w-full">
       </div>
     </section>
 
@@ -224,9 +245,11 @@ stackmemory doctor</code></pre>
   <footer class="border-t border-neutral-200 dark:border-neutral-800 mt-8">
     <div class="max-w-5xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-neutral-500 dark:text-neutral-400">
       <div class="flex items-center gap-4">
+        <a href="tools.html" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">MCP Tools</a>
+        <a href="compare.html" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">Compare</a>
+        <a href="changelog.html" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">Changelog</a>
         <a href="https://github.com/stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">GitHub</a>
         <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">npm</a>
-        <a href="https://github.com/stackmemoryai/stackmemory/blob/main/docs/cli.md" target="_blank" rel="noopener" class="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 transition-colors">Docs</a>
       </div>
       <p>BSL 1.1 &mdash; converts to MIT after 4 years</p>
     </div>
