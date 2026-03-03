@@ -131,4 +131,4 @@ Hooks handle:
 
 - Read the [CLI Reference](./cli.md) for all commands
 - Explore the [Architecture](./architecture.md) to understand the call stack model
-- Check the [MCP Tools Reference](./MCP_TOOLS.md) for all 32 tools
+- Check the [MCP Tools Reference](./MCP_TOOLS.md) for all 56 tools

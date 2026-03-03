@@ -329,31 +329,271 @@ export function createDoctorCommand(): Command {
         });
       }
 
-      // 6. Check environment variables
-      const envChecks = [
-        { key: 'LINEAR_API_KEY', name: 'Linear API Key', optional: true },
-      ];
+      // 6. Auto-detect Linear API token
+      {
+        let linearTokenFound = false;
+        let linearTokenSource = '';
 
-      for (const check of envChecks) {
-        const value = process.env[check.key];
-        if (value) {
+        // Check process.env first
+        if (process.env['LINEAR_API_KEY']) {
+          linearTokenFound = true;
+          linearTokenSource = 'process.env';
+        }
+
+        // Check .env file
+        if (!linearTokenFound) {
+          const envPath = join(process.cwd(), '.env');
+          if (existsSync(envPath)) {
+            try {
+              const envContent = readFileSync(envPath, 'utf8');
+              if (/^LINEAR_API_KEY\s*=/m.test(envContent)) {
+                linearTokenFound = true;
+                linearTokenSource = '.env';
+              }
+            } catch {
+              // Cannot read .env
+            }
+          }
+        }
+
+        // Check .env.local file
+        if (!linearTokenFound) {
+          const envLocalPath = join(process.cwd(), '.env.local');
+          if (existsSync(envLocalPath)) {
+            try {
+              const envContent = readFileSync(envLocalPath, 'utf8');
+              if (/^LINEAR_API_KEY\s*=/m.test(envContent)) {
+                linearTokenFound = true;
+                linearTokenSource = '.env.local';
+              }
+            } catch {
+              // Cannot read .env.local
+            }
+          }
+        }
+
+        if (linearTokenFound) {
           results.push({
-            name: check.name,
+            name: 'Linear API Token',
             status: 'ok',
-            message: 'Environment variable set',
+            message: `Token found via ${linearTokenSource}`,
           });
-        } else if (!check.optional) {
+        } else {
           results.push({
-            name: check.name,
-            status: 'error',
-            message: 'Required environment variable not set',
-            fix: `Set ${check.key} in your .env file`,
+            name: 'Linear API Token',
+            status: 'warn',
+            message:
+              'LINEAR_API_KEY not found (checked process.env, .env, .env.local)',
+            fix: 'Add LINEAR_API_KEY=lin_api_... to your .env file',
           });
         }
-        // Skip optional env vars that aren't set
       }
 
-      // 7. Check file permissions
+      // 7. Detect existing hooks (settings.json canonical hooks)
+      {
+        const settingsPath = join(homedir(), '.claude', 'settings.json');
+        const projectHooksDir = join(process.cwd(), '.claude', 'hooks');
+        const globalHooksDir = join(homedir(), '.claude', 'hooks');
+
+        const expectedHookScripts = [
+          'session-rescue.sh',
+          'stop-checkpoint.js',
+          'chime-on-stop.sh',
+          'auto-checkpoint.js',
+          'cord-trace.js',
+        ];
+
+        // Check settings.json for registered hooks
+        const registeredHooks: string[] = [];
+        if (existsSync(settingsPath)) {
+          try {
+            const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+            if (settings.hooks) {
+              for (const eventType of Object.keys(settings.hooks)) {
+                const groups = settings.hooks[eventType] as Array<{
+                  hooks: Array<{ command: string }>;
+                }>;
+                for (const group of groups) {
+                  for (const hook of group.hooks) {
+                    registeredHooks.push(hook.command);
+                  }
+                }
+              }
+            }
+          } catch {
+            // Cannot parse settings.json
+          }
+        }
+
+        // Check which expected scripts are present on disk
+        const presentScripts: string[] = [];
+        const missingScripts: string[] = [];
+        for (const script of expectedHookScripts) {
+          const inGlobal = existsSync(join(globalHooksDir, script));
+          const inProject = existsSync(join(projectHooksDir, script));
+          if (inGlobal || inProject) {
+            presentScripts.push(script);
+          } else {
+            missingScripts.push(script);
+          }
+        }
+
+        // Check which are registered in settings.json
+        const unregisteredScripts = expectedHookScripts.filter(
+          (script) => !registeredHooks.some((cmd) => cmd.includes(script))
+        );
+
+        if (
+          presentScripts.length === expectedHookScripts.length &&
+          unregisteredScripts.length === 0
+        ) {
+          results.push({
+            name: 'Hook Scripts',
+            status: 'ok',
+            message: `All ${expectedHookScripts.length} hook scripts present and registered`,
+          });
+        } else if (presentScripts.length > 0) {
+          const parts: string[] = [];
+          if (missingScripts.length > 0) {
+            parts.push(`missing files: ${missingScripts.join(', ')}`);
+          }
+          if (unregisteredScripts.length > 0) {
+            parts.push(
+              `not in settings.json: ${unregisteredScripts.join(', ')}`
+            );
+          }
+          results.push({
+            name: 'Hook Scripts',
+            status: 'warn',
+            message: `${presentScripts.length}/${expectedHookScripts.length} hooks present; ${parts.join('; ')}`,
+            fix: 'Run: stackmemory hooks install',
+          });
+        } else {
+          results.push({
+            name: 'Hook Scripts',
+            status: 'warn',
+            message: 'No StackMemory hook scripts found',
+            fix: 'Run: stackmemory hooks install',
+          });
+        }
+      }
+
+      // 8. Check Node.js version (requires >= 20.0.0)
+      {
+        const nodeVersion = process.version; // e.g. "v20.11.0"
+        const major = parseInt(nodeVersion.slice(1), 10);
+        if (major >= 20) {
+          results.push({
+            name: 'Node.js Version',
+            status: 'ok',
+            message: `${nodeVersion} (requires >= 20.0.0)`,
+          });
+        } else {
+          results.push({
+            name: 'Node.js Version',
+            status: 'error',
+            message: `${nodeVersion} is too old (requires >= 20.0.0)`,
+            fix: 'Upgrade Node.js: https://nodejs.org/',
+          });
+        }
+      }
+
+      // 9. Check npm version (requires >= 10.0.0)
+      {
+        try {
+          const npmVersion = execSync('npm --version', {
+            encoding: 'utf-8',
+            timeout: 5000,
+          }).trim();
+          const npmMajor = parseInt(npmVersion.split('.')[0], 10);
+          if (npmMajor >= 10) {
+            results.push({
+              name: 'npm Version',
+              status: 'ok',
+              message: `v${npmVersion} (requires >= 10.0.0)`,
+            });
+          } else {
+            results.push({
+              name: 'npm Version',
+              status: 'warn',
+              message: `v${npmVersion} is below recommended >= 10.0.0`,
+              fix: 'Upgrade npm: npm install -g npm@latest',
+            });
+          }
+        } catch {
+          results.push({
+            name: 'npm Version',
+            status: 'warn',
+            message: 'Could not detect npm version',
+            fix: 'Ensure npm is installed and in PATH',
+          });
+        }
+      }
+
+      // 10. Detect MCP config in Claude settings
+      {
+        const configJsonPath = join(homedir(), '.claude', 'config.json');
+        const mcpJsonPath = join(homedir(), '.claude', 'stackmemory-mcp.json');
+        let mcpRegistered = false;
+        let mcpServerConfigured = false;
+
+        // Check config.json references stackmemory MCP config file
+        if (existsSync(configJsonPath)) {
+          try {
+            const configJson = JSON.parse(readFileSync(configJsonPath, 'utf8'));
+            const configFiles =
+              (configJson?.mcp?.configFiles as string[]) || [];
+            mcpRegistered = configFiles.some((f: string) =>
+              f.includes('stackmemory')
+            );
+          } catch {
+            // Cannot parse config.json
+          }
+        }
+
+        // Check the MCP config file itself has stackmemory server entry
+        if (existsSync(mcpJsonPath)) {
+          try {
+            const mcpConfig = JSON.parse(readFileSync(mcpJsonPath, 'utf8'));
+            mcpServerConfigured = !!mcpConfig?.mcpServers?.stackmemory;
+          } catch {
+            // Cannot parse MCP config
+          }
+        }
+
+        if (mcpRegistered && mcpServerConfigured) {
+          results.push({
+            name: 'MCP Registration',
+            status: 'ok',
+            message:
+              'StackMemory MCP registered in Claude config.json and server configured',
+          });
+        } else if (mcpServerConfigured && !mcpRegistered) {
+          results.push({
+            name: 'MCP Registration',
+            status: 'warn',
+            message:
+              'MCP server config exists but not referenced in config.json',
+            fix: 'Run: stackmemory setup-mcp',
+          });
+        } else if (mcpRegistered && !mcpServerConfigured) {
+          results.push({
+            name: 'MCP Registration',
+            status: 'warn',
+            message: 'config.json references MCP but server config missing',
+            fix: 'Run: stackmemory setup-mcp',
+          });
+        } else {
+          results.push({
+            name: 'MCP Registration',
+            status: 'warn',
+            message: 'StackMemory not registered in Claude MCP settings',
+            fix: 'Run: stackmemory setup-mcp',
+          });
+        }
+      }
+
+      // 11. Check file permissions
       const homeStackmemory = join(homedir(), '.stackmemory');
       if (existsSync(homeStackmemory)) {
         try {

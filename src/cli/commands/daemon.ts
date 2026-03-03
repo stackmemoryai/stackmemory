@@ -6,8 +6,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, readFileSync, unlinkSync } from 'fs';
-import { spawn } from 'child_process';
+import { existsSync, readFileSync, unlinkSync, statSync } from 'fs';
+import { spawn, execSync } from 'child_process';
 import { join } from 'path';
 import {
   loadDaemonConfig,
@@ -16,6 +16,7 @@ import {
   getDaemonPaths,
   DEFAULT_DAEMON_CONFIG,
   type DaemonConfig,
+  type DaemonStatus,
 } from '../../daemon/daemon-config.js';
 
 export function createDaemonCommand(): Command {
@@ -28,6 +29,7 @@ Examples:
   stackmemory daemon start      Start the daemon
   stackmemory daemon stop       Stop the daemon
   stackmemory daemon status     Check daemon status
+  stackmemory daemon health     Check daemon health metrics
   stackmemory daemon logs       View daemon logs
   stackmemory daemon config     Show/edit configuration
 
@@ -381,6 +383,148 @@ The daemon provides:
       }
     });
 
+  // Health command
+  cmd
+    .command('health')
+    .description('Check daemon health metrics')
+    .option('--json', 'Output as JSON')
+    .action((options) => {
+      const status = readDaemonStatus();
+      const config = loadDaemonConfig();
+      const paths = getDaemonPaths();
+
+      if (options.json) {
+        const health = buildHealthReport(status, config, paths);
+        console.log(JSON.stringify(health, null, 2));
+        return;
+      }
+
+      console.log(chalk.bold('\nDaemon Health Check\n'));
+
+      // 1. Running check
+      if (!status.running) {
+        console.log(`${chalk.red('[DOWN]')} Daemon Process`);
+        console.log(chalk.gray('    Daemon is not running'));
+        console.log(chalk.cyan('    Fix: stackmemory daemon start'));
+        console.log('');
+        console.log(`Overall: ${chalk.red('RED')} - daemon not running`);
+        return;
+      }
+
+      const checks: HealthCheck[] = [];
+
+      // 2. Process check
+      checks.push({
+        name: 'Daemon Process',
+        status: 'ok',
+        detail: `PID ${status.pid}`,
+      });
+
+      // 3. Uptime
+      if (status.uptime) {
+        const uptimeStr = formatDuration(status.uptime);
+        // Warn if uptime < 60s (just started / restarting)
+        const uptimeStatus = status.uptime < 60_000 ? 'warn' : 'ok';
+        checks.push({
+          name: 'Uptime',
+          status: uptimeStatus,
+          detail: uptimeStr,
+        });
+      }
+
+      // 4. Memory usage (RSS of daemon process)
+      if (status.pid) {
+        const memInfo = getProcessMemory(status.pid);
+        if (memInfo) {
+          const mbUsed = Math.round(memInfo / 1024 / 1024);
+          // Warn at 256MB, error at 512MB
+          const memStatus =
+            mbUsed > 512 ? 'error' : mbUsed > 256 ? 'warn' : 'ok';
+          checks.push({
+            name: 'Memory (RSS)',
+            status: memStatus,
+            detail: `${mbUsed} MB`,
+          });
+        } else {
+          checks.push({
+            name: 'Memory (RSS)',
+            status: 'warn',
+            detail: 'Could not read process memory',
+          });
+        }
+      }
+
+      // 5. Service checks with last sync times
+      const serviceChecks = getServiceHealthChecks(status, config);
+      checks.push(...serviceChecks);
+
+      // 6. Error count from logs
+      const errorInfo = countRecentErrors(paths.logFile);
+      const errorStatus =
+        errorInfo.count > 10 ? 'error' : errorInfo.count > 0 ? 'warn' : 'ok';
+      checks.push({
+        name: 'Recent Errors (1h)',
+        status: errorStatus,
+        detail:
+          errorInfo.count === 0
+            ? 'None'
+            : `${errorInfo.count} error${errorInfo.count !== 1 ? 's' : ''}${errorInfo.lastError ? ` (latest: ${errorInfo.lastError.slice(0, 60)})` : ''}`,
+      });
+
+      // 7. Log file size
+      if (existsSync(paths.logFile)) {
+        try {
+          const stat = statSync(paths.logFile);
+          const sizeMb = (stat.size / 1024 / 1024).toFixed(1);
+          const logStatus =
+            stat.size > 100 * 1024 * 1024
+              ? 'error'
+              : stat.size > 50 * 1024 * 1024
+                ? 'warn'
+                : 'ok';
+          checks.push({
+            name: 'Log File Size',
+            status: logStatus,
+            detail: `${sizeMb} MB`,
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      // Display table
+      const maxNameLen = Math.max(...checks.map((c) => c.name.length));
+
+      for (const check of checks) {
+        const icon =
+          check.status === 'ok'
+            ? chalk.green('[OK]   ')
+            : check.status === 'warn'
+              ? chalk.yellow('[WARN] ')
+              : chalk.red('[ERROR]');
+
+        const paddedName = check.name.padEnd(maxNameLen + 2);
+        console.log(`  ${icon} ${paddedName} ${chalk.gray(check.detail)}`);
+      }
+
+      // Overall health
+      const hasError = checks.some((c) => c.status === 'error');
+      const hasWarn = checks.some((c) => c.status === 'warn');
+
+      console.log('');
+      if (hasError) {
+        console.log(
+          `Overall: ${chalk.red('RED')} - one or more critical issues detected`
+        );
+      } else if (hasWarn) {
+        console.log(
+          `Overall: ${chalk.yellow('YELLOW')} - healthy with warnings`
+        );
+      } else {
+        console.log(`Overall: ${chalk.green('GREEN')} - all services healthy`);
+      }
+    });
+
   // Logs command
   cmd
     .command('logs')
@@ -584,6 +728,314 @@ function getDaemonScriptPath(): string | null {
   }
 
   return candidates[0]; // Return first candidate as fallback
+}
+
+/**
+ * Health check types and helpers
+ */
+
+interface HealthCheck {
+  name: string;
+  status: 'ok' | 'warn' | 'error';
+  detail: string;
+}
+
+interface HealthReport {
+  overall: 'GREEN' | 'YELLOW' | 'RED';
+  running: boolean;
+  pid?: number;
+  uptime?: number;
+  uptimeFormatted?: string;
+  memoryMb?: number;
+  services: Record<
+    string,
+    { enabled: boolean; status: string; lastRun?: number; lastRunAgo?: string }
+  >;
+  errors: { recentCount: number; lastError?: string };
+  logFileSizeMb?: number;
+}
+
+function formatDuration(ms: number): string {
+  const totalSecs = Math.round(ms / 1000);
+  const days = Math.floor(totalSecs / 86400);
+  const hours = Math.floor((totalSecs % 86400) / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  if (parts.length === 0 || secs > 0) parts.push(`${secs}s`);
+  return parts.join(' ');
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const ago = Date.now() - timestamp;
+  if (ago < 60_000) return `${Math.round(ago / 1000)}s ago`;
+  if (ago < 3600_000) return `${Math.round(ago / 60_000)}m ago`;
+  if (ago < 86400_000) return `${(ago / 3600_000).toFixed(1)}h ago`;
+  return `${(ago / 86400_000).toFixed(1)}d ago`;
+}
+
+function getProcessMemory(pid: number): number | null {
+  try {
+    // macOS/Linux: read RSS from ps (returns KB)
+    const output = execSync(`ps -o rss= -p ${pid}`, {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: 'pipe',
+    }).trim();
+    const rssKb = parseInt(output, 10);
+    if (isNaN(rssKb)) return null;
+    return rssKb * 1024; // return bytes
+  } catch {
+    return null;
+  }
+}
+
+function getServiceHealthChecks(
+  status: DaemonStatus,
+  config: DaemonConfig
+): HealthCheck[] {
+  const checks: HealthCheck[] = [];
+
+  // Context service
+  const ctx = status.services.context;
+  if (ctx.enabled) {
+    const intervalMs = config.context.interval * 60_000;
+    const overdue = ctx.lastRun
+      ? Date.now() - ctx.lastRun > intervalMs * 2
+      : false;
+    checks.push({
+      name: 'Context Service',
+      status: overdue ? 'warn' : 'ok',
+      detail: ctx.lastRun
+        ? `Last save: ${formatTimeAgo(ctx.lastRun)} | Saves: ${ctx.saveCount ?? 0}`
+        : `Enabled (interval: ${config.context.interval}m) | No saves yet`,
+    });
+  } else {
+    checks.push({
+      name: 'Context Service',
+      status: 'ok',
+      detail: 'Disabled',
+    });
+  }
+
+  // Linear service
+  const lin = status.services.linear;
+  if (lin.enabled) {
+    const intervalMs = config.linear.interval * 60_000;
+    const overdue = lin.lastRun
+      ? Date.now() - lin.lastRun > intervalMs * 2
+      : false;
+    checks.push({
+      name: 'Linear Service',
+      status: overdue ? 'warn' : 'ok',
+      detail: lin.lastRun
+        ? `Last sync: ${formatTimeAgo(lin.lastRun)} | Syncs: ${lin.syncCount ?? 0}`
+        : `Enabled (interval: ${config.linear.interval}m) | No syncs yet`,
+    });
+  } else {
+    checks.push({
+      name: 'Linear Service',
+      status: 'ok',
+      detail: 'Disabled',
+    });
+  }
+
+  // Maintenance service
+  const maint = status.services.maintenance;
+  if (maint?.enabled) {
+    const intervalMs = config.maintenance.interval * 60_000;
+    const overdue = maint.lastRun
+      ? Date.now() - maint.lastRun > intervalMs * 2
+      : false;
+    checks.push({
+      name: 'Maintenance Service',
+      status: overdue ? 'warn' : 'ok',
+      detail: maint.lastRun
+        ? `Last run: ${formatTimeAgo(maint.lastRun)} | FTS rebuilds: ${maint.ftsRebuilds ?? 0} | Stale cleaned: ${maint.staleFramesCleaned ?? 0}`
+        : `Enabled (interval: ${config.maintenance.interval}m) | No runs yet`,
+    });
+  } else {
+    checks.push({
+      name: 'Maintenance Service',
+      status: 'ok',
+      detail: 'Disabled',
+    });
+  }
+
+  // Memory service
+  const mem = status.services.memory;
+  if (mem?.enabled) {
+    const ramStr =
+      mem.currentRamPercent !== undefined
+        ? `RAM: ${Math.round(mem.currentRamPercent * 100)}%`
+        : 'RAM: n/a';
+    const triggerStr = `Triggers: ${mem.triggerCount ?? 0}`;
+    checks.push({
+      name: 'Memory Service',
+      status: 'ok',
+      detail: `${ramStr} | ${triggerStr}`,
+    });
+  } else {
+    checks.push({
+      name: 'Memory Service',
+      status: 'ok',
+      detail: 'Disabled',
+    });
+  }
+
+  // File watch
+  const fw = status.services.fileWatch;
+  checks.push({
+    name: 'FileWatch Service',
+    status: 'ok',
+    detail: fw.enabled
+      ? `Active | Events: ${fw.eventsProcessed ?? 0}`
+      : 'Disabled',
+  });
+
+  return checks;
+}
+
+function countRecentErrors(logFile: string): {
+  count: number;
+  lastError?: string;
+} {
+  if (!existsSync(logFile)) {
+    return { count: 0 };
+  }
+
+  try {
+    const content = readFileSync(logFile, 'utf8');
+    const lines = content.trim().split('\n');
+    const oneHourAgo = Date.now() - 3600_000;
+
+    let count = 0;
+    let lastError: string | undefined;
+
+    // Read from the end for efficiency
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lines[i]);
+        const timestamp = new Date(entry.timestamp).getTime();
+
+        // Stop scanning once we pass the 1-hour window
+        if (timestamp < oneHourAgo) break;
+
+        if (entry.level === 'ERROR') {
+          count++;
+          if (!lastError) {
+            lastError = entry.message;
+          }
+        }
+      } catch {
+        // skip malformed lines
+      }
+    }
+
+    return { count, lastError };
+  } catch {
+    return { count: 0 };
+  }
+}
+
+function buildHealthReport(
+  status: DaemonStatus,
+  config: DaemonConfig,
+  paths: ReturnType<typeof getDaemonPaths>
+): HealthReport {
+  if (!status.running) {
+    return {
+      overall: 'RED',
+      running: false,
+      services: {},
+      errors: { recentCount: 0 },
+    };
+  }
+
+  const errorInfo = countRecentErrors(paths.logFile);
+  let memoryMb: number | undefined;
+  if (status.pid) {
+    const memBytes = getProcessMemory(status.pid);
+    if (memBytes) memoryMb = Math.round(memBytes / 1024 / 1024);
+  }
+
+  const services: HealthReport['services'] = {};
+
+  const svcEntries: Array<{
+    key: string;
+    enabled: boolean;
+    lastRun?: number;
+  }> = [
+    {
+      key: 'context',
+      enabled: status.services.context.enabled,
+      lastRun: status.services.context.lastRun,
+    },
+    {
+      key: 'linear',
+      enabled: status.services.linear.enabled,
+      lastRun: status.services.linear.lastRun,
+    },
+    {
+      key: 'maintenance',
+      enabled: status.services.maintenance?.enabled ?? false,
+      lastRun: status.services.maintenance?.lastRun,
+    },
+    {
+      key: 'memory',
+      enabled: status.services.memory?.enabled ?? false,
+      lastRun: status.services.memory?.lastTrigger,
+    },
+    {
+      key: 'fileWatch',
+      enabled: status.services.fileWatch.enabled,
+    },
+  ];
+
+  for (const svc of svcEntries) {
+    services[svc.key] = {
+      enabled: svc.enabled,
+      status: svc.enabled ? 'running' : 'disabled',
+      lastRun: svc.lastRun,
+      lastRunAgo: svc.lastRun ? formatTimeAgo(svc.lastRun) : undefined,
+    };
+  }
+
+  let logFileSizeMb: number | undefined;
+  if (existsSync(paths.logFile)) {
+    try {
+      const stat = statSync(paths.logFile);
+      logFileSizeMb = parseFloat((stat.size / 1024 / 1024).toFixed(1));
+    } catch {
+      // ignore
+    }
+  }
+
+  const hasError =
+    errorInfo.count > 10 ||
+    (memoryMb !== undefined && memoryMb > 512) ||
+    (logFileSizeMb !== undefined && logFileSizeMb > 100);
+  const hasWarn =
+    errorInfo.count > 0 ||
+    (memoryMb !== undefined && memoryMb > 256) ||
+    (status.uptime !== undefined && status.uptime < 60_000) ||
+    (logFileSizeMb !== undefined && logFileSizeMb > 50);
+
+  return {
+    overall: hasError ? 'RED' : hasWarn ? 'YELLOW' : 'GREEN',
+    running: true,
+    pid: status.pid,
+    uptime: status.uptime,
+    uptimeFormatted: status.uptime ? formatDuration(status.uptime) : undefined,
+    memoryMb,
+    services,
+    errors: { recentCount: errorInfo.count, lastError: errorInfo.lastError },
+    logFileSizeMb,
+  };
 }
 
 export default createDaemonCommand();

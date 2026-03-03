@@ -30,7 +30,7 @@
   <text x="16" y="220" fill="#22c55e">&#x2713;</text>
   <text x="30" y="220" fill="#a3a3a3"> Added StackMemory to Claude Code MCP config</text>
   <text x="16" y="240" fill="#22c55e">&#x2713;</text>
-  <text x="30" y="240" fill="#a3a3a3"> 55 MCP tools available</text>
+  <text x="30" y="240" fill="#a3a3a3"> 56 MCP tools available</text>
 
   <!-- Line 4: doctor -->
   <text x="16" y="270" fill="#6ee7b7">$</text>
