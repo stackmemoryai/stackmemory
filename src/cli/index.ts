@@ -61,6 +61,7 @@ import { createPingCommand } from './commands/ping.js';
 import { createAuditCommand } from './commands/audit.js';
 import { createStatsCommand } from './commands/stats.js';
 import { createBenchCommand } from './commands/bench.js';
+import { createDigestCommands } from './commands/digest.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -682,6 +683,7 @@ program.addCommand(createModelCommand());
 program.addCommand(createAuditCommand());
 program.addCommand(createStatsCommand());
 program.addCommand(createBenchCommand());
+program.addCommand(createDigestCommands());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);

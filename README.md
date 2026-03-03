@@ -14,7 +14,7 @@ Lossless, project-scoped memory for AI coding tools. **[Website](https://stackme
 StackMemory is a **production-ready memory runtime** for AI coding tools that preserves full project context across sessions:
 
 - **Zero-config setup** — `stackmemory init` just works
-- **32 MCP tools** for Claude Code integration (context, tasks, Linear, traces, discovery, cord, team)
+- **55 MCP tools** for Claude Code integration (context, tasks, Linear, traces, discovery, cord, team)
 - **FTS5 full-text search** with BM25 scoring and hybrid retrieval
 - **Full Linear integration** with bidirectional sync and OAuth/API key support
 - **Context persistence** that survives `/clear` operations
@@ -57,7 +57,7 @@ Tools forget decisions and constraints between sessions. StackMemory makes conte
 
 ## Features
 
-- **MCP tools** for Claude Code: 36 tools across context, tasks, Linear, traces, discovery, cord, and team
+- **MCP tools** for Claude Code: 56 tools across context, tasks, Linear, traces, planning, discovery, cord, team, and more
 - **FTS5 search**: full-text search with BM25 scoring, hybrid retrieval, and smart thresholds
 - **Skills**: `/spec` (iterative spec generation), `/linear-run` (task execution via RLM)
 - **Hooks**: automatic context save, task tracking, Linear sync, PROMPT_PLAN updates, cord tracing
@@ -356,7 +356,7 @@ See [docs/cli.md](https://github.com/stackmemoryai/stackmemory/blob/main/docs/cl
 ## Documentation
 
 - [Getting Started](./docs/GETTING_STARTED.md) — Quick start guide (5 minutes)
-- [MCP Tools Reference](https://stackmemoryai.github.io/stackmemory/tools.html) — All 32 MCP tools
+- [MCP Tools Reference](https://stackmemoryai.github.io/stackmemory/tools.html) — All 55 MCP tools
 - [CLI Reference](./docs/cli.md) — Full command reference
 - [Setup Guide](./docs/SETUP.md) — Advanced setup options
 - [Development Guide](./docs/DEVELOPMENT.md) — Contributing and development

@@ -7,3 +7,4 @@ export * from './types.js';
 export * from './hybrid-digest-generator.js';
 export * from './hybrid-digest.js';
 export * from './frame-digest-integration.js';
+export * from './chronological-digest.js';

@@ -45,6 +45,13 @@ import { LLMContextRetrieval } from '../../core/retrieval/index.js';
 import { DiscoveryHandlers } from './handlers/discovery-handlers.js';
 import { DiffMemHandlers } from './handlers/diffmem-handlers.js';
 import { GreptileHandlers } from './handlers/greptile-handlers.js';
+import { CordHandlers } from './handlers/cord-handlers.js';
+import { TeamHandlers } from './handlers/team-handlers.js';
+import { SQLiteAdapter } from '../../core/database/sqlite-adapter.js';
+import {
+  generateChronologicalDigest,
+  type DigestPeriod,
+} from '../../core/digest/chronological-digest.js';
 import { fuzzyEdit } from '../../utils/fuzzy-edit.js';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -89,6 +96,8 @@ class LocalStackMemoryMCP {
   private providerHandlers:
     | import('./handlers/provider-handlers.js').ProviderHandlers
     | null = null;
+  private cordHandlers: CordHandlers | null = null;
+  private teamHandlers: TeamHandlers | null = null;
   private pendingPlans: Map<string, any> = new Map();
 
   constructor() {
@@ -188,6 +197,9 @@ class LocalStackMemoryMCP {
 
     // Initialize Greptile Handlers
     this.greptileHandlers = new GreptileHandlers();
+
+    // Initialize Cord and Team Handlers (async - best effort)
+    this.initCordTeamHandlers();
 
     // Initialize Provider Handlers (lazy, only when multiProvider enabled)
     this.initProviderHandlers();
@@ -359,6 +371,28 @@ class LocalStackMemoryMCP {
     });
   }
 
+  private async initCordTeamHandlers(): Promise<void> {
+    try {
+      const dbPath = join(this.projectRoot, '.stackmemory', 'context.db');
+      const adapter = new SQLiteAdapter(this.projectId, {
+        dbPath,
+        walMode: true,
+      });
+      await adapter.connect();
+      this.cordHandlers = new CordHandlers({
+        frameManager: this.frameManager,
+        dbAdapter: adapter,
+      });
+      this.teamHandlers = new TeamHandlers({
+        frameManager: this.frameManager,
+        dbAdapter: adapter,
+      });
+      logger.info('Cord and Team handlers initialized');
+    } catch (error) {
+      logger.warn('Failed to initialize Cord/Team handlers', { error });
+    }
+  }
+
   private async initProviderHandlers(): Promise<void> {
     if (!isFeatureEnabled('multiProvider')) return;
     try {
@@ -397,208 +431,190 @@ class LocalStackMemoryMCP {
                 },
               },
             },
-            {
-              name: 'plan_and_code',
-              description:
-                'Generate a plan (Claude), attempt implementation (Codex/Claude), and return JSON result. Quiet by default.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  task: { type: 'string', description: 'Task description' },
-                  implementer: {
-                    type: 'string',
-                    enum: ['codex', 'claude'],
-                    default: 'codex',
-                    description: 'Which agent implements code',
-                  },
-                  maxIters: {
-                    type: 'number',
-                    default: 2,
-                    description: 'Retry loop iterations',
-                  },
-                  execute: {
-                    type: 'boolean',
-                    default: false,
+            // Planning tools (only when ANTHROPIC_API_KEY is set)
+            ...(process.env.ANTHROPIC_API_KEY
+              ? [
+                  {
+                    name: 'plan_gate',
                     description:
-                      'Actually call implementer (otherwise dry-run)',
+                      'Phase 1: Generate a plan and return an approvalId for later execution',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        task: {
+                          type: 'string',
+                          description: 'Task description',
+                        },
+                        plannerModel: {
+                          type: 'string',
+                          description: 'Claude model (optional)',
+                        },
+                      },
+                      required: ['task'],
+                    },
                   },
-                  record: {
-                    type: 'boolean',
-                    default: false,
+                  {
+                    name: 'approve_plan',
                     description:
-                      'Record plan & critique into StackMemory context',
+                      'Phase 2: Execute a previously generated plan by approvalId',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        approvalId: {
+                          type: 'string',
+                          description: 'Id from plan_gate',
+                        },
+                        implementer: {
+                          type: 'string',
+                          enum: ['codex', 'claude'],
+                          default: 'codex',
+                          description: 'Which agent implements code',
+                        },
+                        maxIters: { type: 'number', default: 2 },
+                        recordFrame: { type: 'boolean', default: true },
+                        execute: { type: 'boolean', default: true },
+                      },
+                      required: ['approvalId'],
+                    },
                   },
-                  recordFrame: {
-                    type: 'boolean',
-                    default: false,
-                    description: 'Record as real frame with anchors',
+                  {
+                    name: 'pending_list',
+                    description:
+                      'List pending approval-gated plans (supports filters)',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        taskContains: {
+                          type: 'string',
+                          description: 'Filter tasks containing this substring',
+                        },
+                        olderThanMs: {
+                          type: 'number',
+                          description: 'Only items older than this age (ms)',
+                        },
+                        newerThanMs: {
+                          type: 'number',
+                          description: 'Only items newer than this age (ms)',
+                        },
+                        sort: {
+                          type: 'string',
+                          enum: ['asc', 'desc'],
+                          description: 'Sort by createdAt',
+                        },
+                        limit: {
+                          type: 'number',
+                          description: 'Max items to return',
+                        },
+                      },
+                    },
                   },
-                },
-                required: ['task'],
-              },
-            },
-            {
-              name: 'plan_gate',
-              description:
-                'Phase 1: Generate a plan and return an approvalId for later execution',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  task: { type: 'string', description: 'Task description' },
-                  plannerModel: {
-                    type: 'string',
-                    description: 'Claude model (optional)',
+                  {
+                    name: 'pending_clear',
+                    description:
+                      'Clear pending approval-gated plans (by id, all, or olderThanMs)',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        approvalId: {
+                          type: 'string',
+                          description: 'Clear a single approval by id',
+                        },
+                        all: {
+                          type: 'boolean',
+                          description: 'Clear all pending approvals',
+                          default: false,
+                        },
+                        olderThanMs: {
+                          type: 'number',
+                          description:
+                            'Clear approvals older than this age (ms)',
+                        },
+                      },
+                    },
                   },
-                },
-                required: ['task'],
-              },
-            },
-            {
-              name: 'approve_plan',
-              description:
-                'Phase 2: Execute a previously generated plan by approvalId (runs implement + critique)',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  approvalId: {
-                    type: 'string',
-                    description: 'Id from plan_gate',
+                  {
+                    name: 'pending_show',
+                    description: 'Show a pending plan by approvalId',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        approvalId: {
+                          type: 'string',
+                          description: 'Approval id from plan_gate',
+                        },
+                      },
+                      required: ['approvalId'],
+                    },
                   },
-                  implementer: {
-                    type: 'string',
-                    enum: ['codex', 'claude'],
-                    default: 'codex',
-                    description: 'Which agent implements code',
+                  {
+                    name: 'plan_only',
+                    description:
+                      'Generate an implementation plan (Claude) and return JSON only',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        task: {
+                          type: 'string',
+                          description: 'Task description',
+                        },
+                        plannerModel: {
+                          type: 'string',
+                          description: 'Claude model for planning (optional)',
+                        },
+                      },
+                      required: ['task'],
+                    },
                   },
-                  maxIters: { type: 'number', default: 2 },
-                  recordFrame: { type: 'boolean', default: true },
-                  execute: { type: 'boolean', default: true },
-                },
-                required: ['approvalId'],
-              },
-            },
-            {
-              name: 'pending_list',
-              description:
-                'List pending approval-gated plans (supports filters)',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  taskContains: {
-                    type: 'string',
-                    description: 'Filter tasks containing this substring',
+                  {
+                    name: 'call_codex',
+                    description:
+                      'Invoke Codex via codex-sm with a prompt and args; dry-run by default',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        prompt: {
+                          type: 'string',
+                          description: 'Prompt for Codex',
+                        },
+                        args: {
+                          type: 'array',
+                          items: { type: 'string' },
+                          description: 'Additional CLI args for codex-sm',
+                        },
+                        execute: {
+                          type: 'boolean',
+                          default: false,
+                          description:
+                            'Actually run codex-sm (otherwise dry-run)',
+                        },
+                      },
+                      required: ['prompt'],
+                    },
                   },
-                  olderThanMs: {
-                    type: 'number',
-                    description: 'Only items older than this age (ms)',
+                  {
+                    name: 'call_claude',
+                    description: 'Invoke Claude with a prompt (Anthropic SDK)',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        prompt: {
+                          type: 'string',
+                          description: 'Prompt for Claude',
+                        },
+                        model: {
+                          type: 'string',
+                          description: 'Claude model (optional)',
+                        },
+                        system: {
+                          type: 'string',
+                          description: 'System prompt (optional)',
+                        },
+                      },
+                      required: ['prompt'],
+                    },
                   },
-                  newerThanMs: {
-                    type: 'number',
-                    description: 'Only items newer than this age (ms)',
-                  },
-                  sort: {
-                    type: 'string',
-                    enum: ['asc', 'desc'],
-                    description: 'Sort by createdAt',
-                  },
-                  limit: { type: 'number', description: 'Max items to return' },
-                },
-              },
-            },
-            {
-              name: 'pending_clear',
-              description:
-                'Clear pending approval-gated plans (by id, all, or olderThanMs)',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  approvalId: {
-                    type: 'string',
-                    description: 'Clear a single approval by id',
-                  },
-                  all: {
-                    type: 'boolean',
-                    description: 'Clear all pending approvals',
-                    default: false,
-                  },
-                  olderThanMs: {
-                    type: 'number',
-                    description: 'Clear approvals older than this age (ms)',
-                  },
-                },
-              },
-            },
-            {
-              name: 'pending_show',
-              description: 'Show a pending plan by approvalId',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  approvalId: {
-                    type: 'string',
-                    description: 'Approval id from plan_gate',
-                  },
-                },
-                required: ['approvalId'],
-              },
-            },
-            {
-              name: 'plan_only',
-              description:
-                'Generate an implementation plan (Claude) and return JSON only',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  task: { type: 'string', description: 'Task description' },
-                  plannerModel: {
-                    type: 'string',
-                    description: 'Claude model for planning (optional)',
-                  },
-                },
-                required: ['task'],
-              },
-            },
-            {
-              name: 'call_codex',
-              description:
-                'Invoke Codex via codex-sm with a prompt and args; dry-run by default',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  prompt: { type: 'string', description: 'Prompt for Codex' },
-                  args: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Additional CLI args for codex-sm',
-                  },
-                  execute: {
-                    type: 'boolean',
-                    default: false,
-                    description: 'Actually run codex-sm (otherwise dry-run)',
-                  },
-                },
-                required: ['prompt'],
-              },
-            },
-            {
-              name: 'call_claude',
-              description: 'Invoke Claude with a prompt (Anthropic SDK)',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  prompt: { type: 'string', description: 'Prompt for Claude' },
-                  model: {
-                    type: 'string',
-                    description: 'Claude model (optional)',
-                  },
-                  system: {
-                    type: 'string',
-                    description: 'System prompt (optional)',
-                  },
-                },
-                required: ['prompt'],
-              },
-            },
+                ]
+              : []),
             {
               name: 'add_decision',
               description: 'Record a decision or important information',
@@ -1072,113 +1088,203 @@ class LocalStackMemoryMCP {
                 required: ['query'],
               },
             },
-            // DiffMem tools for user memory management
+            // DiffMem tools (only when DIFFMEM_ENDPOINT or DIFFMEM_ENABLED is set)
+            ...(process.env.DIFFMEM_ENDPOINT ||
+            process.env.DIFFMEM_ENABLED === 'true'
+              ? this.diffMemHandlers.getToolDefinitions()
+              : []),
+            // Cord task orchestration tools
             {
-              name: 'diffmem_get_user_context',
+              name: 'cord_spawn',
               description:
-                'Fetch user knowledge and preferences from memory. Use to personalize responses based on learned user patterns.',
+                'Create a subtask with clean context (spawn). Child sees only its prompt and completed blocker results.',
               inputSchema: {
                 type: 'object',
                 properties: {
-                  categories: {
-                    type: 'array',
-                    items: {
-                      type: 'string',
-                      enum: [
-                        'preference',
-                        'expertise',
-                        'project_knowledge',
-                        'pattern',
-                        'correction',
-                      ],
-                    },
-                    description: 'Filter by memory categories',
+                  goal: {
+                    type: 'string',
+                    description: 'What this task should accomplish',
                   },
+                  prompt: {
+                    type: 'string',
+                    description: 'Detailed instructions for the task',
+                  },
+                  blocked_by: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Task IDs that must complete first',
+                  },
+                  parent_id: { type: 'string', description: 'Parent task ID' },
+                },
+                required: ['goal'],
+              },
+            },
+            {
+              name: 'cord_fork',
+              description:
+                'Create a subtask with full sibling context (fork). Child sees prompt, blocker results, AND completed sibling results.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  goal: {
+                    type: 'string',
+                    description: 'What this task should accomplish',
+                  },
+                  prompt: {
+                    type: 'string',
+                    description: 'Detailed instructions for the task',
+                  },
+                  blocked_by: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Task IDs that must complete first',
+                  },
+                  parent_id: { type: 'string', description: 'Parent task ID' },
+                },
+                required: ['goal'],
+              },
+            },
+            {
+              name: 'cord_complete',
+              description:
+                'Mark a cord task as completed with a result. Automatically unblocks dependent tasks.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  task_id: {
+                    type: 'string',
+                    description: 'Task ID to complete',
+                  },
+                  result: {
+                    type: 'string',
+                    description: 'The result/output of this task',
+                  },
+                },
+                required: ['task_id', 'result'],
+              },
+            },
+            {
+              name: 'cord_ask',
+              description:
+                'Create an ask task — a question that needs an answer before dependent tasks can proceed.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  question: {
+                    type: 'string',
+                    description: 'The question to ask',
+                  },
+                  options: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional list of answer choices',
+                  },
+                  parent_id: { type: 'string', description: 'Parent task ID' },
+                },
+                required: ['question'],
+              },
+            },
+            {
+              name: 'cord_tree',
+              description:
+                'View the cord task tree with context scoping. Shows active, blocked, or completed tasks.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  task_id: {
+                    type: 'string',
+                    description:
+                      'Root task ID to show subtree (omit for full tree)',
+                  },
+                  include_results: {
+                    type: 'boolean',
+                    default: false,
+                    description: 'Include task results in output',
+                  },
+                },
+              },
+            },
+            // Team collaboration tools
+            {
+              name: 'team_context_get',
+              description:
+                'Get context from other agents working on the same project. Returns recent frames and shared anchors.',
+              inputSchema: {
+                type: 'object',
+                properties: {
                   limit: {
                     type: 'number',
                     default: 10,
-                    description: 'Maximum memories to return',
+                    description: 'Max frames to return',
+                  },
+                  types: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Filter by frame types',
+                  },
+                  since: {
+                    type: 'number',
+                    description:
+                      'Only frames created after this timestamp (epoch ms)',
                   },
                 },
               },
             },
             {
-              name: 'diffmem_store_learning',
+              name: 'team_context_share',
               description:
-                'Store a new insight about the user (preference, expertise, pattern, or correction)',
+                'Share a piece of context with other agents. Creates a high-priority anchor visible to team_context_get.',
               inputSchema: {
                 type: 'object',
                 properties: {
                   content: {
                     type: 'string',
-                    description: 'The insight to store',
+                    description: 'The context to share',
                   },
-                  category: {
+                  type: {
                     type: 'string',
                     enum: [
-                      'preference',
-                      'expertise',
-                      'project_knowledge',
-                      'pattern',
-                      'correction',
+                      'FACT',
+                      'DECISION',
+                      'CONSTRAINT',
+                      'INTERFACE_CONTRACT',
+                      'TODO',
+                      'RISK',
                     ],
-                    description: 'Category of the insight',
+                    default: 'FACT',
+                    description: 'Type of context',
                   },
-                  confidence: {
+                  priority: {
                     type: 'number',
-                    minimum: 0,
-                    maximum: 1,
-                    default: 0.7,
-                    description: 'Confidence level (0-1)',
-                  },
-                  context: {
-                    type: 'object',
-                    description: 'Additional context for the insight',
+                    minimum: 1,
+                    maximum: 10,
+                    default: 8,
+                    description: 'Priority level (1-10)',
                   },
                 },
-                required: ['content', 'category'],
+                required: ['content'],
               },
             },
             {
-              name: 'diffmem_search',
+              name: 'team_search',
               description:
-                'Semantic search across user memories. Find relevant past insights and preferences.',
+                "Search across all agents' context in the project. Uses full-text search across all sessions.",
               inputSchema: {
                 type: 'object',
                 properties: {
-                  query: {
-                    type: 'string',
-                    description: 'Search query',
-                  },
-                  timeRange: {
-                    type: 'string',
-                    enum: ['day', 'week', 'month', 'all'],
-                    default: 'all',
-                    description: 'Time range filter',
-                  },
-                  minConfidence: {
-                    type: 'number',
-                    minimum: 0,
-                    maximum: 1,
-                    default: 0.5,
-                    description: 'Minimum confidence threshold',
-                  },
+                  query: { type: 'string', description: 'Search query' },
                   limit: {
                     type: 'number',
-                    default: 10,
-                    description: 'Maximum results',
+                    default: 20,
+                    description: 'Maximum results to return',
+                  },
+                  include_events: {
+                    type: 'boolean',
+                    default: false,
+                    description: 'Include events in results',
                   },
                 },
                 required: ['query'],
-              },
-            },
-            {
-              name: 'diffmem_status',
-              description:
-                'Check DiffMem connection status and memory statistics',
-              inputSchema: {
-                type: 'object',
-                properties: {},
               },
             },
             // Greptile tools (only active when GREPTILE_API_KEY is set)
@@ -1292,6 +1398,23 @@ class LocalStackMemoryMCP {
                   },
                 ]
               : []),
+            // Digest tool
+            {
+              name: 'sm_digest',
+              description:
+                'Generate a chronological activity digest for a time period (today/yesterday/week)',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  period: {
+                    type: 'string',
+                    enum: ['today', 'yesterday', 'week'],
+                    description: 'Time period for the digest',
+                  },
+                },
+                required: ['period'],
+              },
+            },
           ],
         };
       }
@@ -1514,6 +1637,104 @@ class LocalStackMemoryMCP {
               result = await this.handleSmEdit(args);
               break;
 
+            // Cord task orchestration
+            case 'cord_spawn':
+              if (!this.cordHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Cord handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.cordHandlers.handleCordSpawn(args);
+              }
+              break;
+
+            case 'cord_fork':
+              if (!this.cordHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Cord handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.cordHandlers.handleCordFork(args);
+              }
+              break;
+
+            case 'cord_complete':
+              if (!this.cordHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Cord handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.cordHandlers.handleCordComplete(args);
+              }
+              break;
+
+            case 'cord_ask':
+              if (!this.cordHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Cord handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.cordHandlers.handleCordAsk(args);
+              }
+              break;
+
+            case 'cord_tree':
+              if (!this.cordHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Cord handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.cordHandlers.handleCordTree(args);
+              }
+              break;
+
+            // Team collaboration
+            case 'team_context_get':
+              if (!this.teamHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Team handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.teamHandlers.handleTeamContextGet(args);
+              }
+              break;
+
+            case 'team_context_share':
+              if (!this.teamHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Team handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.teamHandlers.handleTeamContextShare(args);
+              }
+              break;
+
+            case 'team_search':
+              if (!this.teamHandlers) {
+                result = {
+                  content: [
+                    { type: 'text', text: 'Team handlers not initialized.' },
+                  ],
+                };
+              } else {
+                result = await this.teamHandlers.handleTeamSearch(args);
+              }
+              break;
+
             // Provider tools
             case 'delegate_to_model':
               if (!this.providerHandlers) {
@@ -1564,6 +1785,10 @@ class LocalStackMemoryMCP {
                   args as any
                 );
               }
+              break;
+
+            case 'sm_digest':
+              result = await this.handleSmDigest(args);
               break;
 
             default:
@@ -3309,6 +3534,36 @@ ${typeBreakdown}`,
         editResult.match.matchedText.length > 200
           ? editResult.match.matchedText.slice(0, 200) + '...'
           : editResult.match.matchedText,
+    };
+  }
+
+  private async handleSmDigest(args: any) {
+    const period = String(args.period || 'today') as DigestPeriod;
+    if (!['today', 'yesterday', 'week'].includes(period)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid period "${period}". Use: today, yesterday, week`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const markdown = generateChronologicalDigest(
+      this.db,
+      period,
+      this.projectId
+    );
+
+    // Write to .stackmemory/<period>.md
+    const outputPath = join(this.projectRoot, '.stackmemory', `${period}.md`);
+    writeFileSync(outputPath, markdown);
+
+    return {
+      content: [{ type: 'text', text: markdown }],
+      isError: false,
     };
   }
 

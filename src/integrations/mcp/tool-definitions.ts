@@ -23,10 +23,18 @@ export class MCPToolDefinitions {
       ...this.getTaskTools(),
       ...this.getLinearTools(),
       ...this.getTraceTools(),
+      ...this.getTraceExtensionTools(),
+      ...this.getPlanningTools(),
+      ...this.getPendingTools(),
+      ...this.getSmartContextTools(),
       ...this.getDiscoveryTools(),
       ...this.getEditTools(),
+      ...this.getDiffMemTools(),
+      ...this.getGreptileTools(),
+      ...this.getProviderTools(),
       ...this.getTeamTools(),
       ...this.getCordTools(),
+      ...this.getDigestTools(),
     ];
   }
 
@@ -456,97 +464,248 @@ export class MCPToolDefinitions {
           },
         },
       },
+    ];
+  }
+
+  /**
+   * Trace extension tools (statistics, flush, compress)
+   */
+  private getTraceExtensionTools(): MCPToolDefinition[] {
+    return [
       {
-        name: 'start_browser_debug',
-        description: 'Start browser debugging session',
+        name: 'get_trace_statistics',
+        description: 'Get statistics about detected traces',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'flush_traces',
+        description: 'Flush any pending trace and finalize detection',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'compress_old_traces',
+        description: 'Compress traces older than specified hours',
         inputSchema: {
           type: 'object',
           properties: {
-            url: {
-              type: 'string',
-              description: 'URL to navigate to',
-            },
-            headless: {
-              type: 'boolean',
-              default: false,
-              description: 'Run browser in headless mode',
-            },
-            width: {
+            ageHours: {
               type: 'number',
-              default: 1280,
-              description: 'Browser width',
-            },
-            height: {
-              type: 'number',
-              default: 720,
-              description: 'Browser height',
-            },
-            capture_screenshots: {
-              type: 'boolean',
-              default: true,
-              description: 'Enable screenshot capture',
+              description: 'Age threshold in hours (default: 24)',
             },
           },
-          required: ['url'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Planning and orchestration tools
+   */
+  private getPlanningTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'plan_only',
+        description:
+          'Generate an implementation plan (Claude) and return JSON only',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task: { type: 'string', description: 'Task description' },
+            plannerModel: {
+              type: 'string',
+              description: 'Claude model for planning (optional)',
+            },
+          },
+          required: ['task'],
         },
       },
       {
-        name: 'take_screenshot',
-        description: 'Take screenshot in browser session',
+        name: 'call_codex',
+        description:
+          'Invoke Codex via codex-sm with a prompt and args; dry-run by default',
         inputSchema: {
           type: 'object',
           properties: {
-            session_id: {
-              type: 'string',
-              description: 'Browser session ID',
-            },
-            selector: {
-              type: 'string',
-              description: 'CSS selector to screenshot',
-            },
-            full_page: {
-              type: 'boolean',
-              default: false,
-              description: 'Capture full page',
-            },
-          },
-          required: ['session_id'],
-        },
-      },
-      {
-        name: 'execute_script',
-        description: 'Execute JavaScript in browser session',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            session_id: {
-              type: 'string',
-              description: 'Browser session ID',
-            },
-            script: {
-              type: 'string',
-              description: 'JavaScript code to execute',
-            },
+            prompt: { type: 'string', description: 'Prompt for Codex' },
             args: {
               type: 'array',
-              description: 'Arguments to pass to script',
+              items: { type: 'string' },
+              description: 'Additional CLI args for codex-sm',
+            },
+            execute: {
+              type: 'boolean',
+              default: false,
+              description: 'Actually run codex-sm (otherwise dry-run)',
             },
           },
-          required: ['session_id', 'script'],
+          required: ['prompt'],
         },
       },
       {
-        name: 'stop_browser_debug',
-        description: 'Stop browser debugging session',
+        name: 'call_claude',
+        description: 'Invoke Claude with a prompt (Anthropic SDK)',
         inputSchema: {
           type: 'object',
           properties: {
-            session_id: {
+            prompt: { type: 'string', description: 'Prompt for Claude' },
+            model: { type: 'string', description: 'Claude model (optional)' },
+            system: { type: 'string', description: 'System prompt (optional)' },
+          },
+          required: ['prompt'],
+        },
+      },
+      {
+        name: 'plan_gate',
+        description:
+          'Phase 1: Generate a plan and return an approvalId for later execution',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task: { type: 'string', description: 'Task description' },
+            plannerModel: {
               type: 'string',
-              description: 'Browser session ID to stop',
+              description: 'Claude model (optional)',
             },
           },
-          required: ['session_id'],
+          required: ['task'],
+        },
+      },
+      {
+        name: 'approve_plan',
+        description:
+          'Phase 2: Execute a previously generated plan by approvalId',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            approvalId: { type: 'string', description: 'Id from plan_gate' },
+            implementer: {
+              type: 'string',
+              enum: ['codex', 'claude'],
+              default: 'codex',
+              description: 'Which agent implements code',
+            },
+            maxIters: { type: 'number', default: 2 },
+            recordFrame: { type: 'boolean', default: true },
+            execute: { type: 'boolean', default: true },
+          },
+          required: ['approvalId'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Pending approval management tools
+   */
+  private getPendingTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'pending_list',
+        description: 'List pending approval-gated plans (supports filters)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            taskContains: {
+              type: 'string',
+              description: 'Filter tasks containing this substring',
+            },
+            olderThanMs: {
+              type: 'number',
+              description: 'Only items older than this age (ms)',
+            },
+            newerThanMs: {
+              type: 'number',
+              description: 'Only items newer than this age (ms)',
+            },
+            sort: {
+              type: 'string',
+              enum: ['asc', 'desc'],
+              description: 'Sort by createdAt',
+            },
+            limit: { type: 'number', description: 'Max items to return' },
+          },
+        },
+      },
+      {
+        name: 'pending_clear',
+        description:
+          'Clear pending approval-gated plans (by id, all, or olderThanMs)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            approvalId: {
+              type: 'string',
+              description: 'Clear a single approval by id',
+            },
+            all: {
+              type: 'boolean',
+              default: false,
+              description: 'Clear all pending approvals',
+            },
+            olderThanMs: {
+              type: 'number',
+              description: 'Clear approvals older than this age (ms)',
+            },
+          },
+        },
+      },
+      {
+        name: 'pending_show',
+        description: 'Show a pending plan by approvalId',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            approvalId: {
+              type: 'string',
+              description: 'Approval id from plan_gate',
+            },
+          },
+          required: ['approvalId'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Smart context and summary tools
+   */
+  private getSmartContextTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'smart_context',
+        description:
+          'LLM-driven context retrieval - intelligently selects relevant frames based on query',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description:
+                'Natural language query describing what context you need',
+            },
+            tokenBudget: {
+              type: 'number',
+              description: 'Maximum tokens to use for context (default: 4000)',
+            },
+            forceRefresh: {
+              type: 'boolean',
+              description: 'Force refresh of cached summaries',
+            },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'get_summary',
+        description: 'Get compressed summary of project memory for analysis',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            forceRefresh: {
+              type: 'boolean',
+              description: 'Force refresh of cached summary',
+            },
+          },
         },
       },
     ];
@@ -698,6 +857,375 @@ export class MCPToolDefinitions {
             },
           },
           required: ['file_path', 'old_string', 'new_string'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * DiffMem user memory management tools
+   */
+  private getDiffMemTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'diffmem_get_user_context',
+        description:
+          'Fetch user knowledge and preferences from memory. Use to personalize responses.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            categories: {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'preference',
+                  'expertise',
+                  'project_knowledge',
+                  'pattern',
+                  'correction',
+                ],
+              },
+              description: 'Filter by memory categories',
+            },
+            limit: {
+              type: 'number',
+              default: 10,
+              description: 'Maximum memories to return',
+            },
+          },
+        },
+      },
+      {
+        name: 'diffmem_store_learning',
+        description:
+          'Store a new insight about the user (preference, expertise, pattern, or correction)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            content: { type: 'string', description: 'The insight to store' },
+            category: {
+              type: 'string',
+              enum: [
+                'preference',
+                'expertise',
+                'project_knowledge',
+                'pattern',
+                'correction',
+              ],
+              description: 'Category of the insight',
+            },
+            confidence: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              default: 0.7,
+              description: 'Confidence level (0-1)',
+            },
+            context: {
+              type: 'object',
+              description: 'Additional context for the insight',
+            },
+          },
+          required: ['content', 'category'],
+        },
+      },
+      {
+        name: 'diffmem_search',
+        description:
+          'Semantic search across user memories. Find relevant past insights and preferences.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search query' },
+            timeRange: {
+              type: 'string',
+              enum: ['day', 'week', 'month', 'all'],
+              default: 'all',
+              description: 'Time range filter',
+            },
+            minConfidence: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              default: 0.5,
+              description: 'Minimum confidence threshold',
+            },
+            limit: {
+              type: 'number',
+              default: 10,
+              description: 'Maximum results',
+            },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'diffmem_status',
+        description: 'Check DiffMem connection status and memory statistics',
+        inputSchema: { type: 'object', properties: {} },
+      },
+    ];
+  }
+
+  /**
+   * Greptile code review tools
+   */
+  private getGreptileTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'greptile_pr_comments',
+        description:
+          'Get PR review comments from Greptile. Returns unaddressed comments with suggestedCode.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Repository full name (e.g., "owner/repo")',
+            },
+            remote: {
+              type: 'string',
+              enum: ['github', 'gitlab', 'azure', 'bitbucket'],
+              description: 'Remote provider',
+            },
+            defaultBranch: {
+              type: 'string',
+              description: 'Default branch (e.g., "main")',
+            },
+            prNumber: { type: 'number', description: 'Pull request number' },
+            greptileGenerated: {
+              type: 'boolean',
+              description: 'Filter for only Greptile review comments',
+            },
+            addressed: {
+              type: 'boolean',
+              description: 'Filter by comment addressed status',
+            },
+          },
+          required: ['name', 'remote', 'defaultBranch', 'prNumber'],
+        },
+      },
+      {
+        name: 'greptile_pr_details',
+        description:
+          'Get detailed PR information including metadata, statistics, and review analysis.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Repository full name' },
+            remote: {
+              type: 'string',
+              enum: ['github', 'gitlab', 'azure', 'bitbucket'],
+              description: 'Remote provider',
+            },
+            defaultBranch: { type: 'string', description: 'Default branch' },
+            prNumber: { type: 'number', description: 'Pull request number' },
+          },
+          required: ['name', 'remote', 'defaultBranch', 'prNumber'],
+        },
+      },
+      {
+        name: 'greptile_list_prs',
+        description:
+          'List pull requests. Filter by repository, branch, author, or state.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Repository full name' },
+            remote: {
+              type: 'string',
+              enum: ['github', 'gitlab', 'azure', 'bitbucket'],
+              description: 'Remote provider',
+            },
+            defaultBranch: { type: 'string', description: 'Default branch' },
+            sourceBranch: {
+              type: 'string',
+              description: 'Filter by source branch name',
+            },
+            authorLogin: {
+              type: 'string',
+              description: 'Filter by PR author username',
+            },
+            state: {
+              type: 'string',
+              enum: ['open', 'closed', 'merged'],
+              description: 'Filter by PR state',
+            },
+            limit: { type: 'number', description: 'Max results (default 20)' },
+          },
+        },
+      },
+      {
+        name: 'greptile_trigger_review',
+        description: 'Trigger a Greptile code review for a pull request.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Repository full name' },
+            remote: {
+              type: 'string',
+              enum: ['github', 'gitlab', 'azure', 'bitbucket'],
+              description: 'Remote provider',
+            },
+            defaultBranch: { type: 'string', description: 'Default branch' },
+            prNumber: { type: 'number', description: 'Pull request number' },
+            branch: { type: 'string', description: 'Current working branch' },
+          },
+          required: ['name', 'remote', 'prNumber'],
+        },
+      },
+      {
+        name: 'greptile_search_patterns',
+        description:
+          'Search custom coding patterns and instructions in Greptile.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search query for pattern content',
+            },
+            limit: { type: 'number', description: 'Max results (default 10)' },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'greptile_create_pattern',
+        description:
+          'Create a new custom coding pattern or instruction in Greptile.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            body: { type: 'string', description: 'Pattern content' },
+            type: {
+              type: 'string',
+              enum: ['CUSTOM_INSTRUCTION', 'PATTERN'],
+              description: 'Context type',
+            },
+            scopes: {
+              type: 'object',
+              description:
+                'Boolean expression defining where this pattern applies',
+            },
+          },
+          required: ['body'],
+        },
+      },
+      {
+        name: 'greptile_status',
+        description: 'Check Greptile integration connection status.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+    ];
+  }
+
+  /**
+   * Multi-provider routing tools
+   */
+  private getProviderTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'delegate_to_model',
+        description:
+          'Route a prompt to a specific provider/model. Uses smart cost-based routing by default.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            prompt: { type: 'string', description: 'The prompt to send' },
+            provider: {
+              type: 'string',
+              enum: [
+                'anthropic',
+                'cerebras',
+                'deepinfra',
+                'openai',
+                'openrouter',
+              ],
+              description: 'Override provider',
+            },
+            model: { type: 'string', description: 'Override model name' },
+            taskType: {
+              type: 'string',
+              enum: ['linting', 'context', 'code', 'testing', 'review', 'plan'],
+              description: 'Task type for auto-routing',
+            },
+            maxTokens: { type: 'number', description: 'Max tokens' },
+            temperature: { type: 'number' },
+            system: { type: 'string', description: 'System prompt' },
+          },
+          required: ['prompt'],
+        },
+      },
+      {
+        name: 'batch_submit',
+        description:
+          'Submit prompts to Anthropic Batch API (50% discount, async)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            prompts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  prompt: { type: 'string' },
+                  model: { type: 'string' },
+                  maxTokens: { type: 'number' },
+                  system: { type: 'string' },
+                },
+                required: ['id', 'prompt'],
+              },
+              description: 'Array of prompts to batch',
+            },
+            description: {
+              type: 'string',
+              description: 'Batch job description',
+            },
+          },
+          required: ['prompts'],
+        },
+      },
+      {
+        name: 'batch_check',
+        description: 'Check status or retrieve results for a batch job',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            batchId: { type: 'string', description: 'Batch job ID' },
+            retrieve: {
+              type: 'boolean',
+              default: false,
+              description: 'Retrieve results if complete',
+            },
+          },
+          required: ['batchId'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Chronological digest tools
+   */
+  private getDigestTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'sm_digest',
+        description:
+          'Generate a chronological activity digest for a time period',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            period: {
+              type: 'string',
+              enum: ['today', 'yesterday', 'week'],
+              description: 'Time period for the digest',
+            },
+          },
+          required: ['period'],
         },
       },
     ];
@@ -939,10 +1467,18 @@ export class MCPToolDefinitions {
       | 'task'
       | 'linear'
       | 'trace'
+      | 'trace_extension'
+      | 'planning'
+      | 'pending'
+      | 'smart_context'
       | 'discovery'
       | 'edit'
+      | 'diffmem'
+      | 'greptile'
+      | 'provider'
       | 'team'
       | 'cord'
+      | 'digest'
   ): MCPToolDefinition[] {
     switch (category) {
       case 'context':
@@ -953,14 +1489,30 @@ export class MCPToolDefinitions {
         return this.getLinearTools();
       case 'trace':
         return this.getTraceTools();
+      case 'trace_extension':
+        return this.getTraceExtensionTools();
+      case 'planning':
+        return this.getPlanningTools();
+      case 'pending':
+        return this.getPendingTools();
+      case 'smart_context':
+        return this.getSmartContextTools();
       case 'discovery':
         return this.getDiscoveryTools();
       case 'edit':
         return this.getEditTools();
+      case 'diffmem':
+        return this.getDiffMemTools();
+      case 'greptile':
+        return this.getGreptileTools();
+      case 'provider':
+        return this.getProviderTools();
       case 'team':
         return this.getTeamTools();
       case 'cord':
         return this.getCordTools();
+      case 'digest':
+        return this.getDigestTools();
       default:
         return [];
     }

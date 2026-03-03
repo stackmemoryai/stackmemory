@@ -13,3 +13,6 @@ command -v stackmemory >/dev/null 2>&1 || exit 0
 # Capture without committing, compact format, 10s timeout
 timeout 10 stackmemory capture --no-commit --format compact \
   -m "auto-rescue on session close" >/dev/null 2>&1 || true
+
+# Generate today's digest (best-effort, 5s timeout)
+timeout 5 stackmemory digest today >/dev/null 2>&1 || true
