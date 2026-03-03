@@ -83,8 +83,8 @@ export function generateChronologicalDigest(
 ): string {
   const { start, end, label } = getTimeRange(period);
 
-  // Query frames in the time window
-  const frames = db
+  // Query frames in the time window — try exact project_id, fallback to 'default', then all
+  let frames = db
     .prepare(
       `SELECT frame_id, name, type, state, created_at, closed_at, inputs, outputs
        FROM frames
@@ -92,6 +92,17 @@ export function generateChronologicalDigest(
        ORDER BY created_at ASC`
     )
     .all(projectId, start, end) as FrameRow[];
+
+  if (frames.length === 0 && projectId !== 'default') {
+    frames = db
+      .prepare(
+        `SELECT frame_id, name, type, state, created_at, closed_at, inputs, outputs
+         FROM frames
+         WHERE project_id = 'default' AND created_at >= ? AND created_at < ?
+         ORDER BY created_at ASC`
+      )
+      .all(start, end) as FrameRow[];
+  }
 
   if (frames.length === 0) {
     return `# ${label}\n\nNo activity recorded.\n`;
