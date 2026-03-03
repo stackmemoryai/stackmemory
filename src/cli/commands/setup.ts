@@ -292,7 +292,44 @@ export function createDoctorCommand(): Command {
         });
       }
 
-      // 5. Check environment variables
+      // 5. Check MCP tool definitions
+      try {
+        const { MCPToolDefinitions } =
+          await import('../../integrations/mcp/tool-definitions.js');
+        const toolDefs = new MCPToolDefinitions();
+        const allTools = toolDefs.getAllToolDefinitions();
+        const toolNames = allTools.map((t: { name: string }) => t.name);
+        const expectedTools = [
+          'sm_digest',
+          'cord_spawn',
+          'team_search',
+          'get_context',
+          'create_task',
+        ];
+        const missing = expectedTools.filter((t) => !toolNames.includes(t));
+
+        if (missing.length === 0) {
+          results.push({
+            name: 'MCP Tools',
+            status: 'ok',
+            message: `${allTools.length} tool definitions loaded`,
+          });
+        } else {
+          results.push({
+            name: 'MCP Tools',
+            status: 'warn',
+            message: `${allTools.length} tools loaded, missing: ${missing.join(', ')}`,
+          });
+        }
+      } catch (error) {
+        results.push({
+          name: 'MCP Tools',
+          status: 'error',
+          message: `Failed to load tool definitions: ${(error as Error).message}`,
+        });
+      }
+
+      // 6. Check environment variables
       const envChecks = [
         { key: 'LINEAR_API_KEY', name: 'Linear API Key', optional: true },
       ];
@@ -316,7 +353,7 @@ export function createDoctorCommand(): Command {
         // Skip optional env vars that aren't set
       }
 
-      // 6. Check file permissions
+      // 7. Check file permissions
       const homeStackmemory = join(homedir(), '.stackmemory');
       if (existsSync(homeStackmemory)) {
         try {
