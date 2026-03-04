@@ -22,7 +22,6 @@ import { execSync } from 'child_process';
 const CLAUDE_DIR = join(homedir(), '.claude');
 const CLAUDE_CONFIG_FILE = join(CLAUDE_DIR, 'config.json');
 const MCP_CONFIG_FILE = join(CLAUDE_DIR, 'stackmemory-mcp.json');
-const HOOKS_JSON = join(CLAUDE_DIR, 'hooks.json');
 
 interface DiagnosticResult {
   name: string;
@@ -264,39 +263,41 @@ export function createDoctorCommand(): Command {
         });
       }
 
-      // 4. Check Claude hooks
-      if (existsSync(HOOKS_JSON)) {
-        try {
-          const hooks = JSON.parse(readFileSync(HOOKS_JSON, 'utf8'));
-          const hasTraceHook = !!hooks['tool-use-approval'];
-          if (hasTraceHook) {
-            results.push({
-              name: 'Claude Hooks',
-              status: 'ok',
-              message: 'Tool tracing hook installed',
-            });
-          } else {
-            results.push({
-              name: 'Claude Hooks',
-              status: 'warn',
-              message: 'Hooks file exists but tracing not configured',
-              fix: 'Run: stackmemory hooks install',
-            });
+      // 4. Check Claude hooks (settings.json)
+      {
+        const settingsFile = join(homedir(), '.claude', 'settings.json');
+        let hookCount = 0;
+        if (existsSync(settingsFile)) {
+          try {
+            const settings = JSON.parse(readFileSync(settingsFile, 'utf8'));
+            if (settings.hooks) {
+              for (const groups of Object.values(settings.hooks) as Array<
+                Array<{ hooks: Array<{ command: string }> }>
+              >) {
+                for (const group of groups) {
+                  hookCount += group.hooks.length;
+                }
+              }
+            }
+          } catch {
+            // Cannot parse settings.json
           }
-        } catch {
+        }
+
+        if (hookCount > 0) {
+          results.push({
+            name: 'Claude Hooks',
+            status: 'ok',
+            message: `${hookCount} hooks registered in settings.json`,
+          });
+        } else {
           results.push({
             name: 'Claude Hooks',
             status: 'warn',
-            message: 'Could not read hooks.json',
+            message: 'No hooks registered in settings.json',
+            fix: 'Run: stackmemory hooks install',
           });
         }
-      } else {
-        results.push({
-          name: 'Claude Hooks',
-          status: 'warn',
-          message: 'Claude hooks not installed (optional)',
-          fix: 'Run: stackmemory hooks install',
-        });
       }
 
       // 5. Check MCP tool definitions
@@ -659,7 +660,44 @@ export function createDoctorCommand(): Command {
         }
       }
 
-      // 12. Check file permissions
+      // 12. Check daemon health
+      {
+        try {
+          const { readDaemonStatus } =
+            await import('../../daemon/daemon-config.js');
+          const status = readDaemonStatus();
+          if (status.running) {
+            const uptime = status.startedAt
+              ? Math.round((Date.now() - status.startedAt) / 1000 / 60)
+              : 0;
+            const svcCount = Object.values(status.services || {}).filter(
+              (s: { enabled?: boolean }) => s.enabled
+            ).length;
+            results.push({
+              name: 'Background Daemon',
+              status: 'ok',
+              message: `Running (PID: ${status.pid}, ${svcCount} services, ${uptime}min uptime)`,
+            });
+          } else {
+            results.push({
+              name: 'Background Daemon',
+              status: 'warn',
+              message:
+                'Daemon not running — context auto-save and maintenance disabled',
+              fix: 'Run: stackmemory daemon start',
+            });
+          }
+        } catch {
+          results.push({
+            name: 'Background Daemon',
+            status: 'warn',
+            message: 'Could not check daemon status',
+            fix: 'Run: stackmemory daemon start',
+          });
+        }
+      }
+
+      // 13. Check file permissions
       const homeStackmemory = join(homedir(), '.stackmemory');
       if (existsSync(homeStackmemory)) {
         try {
@@ -701,13 +739,23 @@ export function createDoctorCommand(): Command {
           console.log(chalk.cyan(`    Fix: ${result.fix}`));
 
           if (options.fix && result.status !== 'ok') {
-            // Auto-fix logic for specific issues
-            if (result.fix.includes('stackmemory setup-mcp')) {
-              console.log(chalk.gray('    Attempting auto-fix...'));
-              try {
-                execSync('stackmemory setup-mcp', { stdio: 'inherit' });
-              } catch {
-                console.log(chalk.red('    Auto-fix failed'));
+            const fixCmds = [
+              'stackmemory setup-mcp',
+              'stackmemory hooks install',
+              'stackmemory daemon start',
+            ];
+            for (const cmd of fixCmds) {
+              if (result.fix.includes(cmd)) {
+                console.log(chalk.gray(`    Attempting: ${cmd}...`));
+                try {
+                  execSync(cmd, {
+                    stdio: 'inherit',
+                    timeout: 15000,
+                  });
+                } catch {
+                  console.log(chalk.red('    Auto-fix failed'));
+                }
+                break;
               }
             }
           }

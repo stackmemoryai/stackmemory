@@ -117,6 +117,13 @@ try {
       commandPrefix: 'node',
       required: false,
     },
+    {
+      scriptName: 'daemon-auto-start.js',
+      eventType: 'PostToolUse',
+      timeout: 2,
+      commandPrefix: 'node',
+      required: false,
+    },
   ];
 
   const DEAD_HOOKS = ['sms-response-handler.js'];

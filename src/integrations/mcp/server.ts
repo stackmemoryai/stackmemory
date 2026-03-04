@@ -1652,6 +1652,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Cord handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.cordHandlers.handleCordSpawn(args);
@@ -1664,6 +1665,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Cord handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.cordHandlers.handleCordFork(args);
@@ -1676,6 +1678,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Cord handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.cordHandlers.handleCordComplete(args);
@@ -1688,6 +1691,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Cord handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.cordHandlers.handleCordAsk(args);
@@ -1700,6 +1704,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Cord handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.cordHandlers.handleCordTree(args);
@@ -1713,6 +1718,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Team handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.teamHandlers.handleTeamContextGet(args);
@@ -1725,6 +1731,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Team handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.teamHandlers.handleTeamContextShare(args);
@@ -1737,6 +1744,7 @@ class LocalStackMemoryMCP {
                   content: [
                     { type: 'text', text: 'Team handlers not initialized.' },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.teamHandlers.handleTeamSearch(args);
@@ -1753,6 +1761,7 @@ class LocalStackMemoryMCP {
                       text: 'Multi-provider routing is disabled.',
                     },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.providerHandlers.handleDelegateToModel(
@@ -1770,6 +1779,7 @@ class LocalStackMemoryMCP {
                       text: 'Multi-provider routing is disabled.',
                     },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.providerHandlers.handleBatchSubmit(
@@ -1787,6 +1797,7 @@ class LocalStackMemoryMCP {
                       text: 'Multi-provider routing is disabled.',
                     },
                   ],
+                  is_error: true,
                 };
               } else {
                 result = await this.providerHandlers.handleBatchCheck(
