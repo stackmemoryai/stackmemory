@@ -35,6 +35,7 @@ export class MCPToolDefinitions {
       ...this.getTeamTools(),
       ...this.getCordTools(),
       ...this.getDigestTools(),
+      ...this.getDesirePathTools(),
     ];
   }
 
@@ -1232,6 +1233,45 @@ export class MCPToolDefinitions {
   }
 
   /**
+   * Desire path analysis tools
+   */
+  private getDesirePathTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'sm_desire_paths',
+        description:
+          'Analyze failed tool calls (desire paths) — what agents want but cannot get. Use mode "summary" for aggregated counts or "list" for recent failures.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              enum: ['summary', 'list'],
+              description: 'Output mode: summary (aggregated) or list (recent)',
+              default: 'summary',
+            },
+            limit: {
+              type: 'number',
+              default: 20,
+              description: 'Max entries to return (list mode only)',
+            },
+            category: {
+              type: 'string',
+              enum: ['unknown_tool', 'handler_error', 'invalid_params'],
+              description: 'Filter by failure category',
+            },
+            days: {
+              type: 'number',
+              default: 7,
+              description: 'Look back N days',
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  /**
    * Multi-agent team collaboration tools
    */
   private getTeamTools(): MCPToolDefinition[] {
@@ -1513,6 +1553,8 @@ export class MCPToolDefinitions {
         return this.getCordTools();
       case 'digest':
         return this.getDigestTools();
+      case 'desire_paths':
+        return this.getDesirePathTools();
       default:
         return [];
     }

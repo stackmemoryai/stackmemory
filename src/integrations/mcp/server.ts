@@ -20,11 +20,13 @@ import {
 } from './schemas.js';
 import {
   readFileSync,
+  readdirSync,
   existsSync,
   mkdirSync,
   writeFileSync,
   appendFileSync,
 } from 'fs';
+import { homedir } from 'os';
 import { compactPlan } from '../../orchestrators/multimodal/utils.js';
 import { filterPending } from './pending-utils.js';
 import { join, dirname } from 'path';
@@ -1795,6 +1797,10 @@ class LocalStackMemoryMCP {
 
             case 'sm_digest':
               result = await this.handleSmDigest(args);
+              break;
+
+            case 'sm_desire_paths':
+              result = this.handleDesirePaths(args);
               break;
 
             default:
@@ -3587,6 +3593,128 @@ ${typeBreakdown}`,
     } catch {
       // Fire-and-forget — never block tool execution
     }
+  }
+
+  /** Handle sm_desire_paths tool — read and aggregate desire path logs */
+  private handleDesirePaths(args: Record<string, unknown>) {
+    const mode = String(args.mode || 'summary');
+    const days = Number(args.days || 7);
+    const limit = Number(args.limit || 20);
+    const categoryFilter = args.category ? String(args.category) : undefined;
+
+    const desireDir = join(homedir(), '.stackmemory', 'desire-paths');
+
+    if (!existsSync(desireDir)) {
+      return {
+        content: [{ type: 'text', text: 'No desire path data found.' }],
+      };
+    }
+
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const files = readdirSync(desireDir).filter(
+      (f) => f.startsWith('desire-') && f.endsWith('.jsonl')
+    );
+
+    interface DesireEntry {
+      ts: string;
+      tool: string;
+      error: string;
+      category: string;
+      cwd?: string;
+      source?: string;
+    }
+
+    const entries: DesireEntry[] = [];
+    for (const file of files) {
+      const lines = readFileSync(join(desireDir, file), 'utf-8')
+        .split('\n')
+        .filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as DesireEntry;
+          if (new Date(entry.ts).getTime() < cutoff) continue;
+          if (categoryFilter && entry.category !== categoryFilter) continue;
+          entries.push(entry);
+        } catch {
+          // skip malformed
+        }
+      }
+    }
+
+    if (entries.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `No desire path data in the last ${days} day(s).`,
+          },
+        ],
+      };
+    }
+
+    if (mode === 'list') {
+      const recent = entries
+        .sort((a, b) => b.ts.localeCompare(a.ts))
+        .slice(0, limit);
+
+      const lines = recent.map(
+        (e) =>
+          `${e.ts.slice(0, 19)} ${e.tool} [${e.category}]\n  ${e.error.slice(0, 120)}`
+      );
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Recent desire paths (${recent.length}/${entries.length}):\n\n${lines.join('\n\n')}`,
+          },
+        ],
+      };
+    }
+
+    // Summary mode
+    const byTool = new Map<
+      string,
+      { count: number; category: string; lastSeen: string }
+    >();
+    for (const e of entries) {
+      const existing = byTool.get(e.tool);
+      if (!existing || e.ts > existing.lastSeen) {
+        byTool.set(e.tool, {
+          count: (existing?.count || 0) + 1,
+          category: e.category,
+          lastSeen: e.ts,
+        });
+      } else {
+        existing.count++;
+      }
+    }
+
+    const sorted = [...byTool.entries()].sort(
+      (a, b) => b[1].count - a[1].count
+    );
+
+    const byCat = new Map<string, number>();
+    for (const e of entries) {
+      byCat.set(e.category, (byCat.get(e.category) || 0) + 1);
+    }
+
+    const toolLines = sorted.map(
+      ([tool, data]) =>
+        `${tool}: ${data.count}x [${data.category}] (last: ${data.lastSeen.slice(0, 10)})`
+    );
+    const catLines = [...byCat.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, count]) => `  ${cat}: ${count}`);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Desire Path Summary (last ${days}d, ${entries.length} total failures)\n\nBy Tool:\n${toolLines.join('\n')}\n\nBy Category:\n${catLines.join('\n')}`,
+        },
+      ],
+    };
   }
 
   private async handleSmDigest(args: any) {

@@ -6,7 +6,14 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  mkdirSync,
+  rmSync,
+} from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
@@ -593,7 +600,66 @@ export function createDoctorCommand(): Command {
         }
       }
 
-      // 11. Check file permissions
+      // 11. Check desire paths (unmet agent needs in last 7d)
+      {
+        const desireDir = join(homedir(), '.stackmemory', 'desire-paths');
+        if (existsSync(desireDir)) {
+          try {
+            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const files = readdirSync(desireDir).filter(
+              (f) => f.startsWith('desire-') && f.endsWith('.jsonl')
+            );
+            let totalFailures = 0;
+            let unknownTools = 0;
+            for (const file of files) {
+              const lines = readFileSync(join(desireDir, file), 'utf-8')
+                .split('\n')
+                .filter(Boolean);
+              for (const line of lines) {
+                try {
+                  const entry = JSON.parse(line);
+                  if (new Date(entry.ts).getTime() < cutoff) continue;
+                  totalFailures++;
+                  if (entry.category === 'unknown_tool') unknownTools++;
+                } catch {
+                  // skip malformed
+                }
+              }
+            }
+            if (totalFailures > 0) {
+              results.push({
+                name: 'Desire Paths',
+                status: unknownTools > 0 ? 'warn' : 'ok',
+                message: `${totalFailures} tool failures in last 7d (${unknownTools} unknown tools)`,
+                fix:
+                  unknownTools > 0
+                    ? 'Run: stackmemory desires summary'
+                    : undefined,
+              });
+            } else {
+              results.push({
+                name: 'Desire Paths',
+                status: 'ok',
+                message: 'No tool failures in last 7d',
+              });
+            }
+          } catch {
+            results.push({
+              name: 'Desire Paths',
+              status: 'ok',
+              message: 'Desire path logging active (no data yet)',
+            });
+          }
+        } else {
+          results.push({
+            name: 'Desire Paths',
+            status: 'ok',
+            message: 'Desire path logging not yet active',
+          });
+        }
+      }
+
+      // 12. Check file permissions
       const homeStackmemory = join(homedir(), '.stackmemory');
       if (existsSync(homeStackmemory)) {
         try {
