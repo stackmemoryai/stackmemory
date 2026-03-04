@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { mkdtempSync, mkdirSync, copyFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, copyFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
+import { createTeamCommands } from '../team.js';
 
 /**
  * Create a minimal .stackmemory/context.db that FrameManager can open.
@@ -66,33 +67,70 @@ function setupProjectWithData(dir: string): Database.Database {
   return db;
 }
 
-const cliPath = join(__dirname, '..', '..', 'index.ts');
+/**
+ * Run a team command programmatically via commander.
+ * Temporarily changes cwd and captures console output.
+ */
+async function runTeamCommand(
+  args: string[],
+  cwd: string
+): Promise<{ stdout: string; exitCode: number }> {
+  const originalCwd = process.cwd();
+  const originalExitCode = process.exitCode;
+  process.chdir(cwd);
+  process.exitCode = 0;
+
+  const logs: string[] = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...a) => {
+    logs.push(a.map(String).join(' '));
+  });
+  const errSpy = vi.spyOn(console, 'error').mockImplementation((...a) => {
+    logs.push(a.map(String).join(' '));
+  });
+
+  try {
+    const cmd = createTeamCommands();
+    // Commander expects program name + subcommand in argv
+    await cmd.parseAsync(['node', 'team', ...args]);
+  } finally {
+    spy.mockRestore();
+    errSpy.mockRestore();
+    process.chdir(originalCwd);
+  }
+
+  const exitCode = process.exitCode ?? 0;
+  process.exitCode = originalExitCode;
+  return { stdout: logs.join('\n'), exitCode };
+}
 
 describe('team CLI commands', () => {
   let tmpDir: string;
-  let originalCwd: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'sm-team-test-'));
-    originalCwd = process.cwd();
-  });
-
-  afterEach(() => {
-    process.chdir(originalCwd);
   });
 
   describe('team share', () => {
-    it('should create shared anchor with correct metadata', () => {
+    it('should create shared anchor with correct metadata', async () => {
       setupEmptyProject(tmpDir);
-      process.chdir(tmpDir);
 
-      const result = execSync(
-        `npx tsx ${cliPath} team share -c "API endpoint is /v2/users" -t DECISION -p 9 --source manual`,
-        { cwd: tmpDir, encoding: 'utf-8', timeout: 15000 }
+      const { stdout } = await runTeamCommand(
+        [
+          'share',
+          '-c',
+          'API endpoint is /v2/users',
+          '-t',
+          'DECISION',
+          '-p',
+          '9',
+          '--source',
+          'manual',
+        ],
+        tmpDir
       );
 
-      expect(result).toContain('[DECISION]');
-      expect(result).toContain('priority 9');
+      expect(stdout).toContain('[DECISION]');
+      expect(stdout).toContain('priority 9');
 
       const checkDb = new Database(join(tmpDir, '.stackmemory', 'context.db'));
       const anchors = checkDb
@@ -116,15 +154,10 @@ describe('team CLI commands', () => {
       checkDb.close();
     });
 
-    it('should default to type=FACT priority=7', () => {
+    it('should default to type=FACT priority=7', async () => {
       setupEmptyProject(tmpDir);
-      process.chdir(tmpDir);
 
-      execSync(`npx tsx ${cliPath} team share -c "some fact"`, {
-        cwd: tmpDir,
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
+      await runTeamCommand(['share', '-c', 'some fact'], tmpDir);
 
       const checkDb = new Database(join(tmpDir, '.stackmemory', 'context.db'));
       const anchors = checkDb
@@ -137,15 +170,10 @@ describe('team CLI commands', () => {
       checkDb.close();
     });
 
-    it('should auto-create frame if none active', () => {
+    it('should auto-create frame if none active', async () => {
       setupEmptyProject(tmpDir);
-      process.chdir(tmpDir);
 
-      execSync(`npx tsx ${cliPath} team share -c "auto-frame test"`, {
-        cwd: tmpDir,
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
+      await runTeamCommand(['share', '-c', 'auto-frame test'], tmpDir);
 
       const checkDb = new Database(join(tmpDir, '.stackmemory', 'context.db'));
       const frames = checkDb.prepare(`SELECT * FROM frames`).all() as Array<{
@@ -157,13 +185,22 @@ describe('team CLI commands', () => {
       checkDb.close();
     });
 
-    it('should store source, agentId, taskId in metadata', () => {
+    it('should store source, agentId, taskId in metadata', async () => {
       setupEmptyProject(tmpDir);
-      process.chdir(tmpDir);
 
-      execSync(
-        `npx tsx ${cliPath} team share -c "context with ids" --source subagent --agent-id agent-1 --task-id task-42`,
-        { cwd: tmpDir, encoding: 'utf-8', timeout: 15000 }
+      await runTeamCommand(
+        [
+          'share',
+          '-c',
+          'context with ids',
+          '--source',
+          'subagent',
+          '--agent-id',
+          'agent-1',
+          '--task-id',
+          'task-42',
+        ],
+        tmpDir
       );
 
       const checkDb = new Database(join(tmpDir, '.stackmemory', 'context.db'));
@@ -180,16 +217,11 @@ describe('team CLI commands', () => {
       checkDb.close();
     });
 
-    it('should truncate content > 2000 chars', () => {
+    it('should truncate content > 2000 chars', async () => {
       setupEmptyProject(tmpDir);
-      process.chdir(tmpDir);
 
       const longContent = 'x'.repeat(3000);
-      execSync(`npx tsx ${cliPath} team share -c "${longContent}"`, {
-        cwd: tmpDir,
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
+      await runTeamCommand(['share', '-c', longContent], tmpDir);
 
       const checkDb = new Database(join(tmpDir, '.stackmemory', 'context.db'));
       const anchors = checkDb
@@ -204,7 +236,7 @@ describe('team CLI commands', () => {
   });
 
   describe('team list', () => {
-    it('should list shared anchors', () => {
+    it('should list shared anchors', async () => {
       const db = setupProjectWithData(tmpDir);
       const now = Math.floor(Date.now() / 1000);
       db.prepare(
@@ -217,20 +249,14 @@ describe('team CLI commands', () => {
       ).run(now - 30);
       db.close();
 
-      process.chdir(tmpDir);
+      const { stdout } = await runTeamCommand(['list'], tmpDir);
 
-      const result = execSync(`npx tsx ${cliPath} team list`, {
-        cwd: tmpDir,
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
-
-      expect(result).toContain('shared finding');
-      expect(result).toContain('[FACT]');
-      expect(result).toContain('p8');
+      expect(stdout).toContain('shared finding');
+      expect(stdout).toContain('[FACT]');
+      expect(stdout).toContain('p8');
     });
 
-    it('should respect --limit', () => {
+    it('should respect --limit', async () => {
       const db = setupProjectWithData(tmpDir);
       const now = Math.floor(Date.now() / 1000);
 
@@ -247,29 +273,18 @@ describe('team CLI commands', () => {
       }
       db.close();
 
-      process.chdir(tmpDir);
+      const { stdout } = await runTeamCommand(['list', '--limit', '2'], tmpDir);
 
-      const result = execSync(`npx tsx ${cliPath} team list --limit 2`, {
-        cwd: tmpDir,
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
-
-      expect(result).toContain('2 anchors');
+      expect(stdout).toContain('2 anchors');
     });
 
-    it('should show no results when no shared anchors exist', () => {
+    it('should show no results when no shared anchors exist', async () => {
       const db = setupProjectWithData(tmpDir);
       db.close();
-      process.chdir(tmpDir);
 
-      const result = execSync(`npx tsx ${cliPath} team list`, {
-        cwd: tmpDir,
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
+      const { stdout } = await runTeamCommand(['list'], tmpDir);
 
-      expect(result).toContain('No shared context found');
+      expect(stdout).toContain('No shared context found');
     });
   });
 
