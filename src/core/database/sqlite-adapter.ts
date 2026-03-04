@@ -1767,6 +1767,33 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     });
   }
 
+  async getTablePage(
+    table: 'frames' | 'events' | 'anchors',
+    offset: number,
+    limit: number
+  ): Promise<any[]> {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const safeLimit = Math.max(1, Math.min(limit, 10000));
+    const safeOffset = Math.max(0, offset);
+    const allowedTables = ['frames', 'events', 'anchors'] as const;
+    if (!(allowedTables as readonly string[]).includes(table)) {
+      throw new DatabaseError(
+        `Invalid table name: ${table}`,
+        ErrorCode.DB_QUERY_FAILED,
+        { table }
+      );
+    }
+
+    return this.db
+      .prepare(`SELECT * FROM ${table} ORDER BY rowid LIMIT ? OFFSET ?`)
+      .all(safeLimit, safeOffset);
+  }
+
   async vacuum(): Promise<void> {
     if (!this.db)
       throw new DatabaseError(

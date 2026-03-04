@@ -204,6 +204,18 @@ export abstract class DatabaseAdapter {
     callback: (adapter: DatabaseAdapter) => Promise<void>
   ): Promise<void>;
 
+  // Paginated table reads (for migration)
+  async getTablePage(
+    table: 'frames' | 'events' | 'anchors',
+    offset: number,
+    limit: number
+  ): Promise<any[]> {
+    void table;
+    void offset;
+    void limit;
+    return []; // Default no-op; overridden in concrete adapters
+  }
+
   // Export/Import for migration
   abstract exportData(
     tables: string[],

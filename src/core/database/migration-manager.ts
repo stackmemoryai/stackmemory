@@ -453,25 +453,12 @@ export class MigrationManager extends EventEmitter {
     const safeLimit = Math.max(1, Math.min(limit, 10000));
     const safeOffset = Math.max(0, offset);
 
-    // TODO: Use these options when adapter methods support pagination
-    void safeLimit;
-    void safeOffset;
-
-    switch (table) {
-      case 'frames':
-        // This would need to be implemented in the adapter
-        return []; // Placeholder
-      case 'events':
-        return []; // Placeholder
-      case 'anchors':
-        return []; // Placeholder
-      default:
-        throw new DatabaseError(
-          `Unsupported table: ${table}`,
-          ErrorCode.DB_QUERY_FAILED,
-          { table }
-        );
-    }
+    const validTable = table as 'frames' | 'events' | 'anchors';
+    return this.config.sourceAdapter.getTablePage(
+      validTable,
+      safeOffset,
+      safeLimit
+    );
   }
 
   private async migrateBatch(table: string, batch: any[]): Promise<void> {
