@@ -86,6 +86,7 @@ export interface HandoffProgress {
 export class FrameHandoffManager {
   private dualStackManager: DualStackManager;
   private activeHandoffs: Map<string, HandoffProgress> = new Map();
+  private handoffMetadata: Map<string, HandoffMetadata> = new Map();
   private pendingApprovals: Map<string, HandoffApproval[]> = new Map();
   private notifications: Map<string, HandoffNotification[]> = new Map();
 
@@ -149,6 +150,7 @@ export class FrameHandoffManager {
       };
 
       this.activeHandoffs.set(requestId, progress);
+      this.handoffMetadata.set(requestId, metadata);
 
       // Create notifications for relevant stakeholders
       await this.createHandoffNotifications(requestId, metadata, targetUserId);
@@ -567,12 +569,14 @@ export class FrameHandoffManager {
     const progress = this.activeHandoffs.get(requestId);
     if (!progress) return;
 
-    // Find the original requester (we'll need to enhance this with better metadata tracking)
+    // Get the original requester from stored handoff metadata
+    const metadata = this.handoffMetadata.get(requestId);
+    const requesterId = metadata?.initiatorId || 'unknown';
     const changeRequestNotification: HandoffNotification = {
       id: `${requestId}-changes-${Date.now()}`,
       type: 'request',
       requestId,
-      recipientId: 'requester', // TODO: Get actual requester from handoff metadata
+      recipientId: requesterId,
       title: 'Changes Requested for Handoff',
       message: `${approval.reviewerId} has requested changes: ${approval.feedback || 'See detailed suggestions'}`,
       actionRequired: true,
@@ -580,10 +584,9 @@ export class FrameHandoffManager {
       createdAt: new Date(),
     };
 
-    // Store notification (for now using a placeholder recipient)
-    const notifications = this.notifications.get('requester') || [];
+    const notifications = this.notifications.get(requesterId) || [];
     notifications.push(changeRequestNotification);
-    this.notifications.set('requester', notifications);
+    this.notifications.set(requesterId, notifications);
 
     // Log detailed feedback and suggestions
     logger.info(`Changes requested for handoff: ${requestId}`, {
