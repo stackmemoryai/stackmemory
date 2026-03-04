@@ -89,6 +89,27 @@ try {
       commandPrefix: 'node',
       required: true,
     },
+    {
+      scriptName: 'team-subagent-stop.js',
+      eventType: 'SubagentStop',
+      timeout: 5,
+      commandPrefix: 'node',
+      required: false,
+    },
+    {
+      scriptName: 'team-task-complete.js',
+      eventType: 'TaskCompleted',
+      timeout: 5,
+      commandPrefix: 'node',
+      required: false,
+    },
+    {
+      scriptName: 'team-teammate-idle.js',
+      eventType: 'TeammateIdle',
+      timeout: 3,
+      commandPrefix: 'node',
+      required: false,
+    },
   ];
 
   const DEAD_HOOKS = ['sms-response-handler.js'];

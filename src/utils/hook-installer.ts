@@ -70,6 +70,27 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     commandPrefix: 'node',
     required: false,
   },
+  {
+    scriptName: 'team-subagent-stop.js',
+    eventType: 'SubagentStop',
+    timeout: 5,
+    commandPrefix: 'node',
+    required: false,
+  },
+  {
+    scriptName: 'team-task-complete.js',
+    eventType: 'TaskCompleted',
+    timeout: 5,
+    commandPrefix: 'node',
+    required: false,
+  },
+  {
+    scriptName: 'team-teammate-idle.js',
+    eventType: 'TeammateIdle',
+    timeout: 3,
+    commandPrefix: 'node',
+    required: false,
+  },
 ];
 
 /** Script names that should be removed from settings (dead/deprecated hooks) */
