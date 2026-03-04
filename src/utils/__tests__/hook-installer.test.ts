@@ -18,8 +18,8 @@ const HOOKS_DIR = path.join(os.homedir(), '.claude', 'hooks');
 
 describe('hook-installer', () => {
   describe('CANONICAL_HOOKS', () => {
-    it('defines all 9 hooks', () => {
-      expect(CANONICAL_HOOKS).toHaveLength(9);
+    it('defines all 10 hooks', () => {
+      expect(CANONICAL_HOOKS).toHaveLength(10);
       const names = CANONICAL_HOOKS.map((h) => h.scriptName);
       expect(names).toContain('session-rescue.sh');
       expect(names).toContain('stop-checkpoint.js');
@@ -30,18 +30,20 @@ describe('hook-installer', () => {
       expect(names).toContain('team-subagent-stop.js');
       expect(names).toContain('team-task-complete.js');
       expect(names).toContain('team-teammate-idle.js');
+      expect(names).toContain('desire-path-trace.js');
     });
 
     it('core hooks are required, optional hooks are not', () => {
       const required = CANONICAL_HOOKS.filter((h) => h.required);
       const optional = CANONICAL_HOOKS.filter((h) => !h.required);
       expect(required).toHaveLength(5);
-      expect(optional).toHaveLength(4);
+      expect(optional).toHaveLength(5);
       const optionalNames = optional.map((h) => h.scriptName);
       expect(optionalNames).toContain('theory-capture.js');
       expect(optionalNames).toContain('team-subagent-stop.js');
       expect(optionalNames).toContain('team-task-complete.js');
       expect(optionalNames).toContain('team-teammate-idle.js');
+      expect(optionalNames).toContain('desire-path-trace.js');
     });
 
     it('js hooks have node commandPrefix', () => {

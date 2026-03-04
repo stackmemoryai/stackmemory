@@ -63,6 +63,7 @@ import { createStatsCommand } from './commands/stats.js';
 import { createBenchCommand } from './commands/bench.js';
 import { createDigestCommands } from './commands/digest.js';
 import { createTeamCommands } from './commands/team.js';
+import { createDesiresCommands } from './commands/desires.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -686,6 +687,7 @@ program.addCommand(createStatsCommand());
 program.addCommand(createBenchCommand());
 program.addCommand(createDigestCommands());
 program.addCommand(createTeamCommands());
+program.addCommand(createDesiresCommands());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);

@@ -18,7 +18,13 @@ import {
   AddDecisionSchema,
   GetContextSchema,
 } from './schemas.js';
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  appendFileSync,
+} from 'fs';
 import { compactPlan } from '../../orchestrators/multimodal/utils.js';
 import { filterPending } from './pending-utils.js';
 import { join, dirname } from 'path';
@@ -1797,6 +1803,7 @@ class LocalStackMemoryMCP {
         } catch (err: unknown) {
           error = err instanceof Error ? err : new Error(String(err));
           toolCall.error = error.message;
+          this.logDesirePath(name, args, error.message);
           throw err;
         } finally {
           const endTime = Date.now();
@@ -3535,6 +3542,51 @@ ${typeBreakdown}`,
           ? editResult.match.matchedText.slice(0, 200) + '...'
           : editResult.match.matchedText,
     };
+  }
+
+  /** Log failed tool calls to desire path JSONL for product prioritization */
+  private logDesirePath(
+    tool: string,
+    args: Record<string, unknown>,
+    errorMsg: string
+  ): void {
+    try {
+      const home = process.env['HOME'] || '/tmp';
+      const dir = join(home, '.stackmemory', 'desire-paths');
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+      const category = /unknown tool/i.test(errorMsg)
+        ? 'unknown_tool'
+        : /invalid param|missing.*param/i.test(errorMsg)
+          ? 'invalid_params'
+          : 'handler_error';
+
+      // Sanitize args: truncate long values
+      const sanitized: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(args)) {
+        sanitized[k] =
+          typeof v === 'string' && v.length > 200
+            ? v.slice(0, 200) + '...[truncated]'
+            : v;
+      }
+
+      const date = new Date().toISOString().slice(0, 10);
+      const entry = {
+        ts: new Date().toISOString(),
+        tool,
+        input: sanitized,
+        error: errorMsg.slice(0, 500),
+        category,
+        source: 'mcp-server',
+      };
+
+      appendFileSync(
+        join(dir, `desire-server-${date}.jsonl`),
+        JSON.stringify(entry) + '\n'
+      );
+    } catch {
+      // Fire-and-forget — never block tool execution
+    }
   }
 
   private async handleSmDigest(args: any) {

@@ -91,6 +91,13 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     commandPrefix: 'node',
     required: false,
   },
+  {
+    scriptName: 'desire-path-trace.js',
+    eventType: 'PostToolUse',
+    timeout: 2,
+    commandPrefix: 'node',
+    required: false,
+  },
 ];
 
 /** Script names that should be removed from settings (dead/deprecated hooks) */
