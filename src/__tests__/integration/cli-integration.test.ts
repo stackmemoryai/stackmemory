@@ -33,6 +33,7 @@ describe('CLI Integration', { timeout: 60_000 }, () => {
     it('should show help', () => {
       const result = execSync(`node ${cliPath} --help`, {
         encoding: 'utf8',
+        timeout: 15_000,
       });
 
       expect(result).toContain('stackmemory');
@@ -42,6 +43,7 @@ describe('CLI Integration', { timeout: 60_000 }, () => {
     it('should show version', () => {
       const result = execSync(`node ${cliPath} --version`, {
         encoding: 'utf8',
+        timeout: 15_000,
       });
 
       expect(result).toMatch(/\d+\.\d+\.\d+/);
@@ -51,6 +53,7 @@ describe('CLI Integration', { timeout: 60_000 }, () => {
       const result = execSync(`node ${cliPath} init`, {
         cwd: testDir,
         encoding: 'utf8',
+        timeout: 15_000,
       });
 
       expect(result).toContain('StackMemory initialized');
@@ -67,6 +70,7 @@ describe('CLI Integration', { timeout: 60_000 }, () => {
         execSync(`node ${cliPath} status`, {
           cwd: testDir,
           encoding: 'utf8',
+          timeout: 15_000,
         });
       } catch (error: any) {
         expect(error.stdout || error.message).toContain('not initialized');
