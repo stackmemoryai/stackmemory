@@ -23,6 +23,7 @@ import {
   type TaskDefinition,
 } from '../../core/worktree/preflight.js';
 import { ContextCapture } from '../../core/worktree/capture.js';
+import { extractKeywords } from '../../core/utils/text.js';
 
 // ── Types ──
 
@@ -446,20 +447,8 @@ export class Conductor {
   }
 
   private extractIssueKeywords(issue: LinearIssue): string[] {
-    const words = new Set<string>();
-
-    // From title
-    issue.title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-_]/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length > 3)
-      .forEach((w) => words.add(w));
-
-    // From labels
-    issue.labels.forEach((l) => words.add(l.name.toLowerCase()));
-
-    return [...words].slice(0, 8);
+    const labelText = issue.labels.map((l) => l.name).join(' ');
+    return extractKeywords(`${issue.title} ${labelText}`, { maxCount: 8 });
   }
 
   // ── Dispatch ──

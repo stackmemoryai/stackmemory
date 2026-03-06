@@ -7,6 +7,7 @@
 import { execFileSync } from 'child_process';
 import { extname } from 'path';
 import { logger } from '../monitoring/logger.js';
+import { extractKeywords as extractKeywordsShared } from '../utils/text.js';
 
 export interface TaskDefinition {
   name: string;
@@ -274,53 +275,8 @@ export class PreflightChecker {
     }
   }
 
-  /**
-   * Extract keywords from task description.
-   */
   private extractKeywords(description: string): string[] {
-    const stopWords = new Set([
-      'the',
-      'a',
-      'an',
-      'is',
-      'are',
-      'was',
-      'were',
-      'be',
-      'been',
-      'to',
-      'of',
-      'in',
-      'for',
-      'on',
-      'with',
-      'at',
-      'by',
-      'from',
-      'and',
-      'or',
-      'not',
-      'this',
-      'that',
-      'it',
-      'its',
-      'all',
-      'any',
-      'add',
-      'update',
-      'fix',
-      'change',
-      'make',
-      'create',
-      'new',
-    ]);
-
-    return description
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-_]/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !stopWords.has(w))
-      .slice(0, 5);
+    return extractKeywordsShared(description);
   }
 
   private isInHistory(keywords: string[], file: string): boolean {

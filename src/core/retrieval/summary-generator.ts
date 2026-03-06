@@ -24,6 +24,7 @@ import {
   DEFAULT_RETRIEVAL_CONFIG,
 } from './types.js';
 import { logger } from '../monitoring/logger.js';
+import { extractKeywords as extractKeywordsShared } from '../utils/text.js';
 
 export class CompressedSummaryGenerator {
   private db: Database.Database;
@@ -747,23 +748,7 @@ export class CompressedSummaryGenerator {
   }
 
   private extractKeywords(text: string): string[] {
-    const stopWords = new Set([
-      'the',
-      'a',
-      'an',
-      'and',
-      'or',
-      'but',
-      'in',
-      'on',
-      'at',
-      'to',
-      'for',
-    ]);
-    return text
-      .toLowerCase()
-      .split(/\W+/)
-      .filter((word) => word.length > 2 && !stopWords.has(word));
+    return extractKeywordsShared(text, { maxCount: 20 });
   }
 
   /**

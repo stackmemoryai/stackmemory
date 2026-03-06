@@ -4,19 +4,25 @@
  * after a task completes. Stores structured context for future session pickup.
  */
 
-import { execFileSync } from 'child_process';
-import { formatDuration } from '../../utils/formatting.js';
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   writeFileSync,
-  readdirSync,
-  unlinkSync,
 } from 'fs';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { homedir } from 'os';
+import { formatDuration } from '../../utils/formatting.js';
 import { logger } from '../monitoring/logger.js';
+import {
+  getCurrentBranch,
+  detectBaseBranch,
+  getDiffStats,
+  getCommitsSince,
+  type CommitInfo,
+} from '../utils/git.js';
+import { pruneOldFiles } from '../utils/fs.js';
 
 export interface CaptureResult {
   id: string;
@@ -32,12 +38,7 @@ export interface CaptureResult {
   baseBranch: string;
 }
 
-export interface CommitInfo {
-  hash: string;
-  message: string;
-  author: string;
-  date: string;
-}
+export type { CommitInfo } from '../utils/git.js';
 
 const MAX_CAPTURES = 50;
 
@@ -70,15 +71,18 @@ export class ContextCapture {
     baseBranch?: string;
     decisions?: string[];
   }): CaptureResult {
-    const branch = this.getCurrentBranch();
-    const baseBranch = options?.baseBranch || this.detectBaseBranch();
+    const branch = getCurrentBranch(this.repoPath);
+    const baseBranch = options?.baseBranch || detectBaseBranch(this.repoPath);
     const task = options?.task || branch;
 
     // Get diff stats against base
-    const { changed, created, deleted } = this.getDiffStats(baseBranch);
+    const { changed, created, deleted } = getDiffStats(
+      baseBranch,
+      this.repoPath
+    );
 
     // Get commits since branch point
-    const commits = this.getCommitsSince(baseBranch);
+    const commits = getCommitsSince(baseBranch, this.repoPath);
 
     // Extract decisions from commit messages
     const commitDecisions = this.extractDecisions(commits);
@@ -194,102 +198,6 @@ export class ContextCapture {
 
   // --- Private ---
 
-  private getCurrentBranch(): string {
-    try {
-      return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
-        cwd: this.repoPath,
-        encoding: 'utf-8',
-      }).trim();
-    } catch {
-      return 'unknown';
-    }
-  }
-
-  private detectBaseBranch(): string {
-    // Try main, then master
-    for (const base of ['main', 'master', 'develop']) {
-      try {
-        execFileSync('git', ['rev-parse', '--verify', base], {
-          cwd: this.repoPath,
-          encoding: 'utf-8',
-          stdio: 'pipe',
-        });
-        return base;
-      } catch {
-        continue;
-      }
-    }
-    return 'main';
-  }
-
-  private getDiffStats(baseBranch: string): {
-    changed: string[];
-    created: string[];
-    deleted: string[];
-  } {
-    try {
-      const output = execFileSync(
-        'git',
-        ['diff', '--name-status', `${baseBranch}...HEAD`],
-        { cwd: this.repoPath, encoding: 'utf-8', timeout: 10000 }
-      );
-
-      const changed: string[] = [];
-      const created: string[] = [];
-      const deleted: string[] = [];
-
-      for (const line of output.split('\n').filter((l) => l.trim())) {
-        const [status, ...pathParts] = line.split('\t');
-        const filePath = pathParts.join('\t'); // handle paths with tabs
-        if (!filePath) continue;
-
-        switch (status.charAt(0)) {
-          case 'A':
-            created.push(filePath);
-            break;
-          case 'D':
-            deleted.push(filePath);
-            break;
-          case 'M':
-          case 'R':
-          case 'C':
-            changed.push(filePath);
-            break;
-        }
-      }
-
-      return { changed, created, deleted };
-    } catch {
-      // If diff against base fails (e.g., same branch), diff against HEAD~1
-      return { changed: [], created: [], deleted: [] };
-    }
-  }
-
-  private getCommitsSince(baseBranch: string): CommitInfo[] {
-    try {
-      const output = execFileSync(
-        'git',
-        [
-          'log',
-          `${baseBranch}..HEAD`,
-          '--pretty=format:%H%x00%s%x00%an%x00%aI',
-          '--no-merges',
-        ],
-        { cwd: this.repoPath, encoding: 'utf-8', timeout: 10000 }
-      );
-
-      return output
-        .split('\n')
-        .filter((l) => l.trim())
-        .map((line) => {
-          const [hash, message, author, date] = line.split('\0');
-          return { hash, message, author, date };
-        });
-    } catch {
-      return [];
-    }
-  }
-
   /**
    * Extract decision-like statements from commit messages.
    * Looks for patterns like "chose X over Y", "switched to", "decided", etc.
@@ -335,21 +243,6 @@ export class ContextCapture {
     writeFileSync(filePath, JSON.stringify(result, null, 2));
 
     // Cleanup old captures
-    this.cleanup();
-  }
-
-  private cleanup(): void {
-    try {
-      const files = readdirSync(this.capturesDir)
-        .filter((f) => f.endsWith('.json'))
-        .sort()
-        .reverse();
-
-      for (const old of files.slice(MAX_CAPTURES)) {
-        unlinkSync(join(this.capturesDir, old));
-      }
-    } catch {
-      // Not critical
-    }
+    pruneOldFiles(this.capturesDir, '.json', MAX_CAPTURES);
   }
 }
