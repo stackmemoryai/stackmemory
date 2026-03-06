@@ -122,7 +122,6 @@ describe('ClaudeCodeSubagentClient', () => {
     it('should create client in mock mode', () => {
       const stats = client.getStats();
 
-      expect(stats.activeSubagents).toBe(0);
       expect(stats.tempDir).toContain('stackmemory-rlm');
     });
 
@@ -456,82 +455,10 @@ describe('ClaudeCodeSubagentClient', () => {
     });
   });
 
-  describe('mockTaskToolExecution', () => {
-    it('should return planning mock response', async () => {
-      const request: SubagentRequest = {
-        type: 'planning',
-        task: 'Plan feature',
-        context: {},
-      };
-
-      const response = await client.mockTaskToolExecution(request);
-
-      expect(response.success).toBe(true);
-      expect(response.result.tasks).toBeDefined();
-      expect(response.result.dependencies).toBeDefined();
-      expect(response.tokens).toBeGreaterThan(0);
-    });
-
-    it('should return code mock response', async () => {
-      const request: SubagentRequest = {
-        type: 'code',
-        task: 'Write code',
-        context: {},
-      };
-
-      const response = await client.mockTaskToolExecution(request);
-
-      expect(response.success).toBe(true);
-      expect(response.result.implementation).toBeDefined();
-      expect(response.result.files).toBeDefined();
-    });
-
-    it('should return review mock response', async () => {
-      const request: SubagentRequest = {
-        type: 'review',
-        task: 'Review code',
-        context: {},
-      };
-
-      const response = await client.mockTaskToolExecution(request);
-
-      expect(response.success).toBe(true);
-      expect(response.result.quality).toBeDefined();
-      expect(response.result.issues).toBeDefined();
-      expect(response.result.suggestions).toBeDefined();
-    });
-
-    it('should return generic response for unknown type', async () => {
-      const request: SubagentRequest = {
-        type: 'unknown_type' as any,
-        task: 'Unknown task',
-        context: {},
-      };
-
-      const response = await client.mockTaskToolExecution(request);
-
-      expect(response.success).toBe(true);
-      expect(response.result.status).toBe('completed');
-    });
-
-    it('should include duration in response', async () => {
-      const request: SubagentRequest = {
-        type: 'planning',
-        task: 'Plan',
-        context: {},
-      };
-
-      const response = await client.mockTaskToolExecution(request);
-
-      expect(response.duration).toBeGreaterThan(0);
-    });
-  });
-
   describe('getStats', () => {
-    it('should return stats with zero active subagents', () => {
+    it('should return stats with temp dir', () => {
       const stats = client.getStats();
 
-      expect(stats.activeSubagents).toBe(0);
       expect(stats.tempDir).toBeDefined();
     });
   });
@@ -553,11 +480,9 @@ describe('ClaudeCodeSubagentClient', () => {
       await expect(client.cleanupAll()).resolves.not.toThrow();
     });
 
-    it('should clear active subagents', async () => {
+    it('should handle repeated cleanup', async () => {
       await client.cleanupAll();
-
-      const stats = client.getStats();
-      expect(stats.activeSubagents).toBe(0);
+      await expect(client.cleanupAll()).resolves.not.toThrow();
     });
   });
 

@@ -12,9 +12,10 @@
 import { Command } from 'commander';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
 import Database from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
+import { SymphonyOrchestrator } from './symphony-orchestrator.js';
 
 /** Global store for cross-workspace context */
 function getGlobalStorePath(): string {
@@ -378,6 +379,52 @@ export function createSymphonyCommands(): Command {
       }
 
       globalDb.close();
+    });
+
+  // --- start ---
+  cmd
+    .command('start')
+    .description('Start the Symphony orchestrator daemon')
+    .option('--team <id>', 'Linear team ID')
+    .option(
+      '--states <states>',
+      'Comma-separated issue states to pick up',
+      'Todo'
+    )
+    .option(
+      '--in-progress <state>',
+      'State name for in-progress',
+      'In Progress'
+    )
+    .option(
+      '--in-review <state>',
+      'State name for completed review',
+      'In Review'
+    )
+    .option('--poll <ms>', 'Polling interval in milliseconds', '30000')
+    .option('--concurrency <n>', 'Max concurrent agents', '3')
+    .option('--workspace-root <path>', 'Workspace root directory')
+    .option('--repo <path>', 'Git repo root for worktrees', process.cwd())
+    .option('--branch <name>', 'Base branch for worktrees', 'main')
+    .option('--retries <n>', 'Max retries per issue', '1')
+    .option('--turn-timeout <ms>', 'Agent turn timeout in ms', '3600000')
+    .action(async (options) => {
+      const orchestrator = new SymphonyOrchestrator({
+        teamId: options.team,
+        activeStates: options.states.split(',').map((s: string) => s.trim()),
+        inProgressState: options.inProgress,
+        inReviewState: options.inReview,
+        pollIntervalMs: parseInt(options.poll, 10),
+        maxConcurrent: parseInt(options.concurrency, 10),
+        workspaceRoot:
+          options.workspaceRoot || join(tmpdir(), 'symphony_workspaces'),
+        repoRoot: options.repo,
+        baseBranch: options.branch,
+        maxRetries: parseInt(options.retries, 10),
+        turnTimeoutMs: parseInt(options.turnTimeout, 10),
+      });
+
+      await orchestrator.start();
     });
 
   return cmd;

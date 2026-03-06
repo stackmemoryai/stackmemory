@@ -273,12 +273,17 @@ export class ClaudeCodeTaskCoordinator {
 
     // Wait for active tasks to complete or force cleanup after timeout
     if (this.activeTasks.size > 0) {
-      const timeoutPromise = new Promise((resolve) =>
-        setTimeout(resolve, 30000)
-      );
+      let timer: ReturnType<typeof setTimeout>;
+      const timeoutPromise = new Promise((resolve) => {
+        timer = setTimeout(resolve, 30000);
+      });
       const completionPromise = this.waitForTaskCompletion();
 
-      await Promise.race([completionPromise, timeoutPromise]);
+      try {
+        await Promise.race([completionPromise, timeoutPromise]);
+      } finally {
+        clearTimeout(timer!);
+      }
 
       if (this.activeTasks.size > 0) {
         logger.warn('Force terminating active tasks', {
