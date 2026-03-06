@@ -6,6 +6,30 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { EventEmitter } from 'events';
+
+// Mock child_process.spawn to avoid invoking real claude CLI in tests
+vi.mock('child_process', () => ({
+  spawn: vi.fn(() => {
+    const proc = new EventEmitter() as any;
+    proc.stdout = new EventEmitter();
+    proc.stderr = new EventEmitter();
+    proc.stdin = { write: vi.fn(), end: vi.fn() };
+    setTimeout(() => {
+      // Emit stream-json format that subagent-client parses
+      const event = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [{ type: 'text', text: '{"result": "mock CLI response"}' }],
+        },
+        session_id: 'test-session',
+      });
+      proc.stdout.emit('data', Buffer.from(event + '\n'));
+      proc.emit('close', 0);
+    }, 50);
+    return proc;
+  }),
+}));
 
 // Create hoisted mock references so they're available inside vi.mock factories
 const {
@@ -324,9 +348,10 @@ describe('ClaudeCodeSubagentClient', () => {
           type: 'code',
           task: 'Generate simple function',
           context: {},
+          timeout: 1000, // Short timeout — we only care about routing, not CLI result
         };
 
-        // This will attempt CLI execution which may fail in test env,
+        // This will attempt CLI execution which may fail/timeout in test env,
         // but the important thing is it didn't try createProvider
         await nonMockClient.executeSubagent(request).catch(() => {});
 
@@ -372,9 +397,10 @@ describe('ClaudeCodeSubagentClient', () => {
         type: 'code',
         task: 'Generate code',
         context: {},
+        timeout: 1000, // Short timeout — we only care about routing, not CLI result
       };
 
-      // Will try CLI path; may fail in test env but that's OK
+      // Will try CLI path; may fail/timeout in test env but that's OK
       const response = await nonMockClient.executeSubagent(request);
 
       // createProvider should not be called for anthropic

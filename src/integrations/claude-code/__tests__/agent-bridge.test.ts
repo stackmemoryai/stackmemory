@@ -3,7 +3,23 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
 import { ClaudeCodeAgentBridge, CLAUDE_CODE_AGENTS } from '../agent-bridge.js';
+
+// Mock child_process.spawn to avoid invoking real claude CLI
+vi.mock('child_process', () => ({
+  spawn: vi.fn(() => {
+    const proc = new EventEmitter() as any;
+    proc.stdout = new EventEmitter();
+    proc.stderr = new EventEmitter();
+    proc.stdin = { write: vi.fn(), end: vi.fn() };
+    setTimeout(() => {
+      proc.stdout.emit('data', Buffer.from('Mock swarm agent response'));
+      proc.emit('close', 0);
+    }, 50);
+    return proc;
+  }),
+}));
 
 // Mock the oracle-worker-pattern module
 vi.mock('../../ralph/patterns/oracle-worker-pattern.js', () => ({
