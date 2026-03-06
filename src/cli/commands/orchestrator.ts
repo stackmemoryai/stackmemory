@@ -101,7 +101,7 @@ const DEFAULT_CONFIG: ConductorConfig = {
     '..',
     '..',
     'scripts',
-    'symphony',
+    'conductor',
     'claude-app-server.cjs'
   ),
   turnTimeoutMs: 3600000,
@@ -381,14 +381,18 @@ export class Conductor {
     try {
       const checker = new PreflightChecker(this.config.repoRoot);
 
-      // Build task definitions from running + candidate issues
-      const runningTasks: TaskDefinition[] = Array.from(
-        this.running.values()
-      ).map((r) => ({
-        name: r.issue.identifier,
-        description: r.issue.title,
-        keywords: this.extractIssueKeywords(r.issue),
-      }));
+      // Predict files for running tasks ONCE (avoid N+1 re-prediction)
+      const runningFileSets: Set<string>[] = [];
+      const runningNames: string[] = [];
+      for (const run of this.running.values()) {
+        const task: TaskDefinition = {
+          name: run.issue.identifier,
+          description: run.issue.title,
+          keywords: this.extractIssueKeywords(run.issue),
+        };
+        runningFileSets.push(checker.predictFiles(task));
+        runningNames.push(run.issue.identifier);
+      }
 
       const safe: LinearIssue[] = [];
 
@@ -398,32 +402,33 @@ export class Conductor {
           description: candidate.title,
           keywords: this.extractIssueKeywords(candidate),
         };
+        const candidateFiles = checker.predictFiles(candidateTask);
 
-        // Check this candidate against all running tasks
-        const allTasks = [...runningTasks, candidateTask];
-        const result = checker.check(allTasks);
+        // Check overlap against each running task's pre-computed file set
+        const conflictFiles: string[] = [];
+        const conflictTasks: string[] = [];
 
-        // Filter overlaps once, reuse for checks and logging
-        const candidateOverlaps = result.allOverlaps.filter(
-          (o) => o.tasks.includes(candidate.identifier) && o.confidence >= 0.6
-        );
+        for (let i = 0; i < runningFileSets.length; i++) {
+          const shared = [...candidateFiles].filter((f) =>
+            runningFileSets[i].has(f)
+          );
+          if (shared.length > 0) {
+            conflictFiles.push(...shared);
+            conflictTasks.push(runningNames[i]);
+          }
+        }
 
-        if (candidateOverlaps.length > 0) {
-          const conflictFiles = candidateOverlaps
-            .map((o) => o.file)
-            .slice(0, 3);
-          const conflictTasks = candidateOverlaps
-            .flatMap((o) => o.tasks)
-            .filter((t) => t !== candidate.identifier);
+        if (conflictFiles.length > 0) {
+          const uniqueFiles = [...new Set(conflictFiles)].slice(0, 3);
 
           logger.info('Preflight: skipping conflicting issue', {
             identifier: candidate.identifier,
             conflictsWith: conflictTasks,
-            files: conflictFiles,
+            files: uniqueFiles,
           });
 
           console.log(
-            `[${candidate.identifier}] Deferred — file overlap with running work (${conflictFiles.join(', ')})`
+            `[${candidate.identifier}] Deferred — file overlap with running work (${uniqueFiles.join(', ')})`
           );
         } else {
           safe.push(candidate);
@@ -588,7 +593,7 @@ export class Conductor {
     }
 
     // Create git worktree
-    const branchName = `symphony/${wsKey}`;
+    const branchName = `conductor/${wsKey}`;
 
     try {
       // Fetch latest
@@ -908,7 +913,7 @@ export class Conductor {
     const hookPath = join(
       this.config.repoRoot,
       'scripts',
-      'symphony',
+      'conductor',
       `${hookName}.sh`
     );
 

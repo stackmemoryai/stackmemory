@@ -5,8 +5,7 @@
  */
 
 import { execFileSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { join, dirname, extname } from 'path';
+import { extname } from 'path';
 import { logger } from '../monitoring/logger.js';
 
 export interface TaskDefinition {
@@ -56,11 +55,16 @@ export class PreflightChecker {
       };
     }
 
-    // Predict files for each task
+    // Predict files and cache keywords for each task
     const taskFiles = new Map<string, Set<string>>();
+    const taskKeywords = new Map<string, string[]>();
     for (const task of tasks) {
       const files = this.predictFiles(task);
       taskFiles.set(task.name, files);
+      taskKeywords.set(
+        task.name,
+        task.keywords || this.extractKeywords(task.description)
+      );
     }
 
     // Find overlaps between all task pairs
@@ -77,20 +81,24 @@ export class PreflightChecker {
         const shared = [...filesA].filter((f) => filesB.has(f));
         if (shared.length > 0) {
           for (const file of shared) {
-            const existing = allOverlaps.find(
-              (o) =>
-                o.file === file &&
-                o.tasks.includes(a.name) &&
-                o.tasks.includes(b.name)
-            );
-            if (!existing) {
-              allOverlaps.push({
+            allOverlaps.push({
+              file,
+              tasks: [a.name, b.name],
+              confidence: this.estimateConfidenceCached(
                 file,
-                tasks: [a.name, b.name],
-                confidence: this.estimateConfidence(file, a, b),
-                source: this.getSource(file, a, b),
-              });
-            }
+                taskKeywords.get(a.name)!,
+                taskKeywords.get(b.name)!,
+                a,
+                b
+              ),
+              source: this.getSourceCached(
+                file,
+                taskKeywords.get(a.name)!,
+                taskKeywords.get(b.name)!,
+                a,
+                b
+              ),
+            });
           }
 
           if (!overlapPairs.has(a.name)) overlapPairs.set(a.name, new Set());
@@ -198,7 +206,7 @@ export class PreflightChecker {
       const files = output
         .split('\n')
         .map((l) => l.trim())
-        .filter((l) => l.length > 0 && existsSync(join(this.repoPath, l)));
+        .filter((l) => l.length > 0);
 
       // Count frequency, return top files
       const freq = new Map<string, number>();
@@ -315,63 +323,49 @@ export class PreflightChecker {
       .slice(0, 5);
   }
 
-  /**
-   * Estimate confidence that a file will be touched by both tasks.
-   */
-  private estimateConfidence(
+  private isInHistory(keywords: string[], file: string): boolean {
+    return keywords.some((k) =>
+      (this.gitLogCache.get(k.toLowerCase()) || []).includes(file)
+    );
+  }
+
+  private estimateConfidenceCached(
     file: string,
+    keywordsA: string[],
+    keywordsB: string[],
     taskA: TaskDefinition,
     taskB: TaskDefinition
   ): number {
-    let confidence = 0.3; // base
-
-    // Explicit file in either task = high confidence
     if (taskA.files?.includes(file) || taskB.files?.includes(file)) {
-      confidence = 0.9;
+      return 0.9;
     }
 
-    // File appears in git history for both tasks' keywords
-    const keywordsA = taskA.keywords || this.extractKeywords(taskA.description);
-    const keywordsB = taskB.keywords || this.extractKeywords(taskB.description);
-
-    const inHistoryA = keywordsA.some((k) =>
-      (this.gitLogCache.get(k.toLowerCase()) || []).includes(file)
-    );
-    const inHistoryB = keywordsB.some((k) =>
-      (this.gitLogCache.get(k.toLowerCase()) || []).includes(file)
-    );
-
-    if (inHistoryA && inHistoryB) {
-      confidence = Math.max(confidence, 0.7);
+    if (
+      this.isInHistory(keywordsA, file) &&
+      this.isInHistory(keywordsB, file)
+    ) {
+      return 0.7;
     }
 
-    return Math.min(confidence, 1.0);
+    return 0.3;
   }
 
-  /**
-   * Determine the primary source of a file overlap prediction.
-   */
-  private getSource(
+  private getSourceCached(
     file: string,
+    keywordsA: string[],
+    keywordsB: string[],
     taskA: TaskDefinition,
     taskB: TaskDefinition
   ): FileOverlap['source'] {
     if (taskA.files?.includes(file) || taskB.files?.includes(file)) {
       return 'explicit';
     }
-
-    const keywordsA = taskA.keywords || this.extractKeywords(taskA.description);
-    const keywordsB = taskB.keywords || this.extractKeywords(taskB.description);
-
-    const inHistoryA = keywordsA.some((k) =>
-      (this.gitLogCache.get(k.toLowerCase()) || []).includes(file)
-    );
-    const inHistoryB = keywordsB.some((k) =>
-      (this.gitLogCache.get(k.toLowerCase()) || []).includes(file)
-    );
-
-    if (inHistoryA || inHistoryB) return 'git-history';
-
+    if (
+      this.isInHistory(keywordsA, file) ||
+      this.isInHistory(keywordsB, file)
+    ) {
+      return 'git-history';
+    }
     return 'keyword-match';
   }
 

@@ -5,6 +5,7 @@
  */
 
 import { execFileSync } from 'child_process';
+import { formatDuration } from '../../utils/formatting.js';
 import {
   existsSync,
   mkdirSync,
@@ -271,7 +272,7 @@ export class ContextCapture {
         [
           'log',
           `${baseBranch}..HEAD`,
-          '--pretty=format:%H|%s|%an|%aI',
+          '--pretty=format:%H%x00%s%x00%an%x00%aI',
           '--no-merges',
         ],
         { cwd: this.repoPath, encoding: 'utf-8', timeout: 10000 }
@@ -281,7 +282,7 @@ export class ContextCapture {
         .split('\n')
         .filter((l) => l.trim())
         .map((line) => {
-          const [hash, message, author, date] = line.split('|');
+          const [hash, message, author, date] = line.split('\0');
           return { hash, message, author, date };
         });
     } catch {
@@ -324,12 +325,7 @@ export class ContextCapture {
     const first = new Date(commits[commits.length - 1].date);
     const last = new Date(commits[0].date);
     const diffMs = last.getTime() - first.getTime();
-    const diffMin = Math.round(diffMs / 60000);
-
-    if (diffMin < 60) return `${diffMin}min`;
-    const hours = Math.floor(diffMin / 60);
-    const mins = diffMin % 60;
-    return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
+    return formatDuration(diffMs);
   }
 
   private save(result: CaptureResult): void {

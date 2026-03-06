@@ -66,7 +66,7 @@ import { createTeamCommands } from './commands/team.js';
 import { createDesiresCommands } from './commands/desires.js';
 import { createConductorCommands } from './commands/orchestrate.js';
 import { createPreflightCommand } from './commands/preflight.js';
-import { createSnapshotCommand } from './commands/capture.js';
+import { createSnapshotCommand } from './commands/snapshot.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';

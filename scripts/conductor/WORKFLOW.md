@@ -18,9 +18,9 @@ Add to your config:
 
 ```toml
 [hooks]
-after_create = "scripts/symphony/after-create.sh"
-after_run = "scripts/symphony/after-run.sh"
-before_remove = "scripts/symphony/before-remove.sh"
+after_create = "scripts/conductor/after-create.sh"
+after_run = "scripts/conductor/after-run.sh"
+before_remove = "scripts/conductor/before-remove.sh"
 ```
 
 ## Environment Variables
