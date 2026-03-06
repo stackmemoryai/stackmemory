@@ -1,12 +1,12 @@
 /**
- * Symphony Integration Commands
+ * Conductor Commands
  *
- * Provides capture/restore/archive commands that integrate with
- * OpenAI Symphony's workspace lifecycle hooks.
+ * Provides capture/restore/archive/start commands for autonomous
+ * agent orchestration via Linear.
  *
- * Symphony creates isolated workspaces per issue and calls hooks
- * at lifecycle events. These commands persist agent memory across
- * runs so attempt N+1 has context from attempt N.
+ * Conductor creates isolated workspaces per issue, spawns Claude Code
+ * agents, and persists memory across runs so attempt N+1 has context
+ * from attempt N.
  */
 
 import { Command } from 'commander';
@@ -15,25 +15,25 @@ import { join } from 'path';
 import { homedir, tmpdir } from 'os';
 import Database from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
-import { SymphonyOrchestrator } from './symphony-orchestrator.js';
+import { Conductor } from './orchestrator.js';
 
 /** Global store for cross-workspace context */
 function getGlobalStorePath(): string {
-  const dir = join(homedir(), '.stackmemory', 'symphony');
+  const dir = join(homedir(), '.stackmemory', 'conductor');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
   return dir;
 }
 
-/** Get the global context database for Symphony */
+/** Get the global context database for the orchestrator */
 function getGlobalDb(): Database.Database {
   const dbPath = join(getGlobalStorePath(), 'context.db');
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  // Create symphony-specific tables if needed
+  // Create conductor tables (named symphony_contexts for backward compat)
   db.exec(`
     CREATE TABLE IF NOT EXISTS symphony_contexts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,9 +57,9 @@ function getGlobalDb(): Database.Database {
   return db;
 }
 
-export function createSymphonyCommands(): Command {
-  const cmd = new Command('symphony');
-  cmd.description('Symphony orchestrator integration commands');
+export function createConductorCommands(): Command {
+  const cmd = new Command('conductor');
+  cmd.description('Conductor — autonomous agent orchestration via Linear');
 
   // --- capture ---
   cmd
@@ -144,7 +144,7 @@ export function createSymphonyCommands(): Command {
         // Not a git repo
       }
 
-      // Store in global Symphony database
+      // Store in global conductor database
       const globalDb = getGlobalDb();
       globalDb
         .prepare(
@@ -185,7 +185,7 @@ export function createSymphonyCommands(): Command {
       const globalDbPath = join(getGlobalStorePath(), 'context.db');
 
       if (!existsSync(globalDbPath)) {
-        console.log('No prior Symphony context found');
+        console.log('No prior orchestrator context found');
         return;
       }
 
@@ -265,7 +265,7 @@ export function createSymphonyCommands(): Command {
       if (!existsSync(restoreDir)) {
         mkdirSync(restoreDir, { recursive: true });
       }
-      const restorePath = join(restoreDir, 'symphony-context.md');
+      const restorePath = join(restoreDir, 'conductor-context.md');
       writeFileSync(restorePath, lines.join('\n'));
 
       globalDb.close();
@@ -336,13 +336,13 @@ export function createSymphonyCommands(): Command {
   // --- search ---
   cmd
     .command('search')
-    .description('Search across all Symphony issue contexts')
+    .description('Search across all orchestrator issue contexts')
     .argument('<query>', 'Search query')
     .option('--limit <n>', 'Max results', '10')
     .action(async (query, options) => {
       const globalDbPath = join(getGlobalStorePath(), 'context.db');
       if (!existsSync(globalDbPath)) {
-        console.log('No Symphony context database found');
+        console.log('No orchestrator context database found');
         return;
       }
 
@@ -384,7 +384,7 @@ export function createSymphonyCommands(): Command {
   // --- start ---
   cmd
     .command('start')
-    .description('Start the Symphony orchestrator daemon')
+    .description('Start the orchestrator daemon')
     .option('--team <id>', 'Linear team ID')
     .option(
       '--states <states>',
@@ -409,7 +409,7 @@ export function createSymphonyCommands(): Command {
     .option('--retries <n>', 'Max retries per issue', '1')
     .option('--turn-timeout <ms>', 'Agent turn timeout in ms', '3600000')
     .action(async (options) => {
-      const orchestrator = new SymphonyOrchestrator({
+      const conductor = new Conductor({
         teamId: options.team,
         activeStates: options.states.split(',').map((s: string) => s.trim()),
         inProgressState: options.inProgress,
@@ -417,14 +417,14 @@ export function createSymphonyCommands(): Command {
         pollIntervalMs: parseInt(options.poll, 10),
         maxConcurrent: parseInt(options.concurrency, 10),
         workspaceRoot:
-          options.workspaceRoot || join(tmpdir(), 'symphony_workspaces'),
+          options.workspaceRoot || join(tmpdir(), 'conductor_workspaces'),
         repoRoot: options.repo,
         baseBranch: options.branch,
         maxRetries: parseInt(options.retries, 10),
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
       });
 
-      await orchestrator.start();
+      await conductor.start();
     });
 
   return cmd;

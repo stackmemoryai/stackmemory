@@ -1,14 +1,20 @@
-# StackMemory + Symphony Integration
+# StackMemory Conductor
 
 ## Overview
 
-StackMemory provides persistent agent memory across Symphony workspace lifecycle events.
-When Symphony creates a workspace for an issue, StackMemory restores context from prior
+StackMemory Conductor provides persistent agent memory across autonomous agent runs.
+When Conductor creates a workspace for an issue, StackMemory restores context from prior
 attempts. After each run, it captures context. Before workspace removal, it archives everything.
+
+## Usage
+
+```bash
+stackmemory conductor start --team <team-id> --repo /path/to/repo
+```
 
 ## Hook Configuration
 
-Add to your Symphony `config.toml`:
+Add to your config:
 
 ```toml
 [hooks]
@@ -19,11 +25,11 @@ before_remove = "scripts/symphony/before-remove.sh"
 
 ## Environment Variables
 
-Symphony sets these automatically:
+Conductor sets these automatically:
 
 | Variable | Description | Example |
 |---|---|---|
-| `SYMPHONY_WORKSPACE_DIR` | Workspace path | `/tmp/symphony/STA-476` |
+| `SYMPHONY_WORKSPACE_DIR` | Workspace path | `/tmp/conductor_workspaces/STA-476` |
 | `SYMPHONY_ISSUE_ID` | Internal issue ID | `uuid-string` |
 | `SYMPHONY_ISSUE_IDENTIFIER` | Human-readable ID | `STA-476` |
 | `SYMPHONY_ATTEMPT` | Current attempt number | `1` |
@@ -31,33 +37,38 @@ Symphony sets these automatically:
 ## Lifecycle
 
 ```
-Issue assigned
-  → after_create: stackmemory init + restore prior context
-  → agent runs...
-  → after_run: capture frames/anchors/events to global store
-  → (repeat for retries, attempt increments)
-  → before_remove: archive full context, workspace deleted
+Issue in "Todo" on Linear
+  -> Conductor polls, claims issue, moves to "In Progress"
+  -> after_create: stackmemory init + restore prior context
+  -> agent runs (Claude Code via worktree)...
+  -> after_run: capture frames/anchors/events to global store
+  -> (repeat for retries, attempt increments)
+  -> On success: move issue to "In Review"
+  -> before_remove: archive full context, workspace deleted
 ```
 
 ## Manual Commands
 
 ```bash
+# Start the daemon
+stackmemory conductor start --team <team-id> --repo /path/to/repo
+
 # Capture context from a workspace
-stackmemory symphony capture --issue STA-476 --workspace /path/to/ws --attempt 1
+stackmemory conductor capture --issue STA-476 --workspace /path/to/ws --attempt 1
 
 # Restore prior context into workspace
-stackmemory symphony restore --issue STA-476 --workspace /path/to/ws
+stackmemory conductor restore --issue STA-476 --workspace /path/to/ws
 
 # Archive before deletion
-stackmemory symphony archive --issue STA-476 --workspace /path/to/ws
+stackmemory conductor archive --issue STA-476 --workspace /path/to/ws
 
 # Search across all issue contexts
-stackmemory symphony search "database migration"
+stackmemory conductor search "database migration"
 ```
 
 ## Storage
 
-Global context stored at `~/.stackmemory/symphony/context.db` (SQLite).
+Global context stored at `~/.stackmemory/conductor/context.db` (SQLite).
 Per-workspace context at `<workspace>/.stackmemory/context.db`.
 
 The global database persists across workspace deletions, enabling cross-attempt learning.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Symphony after_run hook
+# Conductor after_run hook
 # Captures context from the agent run and tags it with the issue identifier
 # Called after each agent attempt (success or failure)
 #
@@ -13,10 +13,10 @@ ATTEMPT="${SYMPHONY_ATTEMPT:-1}"
 cd "$WORKSPACE"
 
 # Capture context from this run, tagged with issue ID and attempt number
-stackmemory symphony capture \
+stackmemory conductor capture \
   --issue "$ISSUE_ID" \
   --workspace "$WORKSPACE" \
   --attempt "$ATTEMPT" \
   2>/dev/null || true
 
-echo "[stackmemory] Context captured for $ISSUE_ID (attempt $ATTEMPT)"
+echo "[conductor] Context captured for $ISSUE_ID (attempt $ATTEMPT)"

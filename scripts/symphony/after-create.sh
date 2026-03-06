@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Symphony after_create hook
+# Conductor after_create hook
 # Initializes StackMemory in the workspace directory
-# Called once when Symphony creates a new workspace for an issue
+# Called once when Conductor creates a new workspace for an issue
 #
 # Environment: SYMPHONY_WORKSPACE_DIR, SYMPHONY_ISSUE_ID, SYMPHONY_ISSUE_IDENTIFIER
 set -euo pipefail
@@ -17,6 +17,6 @@ if [ ! -d ".stackmemory" ]; then
 fi
 
 # Restore relevant context from prior runs on this issue
-stackmemory symphony restore --issue "$ISSUE_ID" --workspace "$WORKSPACE" 2>/dev/null || true
+stackmemory conductor restore --issue "$ISSUE_ID" --workspace "$WORKSPACE" 2>/dev/null || true
 
-echo "[stackmemory] Workspace initialized for $ISSUE_ID"
+echo "[conductor] Workspace initialized for $ISSUE_ID"

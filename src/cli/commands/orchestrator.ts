@@ -1,12 +1,11 @@
 /**
- * Symphony Orchestrator
+ * Conductor
  *
  * Polls Linear for issues in target states, creates git worktrees per issue,
- * spawns Claude Code agents via claude-app-server.cjs, manages bounded
- * concurrency, and runs lifecycle hooks.
+ * spawns Claude Code agents, manages bounded concurrency, and runs
+ * lifecycle hooks.
  *
- * Implements SPEC.md sections 3-7 (Polling, Workspace, Agent Session,
- * Concurrency, Orchestration State Machine).
+ * `stackmemory conductor start`
  */
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
@@ -22,7 +21,7 @@ import { LinearAuthManager } from '../../integrations/linear/auth.js';
 
 // ── Types ──
 
-export interface SymphonyConfig {
+export interface ConductorConfig {
   /** Linear team ID or key */
   teamId?: string;
   /** Linear project slug for filtering */
@@ -81,14 +80,14 @@ export interface OrchestratorStats {
 
 // ── Default Config ──
 
-const DEFAULT_CONFIG: SymphonyConfig = {
+const DEFAULT_CONFIG: ConductorConfig = {
   activeStates: ['Todo'],
   terminalStates: ['Done', 'Cancelled', 'Canceled', 'Closed'],
   inProgressState: 'In Progress',
   inReviewState: 'In Review',
   pollIntervalMs: 30000,
   maxConcurrent: 3,
-  workspaceRoot: join(tmpdir(), 'symphony_workspaces'),
+  workspaceRoot: join(tmpdir(), 'conductor_workspaces'),
   repoRoot: process.cwd(),
   baseBranch: 'main',
   appServerPath: join(
@@ -107,8 +106,8 @@ const DEFAULT_CONFIG: SymphonyConfig = {
 
 // ── Orchestrator ──
 
-export class SymphonyOrchestrator {
-  private config: SymphonyConfig;
+export class Conductor {
+  private config: ConductorConfig;
   private client: LinearClient | null = null;
   private running: Map<string, RunningIssue> = new Map();
   private claimed: Set<string> = new Set();
@@ -121,7 +120,7 @@ export class SymphonyOrchestrator {
   private stopping = false;
   private stateCache: Map<string, { id: string; name: string }> = new Map();
 
-  constructor(config: Partial<SymphonyConfig> = {}) {
+  constructor(config: Partial<ConductorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
@@ -162,7 +161,7 @@ export class SymphonyOrchestrator {
     // Cache workflow states for state transitions
     await this.cacheWorkflowStates();
 
-    logger.info('Symphony orchestrator started', {
+    logger.info('Orchestrator started', {
       activeStates: this.config.activeStates,
       maxConcurrent: this.config.maxConcurrent,
       pollIntervalMs: this.config.pollIntervalMs,
@@ -170,7 +169,7 @@ export class SymphonyOrchestrator {
     });
 
     console.log(
-      `Symphony started — polling every ${this.config.pollIntervalMs / 1000}s, max ${this.config.maxConcurrent} concurrent`
+      `Orchestrator started — polling every ${this.config.pollIntervalMs / 1000}s, max ${this.config.maxConcurrent} concurrent`
     );
 
     // Register signal handlers
@@ -197,8 +196,8 @@ export class SymphonyOrchestrator {
     if (this.stopping) return;
     this.stopping = true;
 
-    console.log('\nSymphony stopping...');
-    logger.info('Symphony orchestrator stopping', {
+    console.log('\nOrchestrator stopping...');
+    logger.info('Orchestrator stopping', {
       runningCount: this.running.size,
     });
 
@@ -236,7 +235,7 @@ export class SymphonyOrchestrator {
     this.claimed.clear();
 
     console.log(
-      `Symphony stopped. Completed: ${this.completeCount}, Failed: ${this.failCount}`
+      `Orchestrator stopped. Completed: ${this.completeCount}, Failed: ${this.failCount}`
     );
   }
 

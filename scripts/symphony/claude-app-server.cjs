@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Claude Code App-Server Adapter for Symphony
+ * Claude Code App-Server Adapter for Conductor
  *
  * Speaks the Codex app-server JSON-RPC 2.0 stdio protocol
  * but runs Claude Code underneath.
@@ -8,12 +8,10 @@
  * Primary mode: `claude -p --output-format stream-json` (full tool use)
  * Fallback mode: `claude --print` (single-turn, no tools)
  *
- * Symphony spawns this process and sends:
- *   initialize → thread/start → turn/start → (stream events) → turn/completed
+ * Conductor spawns this process and sends:
+ *   initialize -> thread/start -> turn/start -> (stream events) -> turn/completed
  *
- * Usage in WORKFLOW.md:
- *   codex:
- *     command: node /path/to/claude-app-server.cjs
+ * Usage: stackmemory conductor start
  */
 
 const { spawn } = require('child_process');
