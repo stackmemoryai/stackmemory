@@ -65,6 +65,8 @@ import { createDigestCommands } from './commands/digest.js';
 import { createTeamCommands } from './commands/team.js';
 import { createDesiresCommands } from './commands/desires.js';
 import { createConductorCommands } from './commands/orchestrate.js';
+import { createPreflightCommand } from './commands/preflight.js';
+import { createSnapshotCommand } from './commands/capture.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -690,6 +692,8 @@ program.addCommand(createDigestCommands());
 program.addCommand(createTeamCommands());
 program.addCommand(createDesiresCommands());
 program.addCommand(createConductorCommands());
+program.addCommand(createPreflightCommand());
+program.addCommand(createSnapshotCommand());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);

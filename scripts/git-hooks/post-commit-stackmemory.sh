@@ -268,6 +268,30 @@ record_commit_metrics() {
     return 0
 }
 
+# Auto-capture context after commit
+capture_context() {
+    if [ "$STACKMEMORY_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local commit_info="$1"
+    IFS='|' read -r commit_hash commit_msg commit_author branch files_changed <<< "$commit_info"
+
+    # Only capture on significant commits (3+ files or feature/fix commits)
+    if [ "$files_changed" -lt 3 ] && ! echo "$commit_msg" | grep -iE "(feat|fix|refactor|complete|done)" >/dev/null; then
+        return 0
+    fi
+
+    log_info "Capturing context for session continuity..."
+    if stackmemory snapshot save --task "$commit_msg" >/dev/null 2>&1; then
+        log_success "Context captured"
+    else
+        log_warning "Context capture failed (non-critical)"
+    fi
+
+    return 0
+}
+
 # Main execution
 main() {
     log_info "📝 StackMemory post-commit hook starting..."
@@ -296,6 +320,9 @@ main() {
     create_completion_frame "$commit_info"
     record_commit_metrics "$commit_info"
     sync_with_linear "$commit_info"
+
+    # Auto-capture context for session continuity
+    capture_context "$commit_info"
 
     log_success "🎉 Post-commit processing completed!"
     return 0

@@ -10,6 +10,7 @@
  */
 
 import { Command } from 'commander';
+import { execSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir, tmpdir } from 'os';
@@ -78,6 +79,8 @@ export function createConductorCommands(): Command {
       let framesJson = '[]';
       let anchorsJson = '[]';
       let eventsJson = '[]';
+      let frameCount = 0;
+      let anchorCount = 0;
 
       // Extract context from workspace database
       if (existsSync(dbPath)) {
@@ -90,6 +93,7 @@ export function createConductorCommands(): Command {
               'SELECT frame_id, name, type, digest_text, created_at FROM frames ORDER BY created_at DESC LIMIT 20'
             )
             .all();
+          frameCount = frames.length;
           framesJson = JSON.stringify(frames);
 
           // Get anchors (decisions, facts, constraints)
@@ -98,6 +102,7 @@ export function createConductorCommands(): Command {
               "SELECT anchor_id, type, text, priority FROM anchors WHERE type IN ('DECISION', 'FACT', 'CONSTRAINT', 'RISK') ORDER BY priority DESC LIMIT 30"
             )
             .all();
+          anchorCount = anchors.length;
           anchorsJson = JSON.stringify(anchors);
 
           // Get recent events
@@ -126,7 +131,6 @@ export function createConductorCommands(): Command {
       // Also capture git state if available
       let metadata: Record<string, any> = { workspace, attempt };
       try {
-        const { execSync } = await import('child_process');
         const branch = execSync('git rev-parse --abbrev-ref HEAD', {
           cwd: workspace,
           encoding: 'utf8',
@@ -165,8 +169,6 @@ export function createConductorCommands(): Command {
         );
       globalDb.close();
 
-      const frameCount = JSON.parse(framesJson).length;
-      const anchorCount = JSON.parse(anchorsJson).length;
       console.log(
         `Captured ${frameCount} frames, ${anchorCount} anchors for ${issueId} (attempt ${attempt})`
       );

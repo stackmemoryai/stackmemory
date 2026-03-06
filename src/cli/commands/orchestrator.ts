@@ -18,6 +18,11 @@ import {
   type LinearIssue,
 } from '../../integrations/linear/client.js';
 import { LinearAuthManager } from '../../integrations/linear/auth.js';
+import {
+  PreflightChecker,
+  type TaskDefinition,
+} from '../../core/worktree/preflight.js';
+import { ContextCapture } from '../../core/worktree/capture.js';
 
 // ── Types ──
 
@@ -64,7 +69,7 @@ export interface RunningIssue {
   error?: string;
 }
 
-export interface OrchestratorStats {
+export interface ConductorStats {
   running: number;
   completed: number;
   failed: number;
@@ -119,9 +124,17 @@ export class Conductor {
   private completeCount = 0;
   private stopping = false;
   private stateCache: Map<string, { id: string; name: string }> = new Map();
+  private activeStatesLower: string[];
+  private terminalStatesLower: string[];
 
   constructor(config: Partial<ConductorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.activeStatesLower = this.config.activeStates.map((s) =>
+      s.trim().toLowerCase()
+    );
+    this.terminalStatesLower = this.config.terminalStates.map((s) =>
+      s.trim().toLowerCase()
+    );
   }
 
   /**
@@ -242,7 +255,7 @@ export class Conductor {
   /**
    * Get current orchestrator stats.
    */
-  getStats(): OrchestratorStats {
+  getStats(): ConductorStats {
     const issues = Array.from(this.running.values()).map((r) => ({
       identifier: r.issue.identifier,
       status: r.status,
@@ -306,13 +319,17 @@ export class Conductor {
     if (eligible.length === 0) return;
 
     // Dispatch up to available capacity, sorted by priority (lower = higher priority)
-    const toDispatch = eligible
+    const sorted = eligible
       .sort((a, b) => (a.priority || 4) - (b.priority || 4))
       .slice(0, available);
+
+    // Pre-flight: check file overlap between candidates + already running issues
+    const toDispatch = this.preflightFilter(sorted);
 
     logger.info('Dispatching issues', {
       count: toDispatch.length,
       identifiers: toDispatch.map((i) => i.identifier),
+      skipped: sorted.length - toDispatch.length,
     });
 
     for (const issue of toDispatch) {
@@ -339,18 +356,105 @@ export class Conductor {
       limit: 50,
     });
 
-    // Filter by active state names (case-insensitive)
-    const activeStatesLower = this.config.activeStates.map((s) =>
-      s.trim().toLowerCase()
-    );
+    // Filter by active state names (case-insensitive, pre-computed)
     for (const issue of issues) {
       const stateName = issue.state.name.trim().toLowerCase();
-      if (activeStatesLower.includes(stateName)) {
+      if (this.activeStatesLower.includes(stateName)) {
         allCandidates.push(issue);
       }
     }
 
     return allCandidates;
+  }
+
+  // ── Pre-flight ──
+
+  /**
+   * Filter candidates against running issues using file overlap prediction.
+   * Returns only issues that are parallel-safe with currently running work.
+   */
+  private preflightFilter(candidates: LinearIssue[]): LinearIssue[] {
+    if (candidates.length === 0 || this.running.size === 0) {
+      return candidates;
+    }
+
+    try {
+      const checker = new PreflightChecker(this.config.repoRoot);
+
+      // Build task definitions from running + candidate issues
+      const runningTasks: TaskDefinition[] = Array.from(
+        this.running.values()
+      ).map((r) => ({
+        name: r.issue.identifier,
+        description: r.issue.title,
+        keywords: this.extractIssueKeywords(r.issue),
+      }));
+
+      const safe: LinearIssue[] = [];
+
+      for (const candidate of candidates) {
+        const candidateTask: TaskDefinition = {
+          name: candidate.identifier,
+          description: candidate.title,
+          keywords: this.extractIssueKeywords(candidate),
+        };
+
+        // Check this candidate against all running tasks
+        const allTasks = [...runningTasks, candidateTask];
+        const result = checker.check(allTasks);
+
+        // Filter overlaps once, reuse for checks and logging
+        const candidateOverlaps = result.allOverlaps.filter(
+          (o) => o.tasks.includes(candidate.identifier) && o.confidence >= 0.6
+        );
+
+        if (candidateOverlaps.length > 0) {
+          const conflictFiles = candidateOverlaps
+            .map((o) => o.file)
+            .slice(0, 3);
+          const conflictTasks = candidateOverlaps
+            .flatMap((o) => o.tasks)
+            .filter((t) => t !== candidate.identifier);
+
+          logger.info('Preflight: skipping conflicting issue', {
+            identifier: candidate.identifier,
+            conflictsWith: conflictTasks,
+            files: conflictFiles,
+          });
+
+          console.log(
+            `[${candidate.identifier}] Deferred — file overlap with running work (${conflictFiles.join(', ')})`
+          );
+        } else {
+          safe.push(candidate);
+        }
+      }
+
+      return safe;
+    } catch (err) {
+      // Preflight failure is non-fatal — dispatch all candidates
+      logger.warn('Preflight check failed, dispatching all', {
+        error: (err as Error).message,
+      });
+      return candidates;
+    }
+  }
+
+  private extractIssueKeywords(issue: LinearIssue): string[] {
+    const words = new Set<string>();
+
+    // From title
+    issue.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-_]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .forEach((w) => words.add(w));
+
+    // From labels
+    issue.labels.forEach((l) => words.add(l.name.toLowerCase()));
+
+    return [...words].slice(0, 8);
   }
 
   // ── Dispatch ──
@@ -394,6 +498,9 @@ export class Conductor {
 
       // Run after_run hook (capture context)
       await this.runHook('after-run', workspacePath, issue, run.attempt);
+
+      // Take snapshot for session continuity
+      this.takeSnapshot(workspacePath, issue);
 
       // Move to In Review
       await this.transitionIssue(issue, this.config.inReviewState);
@@ -746,7 +853,7 @@ export class Conductor {
     if (attempt > 1) {
       lines.push(
         '',
-        `This is attempt ${attempt}. Check .stackmemory/symphony-context.md for context from prior attempts.`
+        `This is attempt ${attempt}. Check .stackmemory/conductor-context.md for context from prior attempts.`
       );
     }
 
@@ -764,6 +871,30 @@ export class Conductor {
     );
 
     return lines.join('\n');
+  }
+
+  // ── Snapshot ──
+
+  private takeSnapshot(workspacePath: string, issue: LinearIssue): void {
+    try {
+      const capture = new ContextCapture(workspacePath);
+      const result = capture.capture({
+        task: `${issue.identifier}: ${issue.title}`,
+      });
+
+      logger.info('Snapshot captured', {
+        identifier: issue.identifier,
+        filesChanged: result.filesChanged.length,
+        filesCreated: result.filesCreated.length,
+        commits: result.commits.length,
+      });
+    } catch (err) {
+      // Non-fatal
+      logger.warn('Snapshot capture failed', {
+        identifier: issue.identifier,
+        error: (err as Error).message,
+      });
+    }
   }
 
   // ── Hooks ──
@@ -873,20 +1004,15 @@ export class Conductor {
   private async reconcile(): Promise<void> {
     if (!this.client || this.running.size === 0) return;
 
-    const terminalLower = this.config.terminalStates.map((s) =>
-      s.trim().toLowerCase()
-    );
-
     for (const [issueId, run] of this.running) {
       try {
-        // Re-fetch issue to check if state changed externally
-        const issues = await this.client.getIssues({ limit: 1 });
-        const fresh = issues.find((i) => i.id === issueId);
+        // Re-fetch individual issue to check if state changed externally
+        const fresh = await this.client.getIssue(issueId);
 
         if (!fresh) continue;
 
         const currentState = fresh.state.name.trim().toLowerCase();
-        if (terminalLower.includes(currentState)) {
+        if (this.terminalStatesLower.includes(currentState)) {
           logger.info(
             'Issue moved to terminal state externally, stopping agent',
             {
