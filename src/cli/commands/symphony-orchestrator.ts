@@ -588,8 +588,7 @@ export class SymphonyOrchestrator {
       let turnCompleted = false;
 
       // Set turn timeout
-      let timer: ReturnType<typeof setTimeout>;
-      timer = setTimeout(() => {
+      const timer = setTimeout(() => {
         if (!turnCompleted) {
           logger.warn('Agent turn timeout', {
             identifier: issue.identifier,
@@ -696,23 +695,26 @@ export class SymphonyOrchestrator {
   }
 
   private handleAgentMessage(
-    msg: any,
+    msg: Record<string, unknown>,
     issue: LinearIssue,
     _run: RunningIssue
   ): void {
+    const params = msg.params as Record<string, unknown> | undefined;
+
     if (msg.method === 'item/commandExecution/started') {
       logger.debug('Agent tool use', {
         identifier: issue.identifier,
-        tool: msg.params?.tool,
+        tool: (params as Record<string, unknown>)?.tool,
       });
     }
 
     if (msg.method === 'turn/completed') {
-      const output = msg.params?.result?.output;
+      const result = params?.result as Record<string, unknown> | undefined;
+      const output = result?.output;
       if (Array.isArray(output)) {
         const text = output
-          .filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
+          .filter((b: Record<string, unknown>) => b.type === 'text')
+          .map((b: Record<string, unknown>) => b.text)
           .join('\n');
         if (text) {
           logger.info('Agent completed', {
