@@ -7,8 +7,7 @@
 
 import { logger } from '../../core/monitoring/logger.js';
 import { STRUCTURED_RESPONSE_SUFFIX } from '../../orchestrators/multimodal/constants.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -25,8 +24,6 @@ import {
 } from '../../core/extensions/provider-adapter.js';
 import { AnthropicBatchClient } from '../anthropic/batch-client.js';
 import type { BatchRequest } from '../anthropic/batch-client.js';
-
-const execAsync = promisify(exec);
 
 export interface SubagentRequest {
   type:
@@ -64,8 +61,7 @@ export class ClaudeCodeSubagentClient {
   private activeSubagents: Map<string, AbortController> = new Map();
   private mockMode: boolean;
 
-  constructor(mockMode: boolean = true) {
-    // Default to mock mode for testing
+  constructor(mockMode: boolean = false) {
     this.mockMode = mockMode;
 
     // Create temp directory for subagent communication
@@ -236,7 +232,8 @@ export class ClaudeCodeSubagentClient {
   }
 
   /**
-   * Original CLI-based subagent execution (unchanged behavior)
+   * Execute subagent via Claude Code CLI (`claude -p --output-format stream-json`).
+   * Spawns a real Claude Code process with full tool use.
    */
   private async executeSubagentViaCLI(
     request: SubagentRequest,
@@ -250,34 +247,26 @@ export class ClaudeCodeSubagentClient {
         contextFile,
         JSON.stringify(request.context, null, 2)
       );
-      const resultFile = path.join(this.tempDir, `${subagentId}-result.json`);
-      const taskCommand = this.buildTaskCommand(
-        request,
-        prompt,
-        contextFile,
-        resultFile
-      );
-      const result = await this.executeTaskTool(taskCommand, request.timeout);
 
-      let subagentResult: any = {};
-      if (fs.existsSync(resultFile)) {
-        const resultContent = await fs.promises.readFile(resultFile, 'utf-8');
-        try {
-          subagentResult = JSON.parse(resultContent);
-        } catch {
-          subagentResult = { rawOutput: resultContent };
-        }
-      }
+      const fullPrompt = `${prompt}\n\nContext (JSON): ${JSON.stringify(request.context)}`;
+      const result = await this.spawnClaude(fullPrompt, request.timeout);
 
       this.cleanup(subagentId);
 
+      let parsed: any;
+      try {
+        parsed = JSON.parse(result.text);
+      } catch {
+        parsed = { rawOutput: result.text };
+      }
+
       return {
         success: true,
-        result: subagentResult,
-        output: result.stdout,
+        result: parsed,
+        output: result.text,
         duration: Date.now() - startTime,
         subagentType: request.type,
-        tokens: this.estimateTokens(prompt + JSON.stringify(subagentResult)),
+        tokens: this.estimateTokens(fullPrompt + result.text),
       };
     } catch (error: any) {
       logger.error(`Subagent CLI execution failed: ${request.type}`, {
@@ -461,81 +450,115 @@ export class ClaudeCodeSubagentClient {
   }
 
   /**
-   * Build Task tool command
-   * This creates a command that Claude Code's Task tool can execute
+   * Spawn `claude -p --output-format stream-json` and collect the result.
+   * Parses stream-json events to extract the final assistant text.
    */
-  private buildTaskCommand(
-    request: SubagentRequest,
+  private spawnClaude(
     prompt: string,
-    contextFile: string,
-    resultFile: string
-  ): string {
-    // Create a script that the subagent will execute
-    const scriptContent = `
-#!/bin/bash
-# Subagent execution script for ${request.type}
-
-# Read context
-CONTEXT=$(cat "${contextFile}")
-
-# Execute task based on type
-case "${request.type}" in
-  "testing")
-    # For testing subagent, actually run tests
-    echo "Generating and running tests..."
-    # The subagent will generate test files and run them
-    ;;
-  "linting")
-    # For linting subagent, run actual linters
-    echo "Running linters..."
-    npm run lint || true
-    ;;
-  "code")
-    # For code generation, create implementation files
-    echo "Generating implementation..."
-    ;;
-  *)
-    # Default behavior
-    echo "Executing ${request.type} task..."
-    ;;
-esac
-
-# Write result
-echo '{"status": "completed", "type": "${request.type}"}' > "${resultFile}"
-`;
-
-    const scriptFile = path.join(this.tempDir, `${request.type}-script.sh`);
-    fs.writeFileSync(scriptFile, scriptContent);
-    fs.chmodSync(scriptFile, '755');
-
-    // Return the command that Task tool will execute
-    // In practice, this would trigger Claude Code's Task tool
-    return scriptFile;
-  }
-
-  /**
-   * Execute via Task tool (simulated for now)
-   * In production, this would use Claude Code's actual Task tool API
-   */
-  private async executeTaskTool(
-    command: string,
     timeout?: number
-  ): Promise<{ stdout: string; stderr: string }> {
-    try {
-      // In production, this would call Claude Code's Task tool
-      // For now, we simulate with a subprocess
-      const result = await execAsync(command, {
-        timeout: timeout || 300000, // 5 minutes default
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+  ): Promise<{ text: string; toolUseCount: number }> {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-p',
+        '--output-format',
+        'stream-json',
+        '--dangerously-skip-permissions',
+        prompt,
+      ];
+
+      const claude = spawn('claude', args, {
+        cwd: process.cwd(),
+        env: { ...process.env },
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
 
-      return result;
-    } catch (error: any) {
-      if (error.killed || error.signal === 'SIGTERM') {
-        throw new Error(`Subagent timeout after ${timeout}ms`);
-      }
-      throw error;
-    }
+      const timeoutMs = timeout || 300000; // 5 minutes default
+      const timer = setTimeout(() => {
+        claude.kill('SIGTERM');
+        reject(new Error(`Subagent timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      let lastAssistantText = '';
+      let toolUseCount = 0;
+      let lineBuffer = '';
+      let stderr = '';
+
+      claude.stdout.on('data', (chunk: Buffer) => {
+        lineBuffer += chunk.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            if (event.type === 'assistant' && event.message) {
+              const textBlocks = (event.message.content || [])
+                .filter((b: any) => b.type === 'text')
+                .map((b: any) => b.text);
+              if (textBlocks.length > 0) {
+                lastAssistantText = textBlocks.join('\n');
+              }
+              const toolBlocks = (event.message.content || []).filter(
+                (b: any) => b.type === 'tool_use'
+              );
+              toolUseCount += toolBlocks.length;
+            }
+
+            if (event.type === 'result' && event.result) {
+              lastAssistantText = event.result;
+            }
+          } catch {
+            // non-JSON line, ignore
+          }
+        }
+      });
+
+      claude.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      claude.on('close', (code: number | null) => {
+        clearTimeout(timer);
+
+        // Process remaining buffer
+        if (lineBuffer.trim()) {
+          try {
+            const event = JSON.parse(lineBuffer);
+            if (event.type === 'result' && event.result) {
+              lastAssistantText = event.result;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        logger.info('Claude subagent completed', {
+          code,
+          toolUseCount,
+          outputLength: lastAssistantText.length,
+        });
+
+        if (code === 0 && lastAssistantText) {
+          resolve({ text: lastAssistantText, toolUseCount });
+        } else if (code === 0) {
+          resolve({
+            text: '(Claude completed but produced no text output)',
+            toolUseCount,
+          });
+        } else {
+          reject(
+            new Error(`Claude exited code ${code}: ${stderr.slice(0, 500)}`)
+          );
+        }
+      });
+
+      claude.on('error', (err: Error) => {
+        clearTimeout(timer);
+        reject(new Error(`Failed to spawn claude: ${err.message}`));
+      });
+    });
   }
 
   /**

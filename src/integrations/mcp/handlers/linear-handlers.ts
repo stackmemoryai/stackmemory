@@ -4,7 +4,8 @@
  */
 
 import { LinearAuthManager } from '../../linear/auth.js';
-import { LinearSyncEngine, DEFAULT_SYNC_CONFIG } from '../../linear/sync.js';
+import { LinearSyncEngine } from '../../linear/sync.js';
+import { LinearClient } from '../../linear/client.js';
 import { LinearTaskManager } from '../../../features/tasks/linear-task-manager.js';
 import { logger } from '../../../core/monitoring/logger.js';
 
@@ -16,6 +17,14 @@ export interface LinearHandlerDependencies {
 
 export class LinearHandlers {
   constructor(private deps: LinearHandlerDependencies) {}
+
+  /**
+   * Create an authenticated LinearClient from the auth manager token
+   */
+  private async getClient(): Promise<LinearClient> {
+    const token = await this.deps.linearAuthManager.getValidToken();
+    return new LinearClient({ apiKey: token, useBearer: true });
+  }
 
   /**
    * Sync tasks with Linear
@@ -90,7 +99,7 @@ export class LinearHandlers {
   }
 
   /**
-   * Update Linear task status
+   * Update Linear issue directly via GraphQL API
    */
   async handleLinearUpdateTask(args: any): Promise<any> {
     try {
@@ -100,33 +109,32 @@ export class LinearHandlers {
         throw new Error('Linear ID is required');
       }
 
-      try {
-        await this.deps.linearAuthManager.getValidToken();
-      } catch {
-        throw new Error('Linear authentication required');
-      }
+      const client = await this.getClient();
 
-      const updateData: any = {};
-
-      if (status) {
-        updateData.status = status;
-      }
-
-      if (assignee_id) {
-        updateData.assigneeId = assignee_id;
-      }
-
-      if (priority) {
-        updateData.priority = priority;
-      }
-
+      const updateData: Record<string, unknown> = {};
+      if (status) updateData.stateId = status;
+      if (assignee_id) updateData.assigneeId = assignee_id;
+      if (priority !== undefined) updateData.priority = priority;
       if (labels) {
-        updateData.labels = Array.isArray(labels) ? labels : [labels];
+        updateData.labelIds = Array.isArray(labels) ? labels : [labels];
       }
 
-      throw new Error(
-        'Linear issue updates via MCP are not yet implemented. Use `stackmemory linear sync` instead.'
-      );
+      const issue = await client.updateIssue(linear_id, updateData);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Updated ${issue.identifier}: ${issue.title}\nStatus: ${issue.state.name} | Priority: ${issue.priority}`,
+          },
+        ],
+        metadata: {
+          id: issue.id,
+          identifier: issue.identifier,
+          state: issue.state.name,
+          url: issue.url,
+        },
+      };
     } catch (error: unknown) {
       logger.error(
         'Error updating Linear task',
@@ -137,47 +145,54 @@ export class LinearHandlers {
   }
 
   /**
-   * Get tasks from Linear
+   * Get issues from Linear via GraphQL API
    */
   async handleLinearGetTasks(args: any): Promise<any> {
     try {
-      const {
-        team_id,
-        assignee_id,
-        state = 'active',
-        limit = 20,
-        search,
-      } = args;
+      const { team_id, assignee_id, state = 'active', limit = 20 } = args;
 
-      try {
-        await this.deps.linearAuthManager.getValidToken();
-      } catch {
-        throw new Error('Linear authentication required');
-      }
+      const client = await this.getClient();
 
-      const filters: any = {
+      // Map state filter to Linear stateType
+      const stateTypeMap: Record<string, 'started' | 'completed' | undefined> =
+        {
+          active: 'started',
+          closed: 'completed',
+          all: undefined,
+        };
+
+      const issues = await client.getIssues({
+        teamId: team_id,
+        assigneeId: assignee_id,
+        stateType: stateTypeMap[state],
         limit,
-      };
+      });
 
-      if (team_id) {
-        filters.teamId = team_id;
-      }
-
-      if (assignee_id) {
-        filters.assigneeId = assignee_id;
-      }
-
-      if (state) {
-        filters.state = state;
-      }
-
-      if (search) {
-        filters.search = search;
-      }
-
-      throw new Error(
-        'Linear issue listing via MCP is not yet implemented. Use `stackmemory linear sync` instead.'
+      const issueLines = issues.map(
+        (i) =>
+          `${i.identifier} [${i.state.name}] ${i.title}${i.assignee ? ` (@${i.assignee.name})` : ''}`
       );
+
+      const text =
+        issues.length > 0
+          ? `Found ${issues.length} issues:\n${issueLines.join('\n')}`
+          : 'No issues found matching filters.';
+
+      return {
+        content: [{ type: 'text', text }],
+        metadata: {
+          count: issues.length,
+          issues: issues.map((i) => ({
+            id: i.id,
+            identifier: i.identifier,
+            title: i.title,
+            state: i.state.name,
+            priority: i.priority,
+            assignee: i.assignee?.name,
+            url: i.url,
+          })),
+        },
+      };
     } catch (error: unknown) {
       logger.error(
         'Error getting Linear tasks',

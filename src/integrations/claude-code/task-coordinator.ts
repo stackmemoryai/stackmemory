@@ -6,6 +6,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { spawn } from 'child_process';
 import { logger } from '../../core/monitoring/logger.js';
 import { ClaudeCodeAgent } from './agent-bridge.js';
 
@@ -326,50 +327,86 @@ export class ClaudeCodeTaskCoordinator {
       promptTokens: this.estimateTokenUsage(prompt, ''),
     });
 
-    // TODO: Replace with actual Claude Code Task tool invocation
-    // This is where we would call Claude Code's Task tool:
-    /*
-    const result = await claudeCodeTask({
-      subagent_type: agentName,
-      prompt: prompt,
-      description: `${agentConfig.type} task execution`
-    });
-    
-    return result.output;
-    */
-
-    // For now, simulate the Claude Code agent execution
-    return this.simulateClaudeCodeExecution(agentName, prompt, agentConfig);
+    return this.spawnClaudeCode(agentName, prompt, agentConfig);
   }
 
   /**
-   * Simulate Claude Code execution (temporary until real integration)
+   * Spawn Claude Code CLI as a subprocess.
+   * Uses `claude --print` for non-interactive execution with stdout capture.
+   * Workspace cwd is inherited from the coordinator's process.
    */
-  private simulateClaudeCodeExecution(
+  private spawnClaudeCode(
     agentName: string,
     prompt: string,
     agentConfig: ClaudeCodeAgent
   ): Promise<string> {
-    return new Promise((resolve) => {
-      // Simulate execution time based on agent type and complexity
-      const executionTime =
-        agentConfig.type === 'oracle'
-          ? 2000 + Math.random() * 3000 // 2-5 seconds for Oracle
-          : 1000 + Math.random() * 2000; // 1-3 seconds for Workers
+    return new Promise((resolve, reject) => {
+      const args: string[] = ['--print'];
 
-      setTimeout(() => {
-        const result = `Claude Code agent '${agentName}' completed task successfully.
-        
-Agent Capabilities Used: ${agentConfig.capabilities.slice(0, 3).join(', ')}
-Task Type: ${agentConfig.type}
-Specializations: ${agentConfig.specializations.join(', ')}
+      // Map oracle agents to opus model for higher reasoning
+      if (agentConfig.type === 'oracle') {
+        args.push('--model', 'opus');
+      }
 
-Simulated output based on prompt context: ${prompt.substring(0, 100)}...
+      // Scope tool access based on agent capabilities
+      if (agentConfig.capabilities.includes('code_implementation')) {
+        args.push('--allowedTools', 'Edit,Write,Bash,Read,Glob,Grep');
+      } else {
+        args.push('--allowedTools', 'Read,Glob,Grep,Bash');
+      }
 
-This simulation will be replaced with actual Claude Code Task tool integration.`;
+      // Prompt passed as positional arg
+      args.push(prompt);
 
-        resolve(result);
-      }, executionTime);
+      logger.info('Spawning claude CLI', {
+        agentName,
+        agentType: agentConfig.type,
+        cwd: process.cwd(),
+        promptLength: prompt.length,
+      });
+
+      const proc = spawn('claude', args, {
+        cwd: process.cwd(),
+        env: { ...process.env },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      proc.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      proc.on('error', (err) => {
+        logger.error('Failed to spawn claude CLI', {
+          agentName,
+          error: err.message,
+        });
+        reject(new Error(`Failed to spawn claude: ${err.message}`));
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          logger.debug('Claude CLI completed', {
+            agentName,
+            outputLength: stdout.length,
+          });
+          resolve(stdout.trim());
+        } else {
+          const errMsg = stderr.slice(0, 500) || `exit code ${code}`;
+          logger.warn('Claude CLI failed', {
+            agentName,
+            exitCode: code,
+            stderr: errMsg,
+          });
+          reject(new Error(`Claude CLI exited with code ${code}: ${errMsg}`));
+        }
+      });
     });
   }
 

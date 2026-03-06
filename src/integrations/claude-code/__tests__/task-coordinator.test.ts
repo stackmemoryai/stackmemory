@@ -5,6 +5,27 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ClaudeCodeTaskCoordinator } from '../task-coordinator.js';
 import { ClaudeCodeAgent } from '../agent-bridge.js';
+import { EventEmitter } from 'events';
+
+// Mock child_process.spawn to avoid invoking real claude CLI
+vi.mock('child_process', () => ({
+  spawn: vi.fn(() => {
+    const proc = new EventEmitter() as any;
+
+    // Create mock readable streams
+    proc.stdout = new EventEmitter();
+    proc.stderr = new EventEmitter();
+    proc.stdin = { write: vi.fn(), end: vi.fn() };
+
+    // Simulate successful completion after a short delay
+    setTimeout(() => {
+      proc.stdout.emit('data', Buffer.from('Mock agent response'));
+      proc.emit('close', 0);
+    }, 50);
+
+    return proc;
+  }),
+}));
 
 describe('ClaudeCodeTaskCoordinator', () => {
   let coordinator: ClaudeCodeTaskCoordinator;
@@ -57,8 +78,7 @@ describe('ClaudeCodeTaskCoordinator', () => {
         { maxRetries: 0, timeout: 10000 }
       );
 
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('string');
+      expect(result).toBe('Mock agent response');
     }, 15000);
 
     it('should track task in metrics', async () => {
@@ -101,6 +121,45 @@ describe('ClaudeCodeTaskCoordinator', () => {
       const metrics = coordinator.getCoordinationMetrics();
 
       expect(metrics.totalCost).toBeGreaterThanOrEqual(0);
+    }, 15000);
+
+    it('should pass --model opus for oracle agents', async () => {
+      const { spawn } = await import('child_process');
+
+      await coordinator.executeTask(
+        'test-oracle',
+        mockOracleAgent,
+        'Strategic task',
+        { maxRetries: 0, timeout: 10000 }
+      );
+
+      expect(spawn).toHaveBeenCalledWith(
+        'claude',
+        expect.arrayContaining(['--model', 'opus']),
+        expect.any(Object)
+      );
+    }, 15000);
+
+    it('should pass code tools for code_implementation capability', async () => {
+      const { spawn } = await import('child_process');
+      const codeAgent: ClaudeCodeAgent = {
+        ...mockWorkerAgent,
+        capabilities: ['code_implementation'],
+      };
+
+      await coordinator.executeTask('code-worker', codeAgent, 'Write code', {
+        maxRetries: 0,
+        timeout: 10000,
+      });
+
+      expect(spawn).toHaveBeenCalledWith(
+        'claude',
+        expect.arrayContaining([
+          '--allowedTools',
+          'Edit,Write,Bash,Read,Glob,Grep',
+        ]),
+        expect.any(Object)
+      );
     }, 15000);
   });
 
