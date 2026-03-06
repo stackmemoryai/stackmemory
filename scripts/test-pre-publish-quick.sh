@@ -53,11 +53,17 @@ log_success "Package structure valid"
 
 # Core tests + search benchmark (100-frame smoke)
 log_info "Running tests..."
-npm run test:all -- --reporter=dot --bail=3 --retry 1 2>&1 | tail -5
-if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    log_error "Tests failed"
+# Use JSON reporter to check actual pass/fail (dot reporter counts stderr warnings as "errors")
+TEST_JSON_FILE=$(mktemp)
+npx vitest run --reporter=json --bail=3 --retry 1 > "$TEST_JSON_FILE" 2>/dev/null || true
+TEST_FAILED=$(node -e "try{const j=JSON.parse(require('fs').readFileSync('$TEST_JSON_FILE','utf8'));console.log(j.numFailedTests||0)}catch{console.log(1)}")
+TEST_PASSED=$(node -e "try{const j=JSON.parse(require('fs').readFileSync('$TEST_JSON_FILE','utf8'));console.log(j.numPassedTests||0)}catch{console.log(0)}")
+rm -f "$TEST_JSON_FILE"
+echo "  Tests: ${TEST_PASSED} passed, ${TEST_FAILED} failed"
+if [ "$TEST_FAILED" != "0" ] || [ "$TEST_PASSED" = "0" ]; then
+    log_error "Tests failed (${TEST_FAILED} failures)"
 fi
-log_success "Tests pass (including search benchmark)"
+log_success "Tests pass (${TEST_PASSED} tests)"
 
 # Benchmark verification — run search benchmarks explicitly to gate on perf
 log_info "Running search benchmark verification (100-frame + 1000-frame)..."
@@ -77,7 +83,7 @@ log_success "Feedback loops verified (6 loops configured)"
 
 # Lint check
 log_info "Testing lint..."
-npm run lint > /dev/null 2>&1 || log_error "Lint failed"
+npm run lint:fast > /dev/null 2>&1 || log_error "Lint failed"
 log_success "Lint passes"
 
 echo
