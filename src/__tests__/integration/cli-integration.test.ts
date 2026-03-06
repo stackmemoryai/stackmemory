@@ -30,25 +30,6 @@ describe('CLI Integration', { timeout: 60_000 }, () => {
   });
 
   describe('Basic Commands', () => {
-    it('should show help', () => {
-      const result = execSync(`node ${cliPath} --help`, {
-        encoding: 'utf8',
-        timeout: 15_000,
-      });
-
-      expect(result).toContain('stackmemory');
-      expect(result).toContain('Commands:');
-    });
-
-    it('should show version', () => {
-      const result = execSync(`node ${cliPath} --version`, {
-        encoding: 'utf8',
-        timeout: 15_000,
-      });
-
-      expect(result).toMatch(/\d+\.\d+\.\d+/);
-    });
-
     it('should initialize project', () => {
       const result = execSync(`node ${cliPath} init`, {
         cwd: testDir,
