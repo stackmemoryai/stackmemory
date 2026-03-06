@@ -22,6 +22,9 @@ StackMemory is a **production-ready memory runtime** for AI coding tools that pr
 - **Multi-wrapper support** — `claude-sm`, `codex-sm`, `opencode-sm` with auto context loading
 - **Skills system** with `/spec` and `/linear-run` for Claude Code
 - **Automatic hooks** for task tracking, Linear sync, and spec progress
+- **Snapshot capture** — post-run context snapshots for session handoff (`snapshot save`)
+- **Pre-flight overlap check** — predict file conflicts before parallel task dispatch (`preflight`)
+- **Conductor orchestrator** — polls Linear, creates worktrees, spawns agents with bounded concurrency
 - **Memory monitor daemon** with automatic capture/clear on RAM pressure
 - **Auto-save service** for periodic context persistence
 - **Comprehensive test coverage** across all core modules
@@ -63,6 +66,8 @@ Tools forget decisions and constraints between sessions. StackMemory makes conte
 - **Hooks**: automatic context save, task tracking, Linear sync, PROMPT_PLAN updates, cord tracing
 - **Prompt Forge**: watches CLAUDE.md and AGENTS.md for prompt optimization (GEPA)
 - **Safe branches**: worktree isolation with `--worktree` or `-w`
+- **Snapshot**: post-run context capture — records what changed, commits, and decisions (`stackmemory snapshot`)
+- **Pre-flight check**: file overlap prediction before parallel task dispatch (`stackmemory preflight`)
 - **Persistent context**: frames, anchors, decisions, retrieval
 - **Integrations**: Linear (API key + OAuth), DiffMem, Browser MCP, log-mcp (log analysis)
 
@@ -350,6 +355,39 @@ npm run mcp:dev
 ## CLI Commands
 
 See [docs/cli.md](https://github.com/stackmemoryai/stackmemory/blob/main/docs/cli.md) for the full command reference.
+
+### Snapshot (`snapshot` / `snap`)
+
+Capture a point-in-time snapshot of what changed on your branch — files modified, commits, and key decisions. Useful for session handoff and post-task review.
+
+```bash
+# Save a snapshot of current branch state
+stackmemory snapshot save --task "add auth middleware"
+
+# Save with explicit decisions
+stackmemory snap save -d "chose JWT over session cookies" -d "switched to argon2"
+
+# List recent snapshots
+stackmemory snap list
+
+# Show latest snapshot (or by branch)
+stackmemory snap show feature/auth
+```
+
+### Pre-flight Check (`preflight` / `pf`)
+
+Predict file overlaps before running parallel tasks. Uses git history, import graphs, and keyword matching to flag conflicts.
+
+```bash
+# Check if two tasks can safely run in parallel
+stackmemory preflight "add user auth" "refactor database layer"
+
+# With explicit file hints
+stackmemory pf "auth work" "db migration" -f "task1:src/auth.ts;task2:src/db.ts"
+
+# JSON output for programmatic use
+stackmemory pf "task A" "task B" "task C" --json
+```
 
 ---
 
