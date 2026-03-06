@@ -491,6 +491,332 @@ describe('Garbage Collection', () => {
       expect(score).toBeLessThanOrEqual(1.0);
     });
 
+    it('should return framesCompressed: 0 when no generational GC', async () => {
+      insertFrame({ frameId: 'old-1', createdAt: daysAgo(100) });
+      const result = await adapter.runGC({ retentionDays: 90 });
+      expect(result.framesCompressed).toBe(0);
+    });
+  });
+
+  // --- Generational compression ---
+
+  describe('Generational compression', () => {
+    it('should compress mature frames with digest_only strategy', async () => {
+      // 3 days old = mature (between young=1d and old=30d cutoffs)
+      insertFrame({ frameId: 'mature-1', createdAt: daysAgo(3) });
+      // Set non-empty inputs so it qualifies for compression
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\', outputs = \'{"out":"data"}\' WHERE frame_id = \'mature-1\''
+      ).run();
+      insertEvent('mature-1', 'evt-1');
+      insertEvent('mature-1', 'evt-2');
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+          oldCutoffDays: 30,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(1);
+      expect(result.framesDeleted).toBe(0);
+
+      // Frame still exists but inputs/outputs stripped
+      const frame = await adapter.getFrame('mature-1');
+      expect(frame).not.toBeNull();
+      expect(frame!.inputs).toEqual({});
+      expect(frame!.outputs).toEqual({});
+
+      // Events deleted
+      expect(countRows('events')).toBe(0);
+    });
+
+    it('should compress old frames with anchors_only strategy', async () => {
+      // 15 days old = old (between mature=7d and deletion=30d)
+      insertFrame({
+        frameId: 'old-1',
+        createdAt: daysAgo(15),
+        digestText: 'important decision',
+      });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\', outputs = \'{"out":"data"}\', digest_json = \'{"summary":"test"}\' WHERE frame_id = \'old-1\''
+      ).run();
+      insertEvent('old-1', 'evt-1');
+      insertAnchor('old-1', 'anc-1', 'DECISION');
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          old_strategy: 'anchors_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+          oldCutoffDays: 30,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(1);
+
+      // Frame exists: inputs/outputs/digest_json stripped
+      const frame = await adapter.getFrame('old-1');
+      expect(frame).not.toBeNull();
+      expect(frame!.inputs).toEqual({});
+      expect(frame!.outputs).toEqual({});
+      expect(frame!.digest_json).toEqual({});
+
+      // digest_text preserved (for search)
+      expect(frame!.digest_text).toBe('important decision');
+
+      // Anchors preserved
+      expect(countRows('anchors')).toBe(1);
+
+      // Events deleted
+      expect(countRows('events')).toBe(0);
+    });
+
+    it('should skip already-compressed frames (inputs already empty)', async () => {
+      // Already compressed (inputs = '{}')
+      insertFrame({ frameId: 'already-compressed', createdAt: daysAgo(3) });
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+    });
+
+    it('should not compress young frames', async () => {
+      // 12 hours old = young
+      insertFrame({
+        frameId: 'young-1',
+        createdAt: nowSec - 43200,
+      });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\' WHERE frame_id = \'young-1\''
+      ).run();
+      insertEvent('young-1', 'evt-1');
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+      // Events still there
+      expect(countRows('events')).toBe(1);
+    });
+
+    it('should not compress keep_forever frames', async () => {
+      insertFrame({
+        frameId: 'forever-1',
+        createdAt: daysAgo(15),
+        retentionPolicy: 'keep_forever',
+      });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\' WHERE frame_id = \'forever-1\''
+      ).run();
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          old_strategy: 'anchors_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+          oldCutoffDays: 30,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+    });
+
+    it('should not compress active frames', async () => {
+      insertFrame({
+        frameId: 'active-1',
+        createdAt: daysAgo(5),
+        state: 'active',
+      });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\' WHERE frame_id = \'active-1\''
+      ).run();
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+    });
+
+    it('should not compress protected run_id frames', async () => {
+      insertFrame({
+        frameId: 'protected-1',
+        createdAt: daysAgo(5),
+        runId: 'active-session',
+      });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\' WHERE frame_id = \'protected-1\''
+      ).run();
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        protectedRunIds: ['active-session'],
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+    });
+
+    it('should skip compression in dryRun mode', async () => {
+      insertFrame({ frameId: 'mature-1', createdAt: daysAgo(3) });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"key":"value"}\' WHERE frame_id = \'mature-1\''
+      ).run();
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        dryRun: true,
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+      // Inputs still intact
+      const frame = await adapter.getFrame('mature-1');
+      expect(frame!.inputs).toEqual({ key: 'value' });
+    });
+
+    it('should compress both mature and old tiers in one run', async () => {
+      // Mature frame (3 days old)
+      insertFrame({ frameId: 'mature-1', createdAt: daysAgo(3) });
+      // Old frame (15 days old)
+      insertFrame({ frameId: 'old-1', createdAt: daysAgo(15) });
+
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        "UPDATE frames SET inputs = '{\"data\":\"yes\"}' WHERE frame_id IN ('mature-1', 'old-1')"
+      ).run();
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          mature_strategy: 'digest_only',
+          old_strategy: 'anchors_only',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+          oldCutoffDays: 30,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(2);
+    });
+
+    it('should keep_all when strategy is keep_all', async () => {
+      insertFrame({ frameId: 'mature-1', createdAt: daysAgo(3) });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"data":"yes"}\' WHERE frame_id = \'mature-1\''
+      ).run();
+      insertEvent('mature-1', 'evt-1');
+
+      const result = await adapter.runGC({
+        retentionDays: 90,
+        generationalGc: {
+          mature_strategy: 'keep_all',
+          youngCutoffDays: 1,
+          matureCutoffDays: 7,
+        },
+      });
+
+      expect(result.framesCompressed).toBe(0);
+      expect(countRows('events')).toBe(1);
+      const frame = await adapter.getFrame('mature-1');
+      expect(frame!.inputs).toEqual({ data: 'yes' });
+    });
+  });
+
+  describe('compressFrame', () => {
+    it('should return false for non-existent frame', () => {
+      const result = adapter.compressFrame('nonexistent', 'digest_only');
+      expect(result).toBe(false);
+    });
+
+    it('digest_only should strip inputs/outputs and delete events', async () => {
+      insertFrame({ frameId: 'f1', createdAt: daysAgo(5), digestText: 'kept' });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        "UPDATE frames SET inputs = '{\"a\":1}', outputs = '{\"b\":2}' WHERE frame_id = 'f1'"
+      ).run();
+      insertEvent('f1', 'evt-1');
+
+      const result = adapter.compressFrame('f1', 'digest_only');
+      expect(result).toBe(true);
+
+      const frame = await adapter.getFrame('f1');
+      expect(frame!.inputs).toEqual({});
+      expect(frame!.outputs).toEqual({});
+      expect(frame!.digest_text).toBe('kept');
+      expect(countRows('events')).toBe(0);
+    });
+
+    it('anchors_only should also clear digest_json', async () => {
+      insertFrame({ frameId: 'f1', createdAt: daysAgo(5), digestText: 'kept' });
+      const db = adapter.getRawDatabase()!;
+      db.prepare(
+        'UPDATE frames SET inputs = \'{"a":1}\', digest_json = \'{"s":"t"}\' WHERE frame_id = \'f1\''
+      ).run();
+      insertAnchor('f1', 'anc-1', 'DECISION');
+
+      const result = adapter.compressFrame('f1', 'anchors_only');
+      expect(result).toBe(true);
+
+      const frame = await adapter.getFrame('f1');
+      expect(frame!.inputs).toEqual({});
+      expect(frame!.digest_json).toEqual({});
+      expect(frame!.digest_text).toBe('kept');
+      // Anchors preserved
+      expect(countRows('anchors')).toBe(1);
+    });
+  });
+
+  describe('getDatabaseSize', () => {
+    it('should return a positive number', () => {
+      const size = adapter.getDatabaseSize();
+      expect(size).toBeGreaterThan(0);
+    });
+  });
+
+  // --- Importance scoring ---
+
+  describe('Importance scoring', () => {
     it('should recompute scores in batches', async () => {
       // Insert frames with default score of 0.5
       insertFrame({

@@ -412,11 +412,16 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
   }
 
   /**
-   * Incremental garbage collection: delete expired frames and cascade to related tables.
-   * Respects retention_policy per frame:
+   * Incremental garbage collection with generational compression.
+   *
+   * Phase 1 — Compress: Apply generational strategies to mature/old frames.
+   *   - 'digest_only': Strip inputs/outputs/events, keep digest + anchors
+   *   - 'anchors_only': Strip inputs/outputs/events/digest_json, keep digest_text + anchors
+   *   - 'keep_all': No compression
+   *
+   * Phase 2 — Delete: Remove frames past retention cutoffs.
    *   - 'keep_forever': never deleted
-   *   - 'default': deleted after retentionDays (default 90)
-   *   - 'archive': same as default
+   *   - 'default'/'archive': deleted after retentionDays (default 90)
    *   - 'ttl_30d': deleted after 30 days
    *   - 'ttl_7d': deleted after 7 days
    */
@@ -426,6 +431,14 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
       batchSize?: number;
       dryRun?: boolean;
       protectedRunIds?: string[];
+      generationalGc?: {
+        young_strategy?: 'keep_all' | 'digest_only' | 'anchors_only';
+        mature_strategy?: 'keep_all' | 'digest_only' | 'anchors_only';
+        old_strategy?: 'keep_all' | 'digest_only' | 'anchors_only';
+        youngCutoffDays?: number;
+        matureCutoffDays?: number;
+        oldCutoffDays?: number;
+      };
     } = {}
   ): Promise<{
     framesDeleted: number;
@@ -433,6 +446,7 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     anchorsDeleted: number;
     embeddingsDeleted: number;
     ftsEntriesDeleted: number;
+    framesCompressed: number;
   }> {
     if (!this.db)
       throw new DatabaseError(
@@ -450,7 +464,76 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     const ttl30dCutoff = nowSec - 30 * 86400;
     const ttl7dCutoff = nowSec - 7 * 86400;
 
-    // Find candidate frames (excluding keep_forever, active frames, and protected run_ids)
+    // Phase 1: Generational compression
+    let framesCompressed = 0;
+    const gc = options.generationalGc;
+    if (gc && !dryRun) {
+      const youngDays = gc.youngCutoffDays ?? 1;
+      const matureDays = gc.matureCutoffDays ?? 7;
+      const oldDays = gc.oldCutoffDays ?? 30;
+
+      const youngCutoff = nowSec - youngDays * 86400;
+      const matureCutoff = nowSec - matureDays * 86400;
+
+      // Compress mature frames (between young and old cutoffs)
+      const matureStrategy = gc.mature_strategy ?? 'digest_only';
+      if (matureStrategy !== 'keep_all') {
+        const matureFrames = this.db
+          .prepare(
+            `SELECT frame_id FROM frames
+             WHERE created_at < ? AND created_at >= ?
+             AND state = 'closed'
+             AND retention_policy != 'keep_forever'
+             AND inputs != '{}'
+             AND run_id NOT IN (SELECT value FROM json_each(?))
+             LIMIT ?`
+          )
+          .all(
+            youngCutoff,
+            matureCutoff,
+            JSON.stringify(protectedRunIds),
+            batchSize
+          ) as Array<{ frame_id: string }>;
+
+        if (matureFrames.length > 0) {
+          framesCompressed += this.compressFrames(
+            matureFrames.map((f) => f.frame_id),
+            matureStrategy
+          );
+        }
+      }
+
+      // Compress old frames (between mature and deletion cutoffs)
+      const oldStrategy = gc.old_strategy ?? 'anchors_only';
+      if (oldStrategy !== 'keep_all') {
+        const oldCutoff = nowSec - oldDays * 86400;
+        const oldFrames = this.db
+          .prepare(
+            `SELECT frame_id FROM frames
+             WHERE created_at < ? AND created_at >= ?
+             AND state = 'closed'
+             AND retention_policy != 'keep_forever'
+             AND inputs != '{}'
+             AND run_id NOT IN (SELECT value FROM json_each(?))
+             LIMIT ?`
+          )
+          .all(
+            matureCutoff,
+            oldCutoff,
+            JSON.stringify(protectedRunIds),
+            batchSize
+          ) as Array<{ frame_id: string }>;
+
+        if (oldFrames.length > 0) {
+          framesCompressed += this.compressFrames(
+            oldFrames.map((f) => f.frame_id),
+            oldStrategy
+          );
+        }
+      }
+    }
+
+    // Phase 2: Delete expired frames (existing behavior)
     const candidates = this.db
       .prepare(
         `SELECT frame_id FROM frames
@@ -482,6 +565,7 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
         anchorsDeleted: 0,
         embeddingsDeleted: 0,
         ftsEntriesDeleted: 0,
+        framesCompressed,
       };
     }
 
@@ -520,6 +604,7 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
         anchorsDeleted: anchorsCount,
         embeddingsDeleted: embeddingsCount,
         ftsEntriesDeleted: frameIds.length, // FTS has one entry per frame
+        framesCompressed,
       };
     }
 
@@ -569,6 +654,7 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
       eventsDeleted,
       anchorsDeleted,
       embeddingsDeleted,
+      framesCompressed,
     });
 
     return {
@@ -577,6 +663,7 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
       anchorsDeleted,
       embeddingsDeleted,
       ftsEntriesDeleted: frameIds.length,
+      framesCompressed,
     };
   }
 
@@ -639,6 +726,129 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     if (nowSec - frame.created_at < 86400) score += 0.1;
 
     return Math.round(Math.min(score, 1.0) * 100) / 100;
+  }
+
+  /**
+   * Compress a frame by stripping data according to strategy.
+   *
+   * - 'digest_only': Remove inputs, outputs, events. Keep digest_text, digest_json, anchors.
+   * - 'anchors_only': Remove inputs, outputs, events, digest_json. Keep digest_text, anchors.
+   *
+   * Returns true if the frame was compressed, false if not found.
+   */
+  compressFrame(
+    frameId: string,
+    strategy: 'digest_only' | 'anchors_only'
+  ): boolean {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const frame = this.db
+      .prepare('SELECT frame_id FROM frames WHERE frame_id = ?')
+      .get(frameId) as { frame_id: string } | undefined;
+
+    if (!frame) return false;
+
+    this.db.prepare('BEGIN').run();
+    try {
+      // Both strategies: strip inputs/outputs and delete events
+      if (strategy === 'digest_only') {
+        this.db
+          .prepare(
+            "UPDATE frames SET inputs = '{}', outputs = '{}' WHERE frame_id = ?"
+          )
+          .run(frameId);
+      } else {
+        // anchors_only: also clear digest_json (keep digest_text for search)
+        this.db
+          .prepare(
+            "UPDATE frames SET inputs = '{}', outputs = '{}', digest_json = '{}' WHERE frame_id = ?"
+          )
+          .run(frameId);
+      }
+
+      // Delete events (both strategies)
+      this.db.prepare('DELETE FROM events WHERE frame_id = ?').run(frameId);
+
+      // Delete embeddings if vec enabled (search still works via FTS5)
+      if (this.vecEnabled) {
+        this.db
+          .prepare('DELETE FROM frame_embeddings WHERE frame_id = ?')
+          .run(frameId);
+      }
+
+      // anchors_only: do NOT delete anchors — they're the last remaining structured data
+
+      this.db.prepare('COMMIT').run();
+      return true;
+    } catch (error) {
+      this.db.prepare('ROLLBACK').run();
+      throw error;
+    }
+  }
+
+  /**
+   * Compress multiple frames in a single transaction.
+   * Returns count of frames compressed.
+   */
+  compressFrames(
+    frameIds: string[],
+    strategy: 'digest_only' | 'anchors_only'
+  ): number {
+    if (!this.db || frameIds.length === 0) return 0;
+
+    const placeholders = frameIds.map(() => '?').join(',');
+
+    this.db.prepare('BEGIN').run();
+    try {
+      if (strategy === 'digest_only') {
+        this.db
+          .prepare(
+            `UPDATE frames SET inputs = '{}', outputs = '{}' WHERE frame_id IN (${placeholders})`
+          )
+          .run(...frameIds);
+      } else {
+        this.db
+          .prepare(
+            `UPDATE frames SET inputs = '{}', outputs = '{}', digest_json = '{}' WHERE frame_id IN (${placeholders})`
+          )
+          .run(...frameIds);
+      }
+
+      this.db
+        .prepare(`DELETE FROM events WHERE frame_id IN (${placeholders})`)
+        .run(...frameIds);
+
+      if (this.vecEnabled) {
+        this.db
+          .prepare(
+            `DELETE FROM frame_embeddings WHERE frame_id IN (${placeholders})`
+          )
+          .run(...frameIds);
+      }
+
+      this.db.prepare('COMMIT').run();
+      return frameIds.length;
+    } catch (error) {
+      this.db.prepare('ROLLBACK').run();
+      throw error;
+    }
+  }
+
+  /**
+   * Get database file size in bytes.
+   */
+  getDatabaseSize(): number {
+    if (!this.db) return 0;
+    const result = this.db
+      .prepare(
+        'SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()'
+      )
+      .get() as { size: number } | undefined;
+    return result?.size ?? 0;
   }
 
   /**
