@@ -9,7 +9,7 @@ import { SessionManager } from '../../core/session/session-manager.js';
 import { FrameManager } from '../../core/context/index.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { getModelTokenLimit } from '../../core/models/model-router.js';
 
 /** Frame statistics row */
@@ -215,6 +215,82 @@ export const dashboardCommand = {
       console.log(chalk.yellow.bold('💾 Context Usage'));
       console.log(`${usageBar} ${contextUsage}%`);
       console.log();
+
+      // Conductor Status
+      const conductorStatusPath = join(
+        projectRoot,
+        '.stackmemory',
+        'conductor-status.json'
+      );
+      if (existsSync(conductorStatusPath)) {
+        try {
+          const raw = readFileSync(conductorStatusPath, 'utf-8');
+          const conductorStatus = JSON.parse(raw) as {
+            startedAt: number;
+            updatedAt: number;
+            running: Array<{
+              identifier: string;
+              title: string;
+              status: string;
+              runtime: number;
+            }>;
+            queued: number;
+            completed: number;
+            failed: number;
+            maxConcurrent: number;
+            stopping: boolean;
+          };
+
+          const stale = Date.now() - conductorStatus.updatedAt > 120000;
+          const header = stale
+            ? chalk.gray.bold('⚙ Conductor (stale)')
+            : chalk.yellow.bold('⚙ Conductor');
+
+          console.log(header);
+
+          if (conductorStatus.running.length > 0) {
+            const conductorTable = new Table({
+              head: [
+                chalk.white('Issue'),
+                chalk.white('Status'),
+                chalk.white('Title'),
+                chalk.white('Runtime'),
+              ],
+              style: { head: [], border: [] },
+              colWidths: [12, 14, 36, 10],
+            });
+
+            conductorStatus.running.forEach((r) => {
+              const mins = Math.round(r.runtime / 60000);
+              const statusColor =
+                r.status === 'running'
+                  ? chalk.green
+                  : r.status === 'completed'
+                    ? chalk.cyan
+                    : chalk.red;
+              conductorTable.push([
+                r.identifier,
+                statusColor(r.status),
+                r.title.slice(0, 34),
+                `${mins}m`,
+              ]);
+            });
+
+            console.log(conductorTable.toString());
+          } else {
+            console.log(chalk.gray('  No agents running'));
+          }
+
+          console.log(
+            chalk.gray(
+              `  Completed: ${conductorStatus.completed}  Failed: ${conductorStatus.failed}  Max: ${conductorStatus.maxConcurrent}`
+            )
+          );
+          console.log();
+        } catch {
+          // Ignore corrupt status file
+        }
+      }
 
       db.close();
 

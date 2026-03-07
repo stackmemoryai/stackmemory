@@ -9,7 +9,7 @@
  */
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
-import { existsSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
@@ -222,6 +222,8 @@ export class Conductor {
       `Orchestrator started — polling every ${this.config.pollIntervalMs / 1000}s, max ${this.config.maxConcurrent} concurrent`
     );
 
+    this.writeStatusFile();
+
     // Register signal handlers
     const shutdown = () => this.stop();
     process.on('SIGINT', shutdown);
@@ -283,6 +285,7 @@ export class Conductor {
 
     this.running.clear();
     this.claimed.clear();
+    this.clearStatusFile();
 
     console.log(
       `Orchestrator stopped. Completed: ${this.completeCount}, Failed: ${this.failCount}`
@@ -310,6 +313,61 @@ export class Conductor {
     };
   }
 
+  // ── Status File ──
+
+  /**
+   * Write current conductor state to .stackmemory/conductor-status.json
+   * for consumption by `stackmemory dashboard` and other tools.
+   */
+  private writeStatusFile(): void {
+    const statusDir = join(this.config.repoRoot, '.stackmemory');
+    if (!existsSync(statusDir)) return;
+
+    const status = {
+      pid: process.pid,
+      startedAt: this.startedAt,
+      updatedAt: Date.now(),
+      running: Array.from(this.running.values()).map((r) => ({
+        identifier: r.issue.identifier,
+        title: r.issue.title,
+        status: r.status,
+        attempt: r.attempt,
+        startedAt: r.startedAt,
+        runtime: Date.now() - r.startedAt,
+      })),
+      queued: Array.from(this.claimed).filter(
+        (id) => !this.running.has(id) && !this.completed.has(id)
+      ).length,
+      completed: this.completeCount,
+      failed: this.failCount,
+      totalAttempts: this.totalAttempts,
+      maxConcurrent: this.config.maxConcurrent,
+      stopping: this.stopping,
+    };
+
+    try {
+      writeFileSync(
+        join(statusDir, 'conductor-status.json'),
+        JSON.stringify(status, null, 2)
+      );
+    } catch {
+      // Non-fatal — status file is best-effort
+    }
+  }
+
+  private clearStatusFile(): void {
+    const statusPath = join(
+      this.config.repoRoot,
+      '.stackmemory',
+      'conductor-status.json'
+    );
+    try {
+      if (existsSync(statusPath)) rmSync(statusPath);
+    } catch {
+      // Non-fatal
+    }
+  }
+
   // ── Polling ──
 
   private async schedulePoll(): Promise<void> {
@@ -325,6 +383,7 @@ export class Conductor {
       } catch (err) {
         logger.error('Poll cycle failed', { error: (err as Error).message });
       }
+      this.writeStatusFile();
     }
   }
 
@@ -525,6 +584,7 @@ export class Conductor {
       console.log(`[${issue.identifier}] Failed: ${(err as Error).message}`);
     } finally {
       this.running.delete(issueId);
+      this.writeStatusFile();
       // Keep claimed so we don't re-dispatch within this session
     }
   }
