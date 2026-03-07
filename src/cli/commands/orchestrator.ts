@@ -518,88 +518,84 @@ export class Conductor {
       // 3. Run after_create hook (restore context)
       await this.runHook('after-create', workspacePath, issue);
 
-      // 4. Spawn agent
-      run.status = 'running';
-      await this.runAgent(issue, run);
-
-      // 5. Success path
-      run.status = 'completed';
-      this.completeCount++;
-
-      // Run after_run hook (capture context)
-      await this.runHook('after-run', workspacePath, issue, run.attempt);
-
-      // Take snapshot for session continuity
-      this.takeSnapshot(workspacePath, issue);
-
-      // Move to In Review
-      await this.transitionIssue(issue, this.config.inReviewState);
-
-      console.log(`[${issue.identifier}] Completed successfully`);
+      // 4. Attempt agent run (with retries)
+      await this.attemptRun(issue, run);
     } catch (err) {
-      run.status = 'failed';
-      run.error = (err as Error).message;
+      this.failCount++;
+      console.log(`[${issue.identifier}] Failed: ${(err as Error).message}`);
+    } finally {
+      this.running.delete(issueId);
+      // Keep claimed so we don't re-dispatch within this session
+    }
+  }
 
-      logger.error('Issue dispatch failed', {
-        identifier: issue.identifier,
-        error: run.error,
-        attempt: run.attempt,
-      });
+  /**
+   * Run the agent with retry logic. Throws on final failure.
+   */
+  private async attemptRun(
+    issue: LinearIssue,
+    run: RunningIssue
+  ): Promise<void> {
+    const maxAttempts = this.config.maxRetries + 1;
 
-      // Run after_run hook even on failure
-      if (run.workspacePath) {
+    while (run.attempt <= maxAttempts) {
+      try {
+        run.status = 'running';
+        await this.runAgent(issue, run);
+
+        // Success
+        run.status = 'completed';
+        this.completeCount++;
         await this.runHook(
           'after-run',
           run.workspacePath,
           issue,
           run.attempt
         ).catch(() => {});
-      }
-
-      // Retry logic
-      if (run.attempt < this.config.maxRetries + 1) {
+        this.takeSnapshot(run.workspacePath, issue);
+        await this.transitionIssue(issue, this.config.inReviewState);
         console.log(
-          `[${issue.identifier}] Failed (attempt ${run.attempt}), retrying...`
+          run.attempt === 1
+            ? `[${issue.identifier}] Completed successfully`
+            : `[${issue.identifier}] Completed on retry ${run.attempt}`
         );
-        run.attempt++;
-        this.totalAttempts++;
+        return;
+      } catch (err) {
+        run.status = 'failed';
+        run.error = (err as Error).message;
 
-        // Exponential backoff
-        const backoffMs = Math.min(1000 * Math.pow(2, run.attempt - 1), 300000);
-        await new Promise((r) => setTimeout(r, backoffMs));
+        logger.error('Agent run failed', {
+          identifier: issue.identifier,
+          error: run.error,
+          attempt: run.attempt,
+        });
 
-        if (!this.stopping) {
-          try {
-            run.status = 'running';
-            await this.runAgent(issue, run);
-            run.status = 'completed';
-            this.completeCount++;
-            await this.runHook(
-              'after-run',
-              run.workspacePath,
-              issue,
-              run.attempt
-            ).catch(() => {});
-            await this.transitionIssue(issue, this.config.inReviewState);
-            console.log(
-              `[${issue.identifier}] Completed on retry ${run.attempt}`
-            );
-          } catch (retryErr) {
-            run.status = 'failed';
-            run.error = (retryErr as Error).message;
-            this.failCount++;
-            console.log(
-              `[${issue.identifier}] Failed after ${run.attempt} attempts: ${run.error}`
-            );
-          }
+        // Run after_run hook even on failure
+        if (run.workspacePath) {
+          await this.runHook(
+            'after-run',
+            run.workspacePath,
+            issue,
+            run.attempt
+          ).catch(() => {});
         }
-      } else {
-        this.failCount++;
-        console.log(`[${issue.identifier}] Failed: ${run.error}`);
+
+        // If more attempts remain, retry with backoff
+        if (run.attempt < maxAttempts && !this.stopping) {
+          console.log(
+            `[${issue.identifier}] Failed (attempt ${run.attempt}), retrying...`
+          );
+          run.attempt++;
+          this.totalAttempts++;
+          const backoffMs = Math.min(
+            1000 * Math.pow(2, run.attempt - 1),
+            300000
+          );
+          await new Promise((r) => setTimeout(r, backoffMs));
+        } else {
+          throw err;
+        }
       }
-    } finally {
-      this.running.delete(issueId);
-      // Keep claimed so we don't re-dispatch within this session
     }
   }
 
