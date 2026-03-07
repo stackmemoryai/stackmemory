@@ -9,10 +9,18 @@
  */
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  createWriteStream,
+  type WriteStream,
+} from 'fs';
 import { join, dirname } from 'path';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 import { fileURLToPath } from 'url';
+import { Transform, type TransformCallback } from 'stream';
 import { logger } from '../../core/monitoring/logger.js';
 import {
   LinearClient,
@@ -69,6 +77,16 @@ export interface RunningIssue {
   startedAt: number;
   status: 'starting' | 'running' | 'completed' | 'failed';
   error?: string;
+  /** Observability: current agent phase */
+  phase: AgentPhase;
+  /** Observability: count of tool calls observed */
+  toolCalls: number;
+  /** Observability: count of files modified */
+  filesModified: number;
+  /** Observability: estimated token usage */
+  tokensUsed: number;
+  /** Observability: log file write stream */
+  logStream?: WriteStream;
 }
 
 export interface ConductorStats {
@@ -85,6 +103,24 @@ export interface ConductorStats {
   }>;
 }
 
+export type AgentPhase =
+  | 'reading'
+  | 'planning'
+  | 'implementing'
+  | 'testing'
+  | 'committing';
+
+export interface AgentStatusFile {
+  issue: string;
+  pid: number;
+  started: string;
+  lastUpdate: string;
+  phase: AgentPhase;
+  filesModified: number;
+  toolCalls: number;
+  tokensUsed: number;
+}
+
 // ── Helpers ──
 
 /** Find the package root by walking up from the current file. */
@@ -96,6 +132,98 @@ function findPackageRoot(): string {
     dir = dirname(dir);
   }
   return dirname(currentFile);
+}
+
+/** Get the agent status directory for a given issue identifier. */
+export function getAgentStatusDir(issueIdentifier: string): string {
+  return join(
+    homedir(),
+    '.stackmemory',
+    'conductor',
+    'agents',
+    issueIdentifier
+  );
+}
+
+/** Ensure the agent status directory exists and return the path. */
+function ensureAgentStatusDir(issueIdentifier: string): string {
+  const dir = getAgentStatusDir(issueIdentifier);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+/**
+ * Transform stream that tees data to a write stream while passing it through.
+ */
+class TeeTransform extends Transform {
+  private logStream: WriteStream;
+
+  constructor(logStream: WriteStream) {
+    super();
+    this.logStream = logStream;
+  }
+
+  _transform(
+    chunk: Buffer,
+    _encoding: string,
+    callback: TransformCallback
+  ): void {
+    this.logStream.write(chunk);
+    this.push(chunk);
+    callback();
+  }
+
+  _flush(callback: TransformCallback): void {
+    this.logStream.end();
+    callback();
+  }
+}
+
+/**
+ * Infer agent phase from JSON-RPC messages and tool names.
+ */
+function inferPhase(msg: Record<string, unknown>): AgentPhase | null {
+  const method = msg.method as string | undefined;
+  const params = msg.params as Record<string, unknown> | undefined;
+
+  if (method === 'item/commandExecution/started') {
+    const tool = (params?.tool || params?.name || '') as string;
+    const toolLower = tool.toLowerCase();
+
+    if (
+      toolLower.includes('read') ||
+      toolLower.includes('glob') ||
+      toolLower.includes('grep') ||
+      toolLower.includes('search')
+    ) {
+      return 'reading';
+    }
+    if (toolLower.includes('todowrite') || toolLower.includes('todo')) {
+      return 'planning';
+    }
+    if (
+      toolLower.includes('edit') ||
+      toolLower.includes('write') ||
+      toolLower.includes('bash')
+    ) {
+      return 'implementing';
+    }
+    if (toolLower.includes('test')) {
+      return 'testing';
+    }
+  }
+
+  // Detect git commit operations
+  if (method === 'item/commandExecution/started') {
+    const command = (params?.command || '') as string;
+    if (command.includes('git commit') || command.includes('git add')) {
+      return 'committing';
+    }
+  }
+
+  return null;
 }
 
 // ── Default Config ──
@@ -368,6 +496,38 @@ export class Conductor {
     }
   }
 
+  // ── Agent Status Files ──
+
+  /**
+   * Write per-agent status to ~/.stackmemory/conductor/agents/<issue-id>/status.json
+   */
+  writeAgentStatus(issueIdentifier: string, run: RunningIssue): void {
+    try {
+      const dir = ensureAgentStatusDir(issueIdentifier);
+      const status: AgentStatusFile = {
+        issue: issueIdentifier,
+        pid: run.process?.pid || process.pid,
+        started: new Date(run.startedAt).toISOString(),
+        lastUpdate: new Date().toISOString(),
+        phase: run.phase,
+        filesModified: run.filesModified,
+        toolCalls: run.toolCalls,
+        tokensUsed: run.tokensUsed,
+      };
+      writeFileSync(join(dir, 'status.json'), JSON.stringify(status, null, 2));
+    } catch {
+      // Non-fatal — status file is best-effort
+    }
+  }
+
+  /**
+   * Open a log file write stream for an agent.
+   */
+  private openAgentLogStream(issueIdentifier: string): WriteStream {
+    const dir = ensureAgentStatusDir(issueIdentifier);
+    return createWriteStream(join(dir, 'output.log'), { flags: 'a' });
+  }
+
   // ── Polling ──
 
   private async schedulePoll(): Promise<void> {
@@ -559,7 +719,14 @@ export class Conductor {
       attempt: 1,
       startedAt: Date.now(),
       status: 'starting',
+      phase: 'reading',
+      toolCalls: 0,
+      filesModified: 0,
+      tokensUsed: 0,
     };
+
+    // Write initial agent status file
+    this.writeAgentStatus(issue.identifier, run);
 
     this.running.set(issueId, run);
     this.totalAttempts++;
@@ -776,6 +943,15 @@ export class Conductor {
 
       run.process = proc;
 
+      // Open log stream for stdout tee
+      const logStream = this.openAgentLogStream(issue.identifier);
+      run.logStream = logStream;
+      const tee = new TeeTransform(logStream);
+      proc.stdout.pipe(tee);
+
+      // Update status now that we have a PID
+      this.writeAgentStatus(issue.identifier, run);
+
       let stderr = '';
       let turnCompleted = false;
 
@@ -798,9 +974,9 @@ export class Conductor {
         proc.stdin.write(JSON.stringify(msg) + '\n');
       };
 
-      // Read responses line by line
+      // Read responses line by line from the tee'd stream
       let lineBuffer = '';
-      proc.stdout.on('data', (chunk: Buffer) => {
+      tee.on('data', (chunk: Buffer) => {
         lineBuffer += chunk.toString();
         const lines = lineBuffer.split('\n');
         lineBuffer = lines.pop() || '';
@@ -811,11 +987,47 @@ export class Conductor {
             const msg = JSON.parse(line);
             this.handleAgentMessage(msg, issue, run);
 
+            // Track observability metrics
+            const phase = inferPhase(msg);
+            if (phase) {
+              run.phase = phase;
+            }
+
+            if (
+              msg.method === 'item/commandExecution/started' ||
+              msg.method === 'item/toolUse/started'
+            ) {
+              run.toolCalls++;
+            }
+
+            // Track file modifications from tool results
+            const params = msg.params as Record<string, unknown> | undefined;
+            if (msg.method === 'item/commandExecution/started' && params) {
+              const tool = (
+                (params.tool || params.name || '') as string
+              ).toLowerCase();
+              if (tool.includes('edit') || tool.includes('write')) {
+                run.filesModified++;
+              }
+            }
+
+            // Estimate tokens from message sizes
+            if (msg.method === 'item/text' && params?.text) {
+              run.tokensUsed += Math.ceil((params.text as string).length / 4);
+            }
+
+            // Update agent status file periodically (every 5 tool calls)
+            if (run.toolCalls % 5 === 0 || phase) {
+              this.writeAgentStatus(issue.identifier, run);
+            }
+
             if (msg.method === 'turn/completed') {
               turnCompleted = true;
+              this.writeAgentStatus(issue.identifier, run);
             }
             if (msg.method === 'turn/failed') {
               turnCompleted = true;
+              this.writeAgentStatus(issue.identifier, run);
               const errMsg = msg.params?.error?.message || 'Agent turn failed';
               clearTimeout(timer);
               reject(new Error(errMsg));
@@ -847,6 +1059,14 @@ export class Conductor {
       proc.on('close', (code) => {
         clearTimeout(timer);
         run.process = null;
+
+        // Close log stream
+        if (run.logStream && !run.logStream.destroyed) {
+          run.logStream.end();
+        }
+
+        // Final status update
+        this.writeAgentStatus(issue.identifier, run);
 
         if (turnCompleted) {
           resolve();

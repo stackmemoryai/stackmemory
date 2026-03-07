@@ -10,13 +10,20 @@
  */
 
 import { Command } from 'commander';
-import { execSync } from 'child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { execSync, spawn as cpSpawn } from 'child_process';
+import {
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+} from 'fs';
 import { join } from 'path';
 import { homedir, tmpdir } from 'os';
 import Database from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
 import { Conductor } from './orchestrator.js';
+import { getAgentStatusDir, type AgentStatusFile } from './orchestrator.js';
 
 /** Global store for cross-workspace context */
 function getGlobalStorePath(): string {
@@ -56,6 +63,18 @@ function getGlobalDb(): Database.Database {
   `);
 
   return db;
+}
+
+/** Format elapsed time in human-readable form (e.g., "2m ago", "30s ago") */
+export function formatElapsed(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export function createConductorCommands(): Command {
@@ -381,6 +400,91 @@ export function createConductorCommands(): Command {
       }
 
       globalDb.close();
+    });
+
+  // --- status ---
+  cmd
+    .command('status')
+    .description('Show running agent status table')
+    .action(async () => {
+      const agentsDir = join(homedir(), '.stackmemory', 'conductor', 'agents');
+      if (!existsSync(agentsDir)) {
+        console.log('No agent status files found');
+        return;
+      }
+
+      const entries = readdirSync(agentsDir, { withFileTypes: true });
+      const statuses: AgentStatusFile[] = [];
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const statusPath = join(agentsDir, entry.name, 'status.json');
+        if (!existsSync(statusPath)) continue;
+        try {
+          const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
+          statuses.push(data as AgentStatusFile);
+        } catch {
+          // skip corrupt files
+        }
+      }
+
+      if (statuses.length === 0) {
+        console.log('No agent status files found');
+        return;
+      }
+
+      // Sort by lastUpdate descending (most recent first)
+      statuses.sort(
+        (a, b) =>
+          new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
+      );
+
+      // Render table
+      const header = `${'Issue'.padEnd(12)}${'Phase'.padEnd(16)}${'Tools'.padStart(7)}${'Files'.padStart(7)}${'Tokens'.padStart(9)}   Last Update`;
+      console.log(header);
+
+      for (const s of statuses) {
+        const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
+        const lastUpdate = formatElapsed(elapsed);
+        const line = `${s.issue.padEnd(12)}${s.phase.padEnd(16)}${String(s.toolCalls).padStart(7)}${String(s.filesModified).padStart(7)}${String(s.tokensUsed).padStart(9)}   ${lastUpdate}`;
+        console.log(line);
+      }
+    });
+
+  // --- logs ---
+  cmd
+    .command('logs')
+    .description('Tail agent output log')
+    .argument('<issue-id>', 'Issue identifier (e.g., STA-499)')
+    .option('-f, --follow', 'Follow the log (tail -f)', false)
+    .option('-n, --lines <n>', 'Number of lines to show', '50')
+    .action(async (issueId, options) => {
+      const logPath = join(getAgentStatusDir(issueId), 'output.log');
+
+      if (!existsSync(logPath)) {
+        console.error(`No log file found for ${issueId} at ${logPath}`);
+        return;
+      }
+
+      const lines = parseInt(options.lines, 10);
+      const args = options.follow
+        ? ['-f', '-n', String(lines), logPath]
+        : ['-n', String(lines), logPath];
+
+      const tail = cpSpawn('tail', args, { stdio: 'inherit' });
+
+      await new Promise<void>((resolve) => {
+        tail.on('close', () => {
+          resolve();
+        });
+
+        // Forward signals to tail
+        const forward = () => {
+          tail.kill('SIGTERM');
+        };
+        process.on('SIGINT', forward);
+        process.on('SIGTERM', forward);
+      });
     });
 
   // --- start ---
