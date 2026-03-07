@@ -10,8 +10,9 @@
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { logger } from '../../core/monitoring/logger.js';
 import {
   LinearClient,
@@ -84,6 +85,19 @@ export interface ConductorStats {
   }>;
 }
 
+// ── Helpers ──
+
+/** Find the package root by walking up from the current file. */
+function findPackageRoot(): string {
+  const currentFile = fileURLToPath(import.meta.url);
+  let dir = dirname(currentFile);
+  for (let i = 0; i < 6; i++) {
+    if (existsSync(join(dir, 'package.json'))) return dir;
+    dir = dirname(dir);
+  }
+  return dirname(currentFile);
+}
+
 // ── Default Config ──
 
 const DEFAULT_CONFIG: ConductorConfig = {
@@ -97,10 +111,7 @@ const DEFAULT_CONFIG: ConductorConfig = {
   repoRoot: process.cwd(),
   baseBranch: 'main',
   appServerPath: join(
-    __dirname,
-    '..',
-    '..',
-    '..',
+    findPackageRoot(),
     'scripts',
     'conductor',
     'claude-app-server.cjs'
@@ -146,17 +157,25 @@ export class Conductor {
     this.startedAt = Date.now();
     this.stopping = false;
 
-    // Resolve app-server path
+    // Resolve app-server path — try multiple locations
     if (!existsSync(this.config.appServerPath)) {
-      // Try resolving relative to the package
-      const altPath = join(
-        this.config.repoRoot,
-        'scripts',
-        'symphony',
-        'claude-app-server.cjs'
-      );
-      if (existsSync(altPath)) {
-        this.config.appServerPath = altPath;
+      const candidates = [
+        join(
+          this.config.repoRoot,
+          'scripts',
+          'conductor',
+          'claude-app-server.cjs'
+        ),
+        join(
+          this.config.repoRoot,
+          'scripts',
+          'symphony',
+          'claude-app-server.cjs'
+        ),
+      ];
+      const found = candidates.find((p) => existsSync(p));
+      if (found) {
+        this.config.appServerPath = found;
       } else {
         throw new Error(
           `claude-app-server.cjs not found at ${this.config.appServerPath}`
