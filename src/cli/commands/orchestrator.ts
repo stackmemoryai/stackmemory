@@ -191,6 +191,23 @@ export class Conductor {
     // Initialize Linear client
     this.client = await this.createLinearClient();
 
+    // Auto-detect team ID if not provided
+    if (!this.config.teamId && this.client) {
+      try {
+        const team = await this.client.getTeam();
+        this.config.teamId = team.id;
+        logger.info('Auto-detected Linear team', {
+          id: team.id,
+          name: team.name,
+          key: team.key,
+        });
+      } catch (err) {
+        logger.warn('Failed to auto-detect team', {
+          error: (err as Error).message,
+        });
+      }
+    }
+
     // Cache workflow states for state transitions
     await this.cacheWorkflowStates();
 
