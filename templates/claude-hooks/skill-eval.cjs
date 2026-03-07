@@ -350,6 +350,12 @@ function evaluate(prompt) {
     if (config.showMatchReasons && match.reasons.length > 0) {
       output += `   Matched: ${match.reasons.slice(0, 3).join(', ')}\n`;
     }
+
+    // Show suggestion if the skill defines one (e.g. loop-monitor)
+    const skillDef = skills[match.name];
+    if (skillDef?.suggestion) {
+      output += `   Suggestion: ${skillDef.suggestion}\n`;
+    }
   }
 
   if (relatedSkills.length > 0) {

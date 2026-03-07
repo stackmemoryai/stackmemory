@@ -255,6 +255,22 @@
       },
       "relatedSkills": ["linear-task-runner"]
     },
+    "loop-monitor": {
+      "description": "Monitor CI, deploys, logs, or external state with stackmemory loop",
+      "priority": 9,
+      "triggers": {
+        "keywords": ["monitor", "watch", "poll", "wait for", "check status", "loop", "keep checking", "deploy status", "ci status", "action status", "run status"],
+        "keywordPatterns": ["\\b(?:monitor|watch|poll|loop)\\b", "wait\\s+(?:for|until)", "keep\\s+checking", "check.*(?:status|state|progress)", "(?:gh|github)\\s+(?:run|action|check)", "deploy.*(?:status|log|done)", "\\buntil\\b.*(?:done|complete|pass|success|fail)"],
+        "intentPatterns": [
+          "(?:monitor|watch|poll|check).*(?:ci|deploy|action|run|build|status|log|inbox)",
+          "(?:wait|loop).*(?:until|for).*(?:done|complete|pass|success|finish)",
+          "(?:keep|continue).*(?:checking|monitoring|watching)",
+          "(?:let me know|notify|alert).*(?:when|if).*(?:done|complete|ready|fail)"
+        ]
+      },
+      "suggestion": "Use `stackmemory loop` to poll a command until a condition is met:\n  stackmemory loop \"<command>\" --until \"<pattern>\" -i 10s -t 30m\n  stackmemory loop \"gh run view <id> --json status -q .status\" --until \"completed\"\n  stackmemory loop \"curl -s http://localhost/health\" --until \"ok\" --json",
+      "relatedSkills": ["github-actions"]
+    },
     "linear-task-runner": {
       "description": "Execute Linear tasks via RLM orchestrator",
       "priority": 8,
