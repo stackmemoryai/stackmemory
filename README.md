@@ -24,7 +24,8 @@ StackMemory is a **production-ready memory runtime** for AI coding tools that pr
 - **Automatic hooks** for task tracking, Linear sync, and spec progress
 - **Snapshot capture** — post-run context snapshots for session handoff (`snapshot save`)
 - **Pre-flight overlap check** — predict file conflicts before parallel task dispatch (`preflight`)
-- **Conductor orchestrator** — polls Linear, creates worktrees, spawns agents with bounded concurrency
+- **Conductor orchestrator** — polls Linear, creates worktrees, spawns agents with bounded concurrency and auto team detection
+- **Loop/Watch command** — poll any shell command until a condition is met (monitor CI, deploys, logs)
 - **Memory monitor daemon** with automatic capture/clear on RAM pressure
 - **Auto-save service** for periodic context persistence
 - **Comprehensive test coverage** across all core modules
@@ -68,6 +69,8 @@ Tools forget decisions and constraints between sessions. StackMemory makes conte
 - **Safe branches**: worktree isolation with `--worktree` or `-w`
 - **Snapshot**: post-run context capture — records what changed, commits, and decisions (`stackmemory snapshot`)
 - **Pre-flight check**: file overlap prediction before parallel task dispatch (`stackmemory preflight`)
+- **Loop/Watch**: poll shell commands until conditions are met — monitor CI, deploys, logs (`stackmemory loop`)
+- **Conductor**: autonomous orchestrator — polls Linear, creates worktrees, spawns agents with auto team detection
 - **Persistent context**: frames, anchors, decisions, retrieval
 - **Integrations**: Linear (API key + OAuth), DiffMem, Browser MCP, log-mcp (log analysis)
 
@@ -388,6 +391,26 @@ stackmemory pf "auth work" "db migration" -f "task1:src/auth.ts;task2:src/db.ts"
 # JSON output for programmatic use
 stackmemory pf "task A" "task B" "task C" --json
 ```
+
+### Loop / Watch (`loop` / `watch`)
+
+Poll a shell command until a condition is met. Useful for monitoring CI runs, deploy logs, inboxes, or any external state.
+
+```bash
+# Monitor GitHub Actions until complete
+stackmemory loop "gh run view <id> --json status -q .status" --until "completed"
+
+# Watch deploy logs for success
+stackmemory watch "railway logs --latest" --until "deployed" -i 5s
+
+# Wait for health check to pass
+stackmemory loop "curl -s http://localhost:3000/health" --until "ok" -i 3s -t 5m
+
+# JSON output for programmatic use
+stackmemory loop "gh pr checks 42 --json state -q '.[0].state'" --until "SUCCESS" --json
+```
+
+Options: `--until`, `--until-not`, `--until-empty`, `--until-non-empty`, `--until-exit`, `-i/--interval` (default 10s), `-t/--timeout` (default 30m), `--json`, `-q/--quiet`
 
 ---
 

@@ -63,6 +63,7 @@ stackmemory snapshot save  # Post-run context snapshot (alias: snap)
 stackmemory snapshot list  # List recent snapshots
 stackmemory preflight      # File overlap check for parallel tasks (alias: pf)
 stackmemory conductor start  # Autonomous Linear→worktree→agent orchestrator
+stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias: watch)
 ```
 
 ## Working Directory

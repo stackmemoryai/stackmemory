@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StackMemory — Lossless memory for AI coding tools</title>
-  <meta name="description" content="Lossless, project-scoped memory for AI coding tools. Durable context across sessions with MCP tools, FTS5 search, Linear sync, and automatic hooks.">
+  <meta name="description" content="Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, Linear sync, and automatic hooks.">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="StackMemory — Lossless memory for AI coding tools">
-  <meta property="og:description" content="Project-scoped memory runtime that preserves full context across sessions. 56 MCP tools, FTS5 search, Linear sync, Claude/Codex/OpenCode wrappers.">
+  <meta property="og:description" content="Lossless memory runtime that preserves full context across sessions. 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, Linear sync, Claude/Codex/OpenCode wrappers.">
   <meta property="og:url" content="https://stackmemoryai.github.io/stackmemory/">
   <meta property="og:image" content="https://stackmemoryai.github.io/stackmemory/og-image.png">
   <meta property="og:site_name" content="StackMemory">
@@ -137,6 +137,18 @@
         <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
           <h3 class="font-semibold text-sm">Skills System</h3>
           <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed"><code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">/spec</code> for iterative specs, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">/linear-run</code> for task execution via RLM orchestration.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Conductor Orchestrator</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Polls Linear for tasks, creates git worktrees, spawns agents with bounded concurrency and auto team detection.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Loop / Watch</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Poll any shell command until a condition is met. Monitor CI runs, deploy logs, inboxes, and external state with <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">stackmemory loop</code>.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Snapshot &amp; Pre-flight</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Capture post-run context snapshots for session handoff. Pre-flight checks predict file overlaps before parallel task dispatch.</p>
         </div>
       </div>
     </section>
