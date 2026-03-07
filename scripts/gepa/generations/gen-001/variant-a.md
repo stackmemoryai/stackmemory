@@ -21,26 +21,30 @@ docs/            # Documentation
 
 ## Key Files
 
-- Entry: src/cli/index.ts
-- MCP Server: src/integrations/mcp/server.ts
-- Frame Manager: src/core/context/frame-manager.ts
-- Database: src/core/database/sqlite-adapter.ts
+- Entry: `src/cli/index.ts`
+- MCP Server: `src/integrations/mcp/server.ts`
+- Frame Manager: `src/core/context/frame-manager.ts`
+- Database: `src/core/database/sqlite-adapter.ts`
+- Snapshot: `src/core/worktree/capture.ts`
+- Preflight: `src/core/worktree/preflight.ts`
+- Conductor: `src/cli/commands/orchestrator.ts`
+- Shared Utils: `src/core/utils/{git,text,fs}.ts`
 
-## Documentation
+## Reference Docs
 
-Quick reference (agent_docs/):
-- linear_integration.md - Linear sync
-- mcp_server.md - MCP tools
-- database_storage.md - Storage
-- claude_hooks.md - Hooks
+Quick reference (`agent_docs/`):
+- `linear_integration.md` — Linear sync
+- `mcp_server.md` — MCP tools
+- `database_storage.md` — Storage
+- `claude_hooks.md` — Hooks
 
-Full docs (docs/):
-- principles.md - Agent programming paradigm
-- architecture.md - Extension model and browser sandbox
-- SPEC.md - Technical specification
-- API_REFERENCE.md - API docs
-- DEVELOPMENT.md - Dev guide
-- SETUP.md - Installation
+Full docs (`docs/`):
+- `principles.md` — Agent programming paradigm
+- `architecture.md` — Extension model and browser sandbox
+- `SPEC.md` — Technical specification
+- `API_REFERENCE.md` — API docs
+- `DEVELOPMENT.md` — Dev guide
+- `SETUP.md` — Installation
 
 ## Commands
 
@@ -53,53 +57,51 @@ npm run test:run       # Run tests once
 npm run linear:sync    # Sync with Linear
 
 # StackMemory CLI
-stackmemory capture    # Save session state for handoff
-stackmemory restore    # Restore from captured state
+stackmemory capture          # Save session state for handoff
+stackmemory restore          # Restore from captured state
+stackmemory snapshot save    # Post-run context snapshot (alias: snap)
+stackmemory snapshot list    # List recent snapshots
+stackmemory preflight        # File overlap check for parallel tasks (alias: pf)
+stackmemory conductor start  # Autonomous Linear→worktree→agent orchestrator
 ```
 
 ## Working Directory
 
-- PRIMARY: /Users/jwu/Dev/stackmemory
+- PRIMARY: `/Users/jwu/Dev/stackmemory`
 - ALLOWED: All subdirectories
-- TEMP: /tmp for temporary operations
+- TEMP: `/tmp`
 
-## Required Validation
+## Validation (REQUIRED after every code change)
 
-After every code change:
-1. `npm run lint` - fix all errors AND warnings
-2. `npm run test:run` - verify no regressions
-3. `npm run build` - confirm compilation succeeds
-4. Execute code to confirm functionality
+1. `npm run lint` — fix all errors and warnings
+2. `npm run test:run` — confirm no regressions
+3. `npm run build` — confirm compilation succeeds
+4. Run the code to verify behavior
 
-Test coverage requirements:
-- Write tests in `src/**/__tests__/` for all new features
-- Maintain or improve coverage - no untested code paths
-- Critical paths require tests: context management, handoff, Linear sync
+Test coverage rules:
+- New features require tests in `src/**/__tests__/`
+- Maintain or improve coverage — no untested code paths
+- Critical paths: context management, handoff, Linear sync
 
-Do NOT: assume success | skip testing | use mock data as fallback
+Do not: assume success | skip testing | use mock data as fallback
 
 ## Git Rules (CRITICAL)
 
-NEVER:
-- Use `--no-verify` on git push or commit
-- Push without fixing lint/test errors
-- Skip validation when pre-push hooks fail
-
-ALWAYS:
-- Fix underlying issues when hooks fail
-- Run `npm run lint && npm run test:run` before pushing
-- Use commit format: `type(scope): message`
-- Use branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+- NEVER pass `--no-verify` to `git push` or `git commit`
+- Fix lint/test errors before pushing — never bypass pre-push hooks
+- Run `npm run lint && npm run test:run` before every push
+- Commit format: `type(scope): message`
+- Branch format: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
 ## Task Management
 
-- Create TodoWrite for 3+ steps or multiple requests
-- Work on one task at a time (keep one in_progress)
-- Update task status immediately on completion
+- Use TodoWrite for tasks with 3+ steps or multiple requests
+- Keep exactly one task `in_progress` at a time
+- Mark tasks complete immediately when done
 
 ## Security
 
-NEVER hardcode secrets. Use process.env with dotenv/config:
+Never hardcode secrets. Always use `process.env` with dotenv:
 
 ```javascript
 import 'dotenv/config';
@@ -110,18 +112,18 @@ if (!API_KEY) {
 }
 ```
 
-Environment sources (check in order):
-1. .env file
-2. .env.local
-3. ~/.zshrc
+Check env sources in order:
+1. `.env`
+2. `.env.local`
+3. `~/.zshrc`
 4. Process environment
 
-Block secret patterns: lin_api_* | lin_oauth_* | sk-* | npm_*
+Block these patterns: `lin_api_*` | `lin_oauth_*` | `sk-*` | `npm_*`
 
 ## Deploy
 
 ```bash
-# npm publish (uses NPM_TOKEN from .env, no OTP needed)
+# npm publish (NPM_TOKEN from .env, no OTP required)
 git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
 NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
   npm publish --registry https://registry.npmjs.org/ \
@@ -131,46 +133,44 @@ git stash pop                         # restore GEPA state
 # Railway
 railway up
 
-# Pre-publish checks require clean git status — stash GEPA files first
+# Note: pre-publish checks require clean git status — stash GEPA files first
 ```
 
 ## Task Delegation Model
 
-Match effort to complexity:
+Match scrutiny to complexity:
 
-**AUTOMATE** — Execute immediately, lint+test only:
-- CRUD operations, boilerplate, formatting, simple transforms
-- Adding tool handler following existing switch/case pattern
-- Config additions (env var, feature flag)
+**AUTOMATE** — Run immediately; lint+test is enough:
+- CRUD, boilerplate, formatting, simple transforms
+- Adding a tool handler to an existing switch/case
+- Config additions (env vars, feature flags)
 
-**STANDARD** — Normal workflow, lint+test+build:
-- Feature implementation, bug fixes, refactoring
-- New test coverage, documentation updates
-- Integration wiring (adding handler to server.ts dispatch)
+**STANDARD** — Normal workflow; lint+test+build:
+- Feature work, bug fixes, refactoring
+- New tests, doc updates
+- Integration wiring (e.g., adding handler to `server.ts`)
 
-**CAREFUL** — Review approach before coding:
-- API/schema changes, database migrations, auth flows
-- New integration patterns (MCP tools, webhook handlers)
-- Changes to frame-manager, sqlite-adapter, daemon lifecycle
-- Error handling chain modifications
+**CAREFUL** — Confirm approach before implementing:
+- API/schema changes, DB migrations, auth flows
+- New MCP tools or webhook handlers
+- Changes to `frame-manager`, `sqlite-adapter`, or daemon lifecycle
+- Any error handling chain modifications
 
-**ARCHITECT** — Plan mode required, explore patterns first:
-- New service boundaries, system integrations
+**ARCHITECT** — Enter plan mode; read existing patterns first:
+- New service boundaries or system integrations
 - Performance-critical paths (FTS5 queries, search scoring)
 - Breaking changes to MCP protocol or CLI interface
 
-**HUMAN** — Explicit user approval required:
-- Security-critical decisions, secret handling
+**HUMAN** — Get explicit user approval before touching:
+- Security decisions, secret handling
 - Irreversible operations (data migrations, schema drops)
-- Publishing (npm publish, Railway deploy)
-
-Scale quality gates to tier. Don't over-engineer AUTOMATE tasks or under-review CAREFUL ones.
+- Publishing (`npm publish`, Railway deploy)
 
 ## Workflow
 
-- Check .env for API keys before asking user
-- Run `npm run linear:sync` after task completion
+- Check `.env` for API keys before asking the user
+- Run `npm run linear:sync` after completing tasks
 - Use browser MCP for visual testing
-- Review recent commits and stackmemory.json at session start
+- On session start: review recent commits and `stackmemory.json`
 - Use subagents for multi-step tasks
-- Ask 1-3 clarifying questions for complex commands (one at a time)
+- Ask at most 1–3 clarifying questions for complex requests, one at a time

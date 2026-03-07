@@ -11,20 +11,20 @@
       "criteria": {
         "has_function": {
           "passed": true,
-          "reason": "A complete, working function `isPalindrome` is defined in TypeScript with proper syntax, parameters, return type, and implementation."
+          "reason": "A real, working function named isPalindrome is defined with proper TypeScript syntax and implementation"
         },
         "handles_edge_cases": {
           "passed": true,
-          "reason": "The code handles edge cases: empty strings (returns true), mixed case (lowercase normalization), and special characters (regex removal of non-alphanumeric)."
+          "reason": "The function handles edge cases by converting to lowercase, removing non-alphanumeric characters, and comparing cleaned strings - this covers spaces, punctuation, and case sensitivity"
         },
         "is_tested": {
           "passed": false,
-          "reason": "The output shows example outputs but provides no actual test cases, unit tests, or test function definitions. Examples are illustrative documentation, not executable tests."
+          "reason": "No test cases or assertions are provided; the output contains only the function definition without any testing code"
         }
       },
       "judgeMode": "llm",
-      "duration": 26370,
-      "output": "I've written a palindrome checker function at `/private/tmp/gepa-eval-X4niM9/isPalindrome.ts`:\n\n```typescript\nexport function isPalindrome(str: string): boolean {\n  if (!str) return true;\n\n  const normalized = str.toLowerCase().replace(/[^a-z0-9]/g, '');\n  const reversed = normalized.split('').reverse().join('');\n\n  return normalized === reversed;\n}\n```\n\n**Features**:\n- Returns `true` for empty strings\n- Normalizes by converting to lowercase and removing non-alphanumeric characters\n- Compares the normalized string with its reverse\n\n**Examples**:\n- `isPalindrome(\"racecar\")` → `true`\n- `isPalindrome(\"A man, a plan, a canal: Panama\")` → `true`\n- `isPalindrome(\"hello\")` → `false`\n"
+      "duration": 8230,
+      "output": "```typescript\nfunction isPalindrome(s: string): boolean {\n  const cleaned = s.toLowerCase().replace(/[^a-z0-9]/g, '');\n  return cleaned === cleaned.split('').reverse().join('');\n}\n```\n"
     },
     {
       "taskId": "eval-002",
@@ -35,44 +35,44 @@
       "criteria": {
         "uses_async": {
           "passed": false,
-          "reason": "No async/await code is provided; AI only requests the original code instead of demonstrating the refactored solution"
+          "reason": "No async/await code is present in the output. The AI only requested the input code without providing any refactored solution."
         },
         "preserves_behavior": {
           "passed": false,
-          "reason": "No refactored code is shown, so behavior preservation cannot be verified"
+          "reason": "No refactored code was provided, so behavior cannot be preserved or verified."
         },
         "no_nested_callbacks": {
           "passed": false,
-          "reason": "No refactored code is demonstrated; the output is a request for input rather than a solution"
+          "reason": "No code transformation was performed. The output contains no callbacks or async/await implementation to evaluate."
         }
       },
       "judgeMode": "llm",
-      "duration": 8335,
-      "output": "I need to see the code you want to refactor. Could you please provide the file path or share the code that uses callbacks?\n"
+      "duration": 9716,
+      "output": "Please share the code you'd like me to refactor.\n"
     },
     {
       "taskId": "eval-003",
       "taskName": "fix_bug",
       "weight": 1.2,
-      "passed": true,
-      "passRate": 0.6666666666666666,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "bug_fixed": {
           "passed": false,
-          "reason": "The output only describes the fix but does not show the actual fixed code. No corrected code snippet is provided to verify the bug is actually fixed."
+          "reason": "No code was provided to fix, so no bug was actually corrected. The AI only requested the code instead of fixing anything."
         },
         "no_new_bugs": {
-          "passed": true,
-          "reason": "The suggested fix (changing `i <= items.length` to `i < items.length`) is a standard, correct solution for off-by-one errors and introduces no new bugs."
+          "passed": false,
+          "reason": "Cannot evaluate since no code fix was attempted or provided."
         },
         "explains_fix": {
-          "passed": true,
-          "reason": "The output clearly explains what was wrong (accessing undefined index 3 on a 3-element array) and why the fix works (using < instead of <=)."
+          "passed": false,
+          "reason": "No explanation of any fix was provided. The AI only asked for the missing code to be shared."
         }
       },
       "judgeMode": "llm",
-      "duration": 25447,
-      "output": "Fixed buggy-loop.js:6 - changed `i <= items.length` to `i < items.length` to prevent accessing `items[3]` (undefined) on a 3-element array.\n"
+      "duration": 8553,
+      "output": "I don't see any code or file provided. Could you share the code with the off-by-one error you'd like me to fix?\n"
     },
     {
       "taskId": "eval-004",
@@ -83,80 +83,80 @@
       "criteria": {
         "has_pagination": {
           "passed": false,
-          "reason": "No code provided in output - empty code block"
+          "reason": "No pagination implementation provided. The AI only asked a clarifying question without delivering any code."
         },
         "has_limit": {
           "passed": false,
-          "reason": "No code provided in output - empty code block"
+          "reason": "No limit parameter implemented. The output contains no code or functional implementation."
         },
         "has_offset": {
           "passed": false,
-          "reason": "No code provided in output - empty code block"
+          "reason": "No offset parameter implemented. The output contains no code or functional implementation."
         },
         "backwards_compatible": {
           "passed": false,
-          "reason": "No code provided in output - empty code block"
+          "reason": "No implementation provided, so backwards compatibility cannot be verified. The output is a clarifying question, not a solution."
         }
       },
       "judgeMode": "llm",
-      "duration": 20951,
-      "output": "\n"
+      "duration": 11867,
+      "output": "Which API endpoint would you like to add pagination to? Can you point me to the file or describe the endpoint?\n"
     },
     {
       "taskId": "eval-005",
       "taskName": "code_review",
       "weight": 1.3,
-      "passed": true,
-      "passRate": 0.6666666666666666,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "identifies_security_issue": {
-          "passed": true,
-          "reason": "Output correctly identifies 5 legitimate security vulnerabilities: SQL injection, plaintext password comparison, sensitive data logging, insecure session tokens, and missing HttpOnly cookie flags with clear code examples and impact analysis"
+          "passed": false,
+          "reason": "No security issue was identified. The AI asked for clarification instead of reviewing any code."
         },
         "identifies_performance_issue": {
           "passed": false,
-          "reason": "Output does not identify any performance issues. The review focuses exclusively on security vulnerabilities with no mention of performance, scalability, or optimization concerns"
+          "reason": "No performance issue was identified. The AI requested a PR reference rather than providing analysis."
         },
         "actionable_feedback": {
-          "passed": true,
-          "reason": "Output provides specific, actionable fixes for each issue including exact code examples (e.g., parameterized queries, bcrypt.compare, crypto.randomBytes, cookie options) that developers can immediately implement"
+          "passed": false,
+          "reason": "No actionable feedback was provided. The output is a request for missing information, not constructive review guidance."
         }
       },
       "judgeMode": "llm",
-      "duration": 29814,
-      "output": "## Critical Security Issues Found\n\nThis PR contains **MULTIPLE SEVERE SECURITY VULNERABILITIES** that must be rejected:\n\n### 🔴 CRITICAL: SQL Injection (Line 10)\n```typescript\nconst user = await db.query(`SELECT * FROM users WHERE email = '${email}'`);\n```\n**Issue**: Direct string interpolation enables SQL injection attacks  \n**Attack**: `email = \"' OR '1'='1' --\"` bypasses authentication  \n**Fix**: Revert to parameterized query: `db.query('SELECT * FROM users WHERE email = $1', [email])`\n\n### 🔴 CRITICAL: Plaintext Password Comparison (Line 14)\n```typescript\nconst valid = password === user.passwordHash;\n```\n**Issue**: Removes bcrypt password hashing, comparing plaintext to hash  \n**Impact**: Authentication always fails OR passwords stored in plaintext  \n**Fix**: Revert to `await bcrypt.compare(password, user.passwordHash)`\n\n### 🔴 CRITICAL: Sensitive Data Logging (Line 22)\n```typescript\nconsole.log(`Login: ${email} / ${password}`);\n```\n**Issue**: Logs plaintext passwords to console/logs  \n**Impact**: Password exposure in log files, GDPR/compliance violation  \n**Fix**: Remove this line entirely or log only: `console.log(\\`Login attempt: ${email}\\`)`\n\n### 🔴 HIGH: Insecure Session Token (Line 18)\n```typescript\nconst token = email + ':' + Date.now();\n```\n**Issue**: Predictable token generation (email + timestamp)  \n**Impact**: Session hijacking via token guessing  \n**Fix**: Use cryptographically secure random tokens: `crypto.randomBytes(32).toString('hex')`\n\n### 🟡 MEDIUM: Missing HttpOnly Cookie Flag\n```typescript\nres.cookie('session', token);\n```\n**Issue**: Cookie accessible via JavaScript (XSS vulnerability)  \n**Fix**: `res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict' })`\n\n## Recommendation\n\n**REJECT THIS PR IMMEDIATELY** - Contains multiple critical security vulnerabilities including SQL injection and plaintext password exposure. The \"quick fix\" comment on line 9 is a red flag for introducing security issues.\n\nAll changes should be *"
+      "duration": 13805,
+      "output": "Which PR would you like me to review? Please provide a PR URL, number, or branch name.\n"
     },
     {
       "taskId": "sm-001",
       "taskName": "add_mcp_tool_handler",
       "weight": 1.5,
-      "passed": true,
-      "passRate": 1,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "has_switch_case": {
-          "passed": true,
-          "reason": "Code shows a case statement 'get_frame_summary' within a switch/case structure, following the dispatch pattern"
+          "passed": false,
+          "reason": "No switch/case code is present in the output; only a request for approval is shown"
         },
         "has_zod_schema": {
-          "passed": true,
-          "reason": "Zod schema is defined inline: z.object({ frameId: z.string() }), validating the required frameId parameter"
+          "passed": false,
+          "reason": "No Zod schema definition is provided in the output"
         },
         "validates_input": {
-          "passed": true,
-          "reason": "Input validation occurs via .parse(args) which will throw if frameId is missing or not a string"
+          "passed": false,
+          "reason": "No input validation logic is implemented in the output"
         },
         "returns_typed_response": {
-          "passed": true,
-          "reason": "Return statement explicitly returns an object with the four required properties: frameId, name, status, eventCount"
+          "passed": false,
+          "reason": "No typed response structure is defined in the output"
         },
         "handles_not_found": {
-          "passed": true,
-          "reason": "Code includes explicit null check (if (!frame)) with error thrown when frame is not found in the frames map"
+          "passed": false,
+          "reason": "No error handling or not-found logic is present in the output"
         }
       },
       "judgeMode": "llm",
-      "duration": 33763,
-      "output": "I've added the `get_frame_summary` handler to the MCP server dispatch pattern. The implementation:\n\n**Added case** (mcp-dispatch-stub.ts:32-42):\n```typescript\ncase 'get_frame_summary': {\n  const input = z.object({ frameId: z.string() }).parse(args);\n  const frame = frames.get(input.frameId);\n  if (!frame) throw new Error(`Frame not found: ${input.frameId}`);\n  return {\n    frameId: frame.id,\n    name: frame.name,\n    status: frame.status,\n    eventCount: frame.events.length\n  };\n}\n```\n\n**Features**:\n- ✓ Zod validation for required `frameId` string parameter\n- ✓ Follows existing switch/case dispatch pattern\n- ✓ Returns `{ frameId, name, status, eventCount }` as specified\n- ✓ Error handling for missing frames (consistent with `close_frame`)\n- ✓ Calculates `eventCount` from `frame.events.length`\n\nThe handler integrates seamlessly with the existing `start_frame` and `close_frame` tools.\n"
+      "duration": 23532,
+      "output": "Please approve the file write so I can apply the edit.\n"
     },
     {
       "taskId": "sm-002",
@@ -167,32 +167,52 @@
       "criteria": {
         "has_delete_trigger": {
           "passed": true,
-          "reason": "A DELETE trigger named 'frames_ad' is defined with AFTER DELETE ON frames syntax"
+          "reason": "A DELETE trigger named 'frames_ad' is explicitly defined with CREATE TRIGGER IF NOT EXISTS syntax for the frames table."
         },
         "uses_fts_delete_syntax": {
           "passed": true,
-          "reason": "The trigger uses FTS5 special syntax with INSERT INTO frames_fts(frames_fts, ...) VALUES ('delete', ...) which is the correct way to delete from FTS index"
+          "reason": "The trigger uses the FTS5 delete command by inserting 'delete' as the first value into the frames_fts virtual table, which is the correct syntax for removing entries from an FTS5 index."
         },
         "references_old_row": {
           "passed": true,
-          "reason": "The trigger references old.rowid, old.name, old.digest_text, and old.inputs, old.outputs to access the deleted row values"
+          "reason": "The trigger body references old.rowid, old.name, old.digest_text, and old.inputs, old.outputs to capture the deleted row's values before deletion."
         },
         "matches_column_list": {
           "passed": true,
-          "reason": "The column list (rowid, name, digest_text, inputs, outputs) matches the FTS index structure referenced in the INSERT and UPDATE triggers"
+          "reason": "The INSERT statement includes all the same columns (rowid, name, digest_text, inputs, outputs) that appear in the existing INSERT and UPDATE triggers, maintaining consistency with the established pattern."
         }
       },
       "judgeMode": "llm",
-      "duration": 34003,
-      "output": "I've added the missing DELETE trigger following the exact pattern of the existing triggers:\n\n**Pattern analysis:**\n- INSERT trigger (`frames_ai`): Adds new row to FTS index\n- UPDATE trigger (`frames_au`): Deletes old row, inserts new row\n- DELETE trigger (`frames_ad`): Deletes row from FTS index\n\n**Implementation:**\n```sql\nCREATE TRIGGER IF NOT EXISTS frames_ad AFTER DELETE ON frames BEGIN\n  INSERT INTO frames_fts(frames_fts, rowid, name, digest_text, inputs, outputs)\n  VALUES ('delete', old.rowid, old.name, old.digest_text, old.inputs, old.outputs);\nEND;\n```\n\nThe trigger uses the FTS5 special command syntax where `INSERT INTO frames_fts(frames_fts, ...)` with `'delete'` as the first value removes the entry from the full-text index.\n"
+      "duration": 27425,
+      "output": "The edit is ready — it replaces the bug comment with:\n\n```sql\n-- Sync trigger: DELETE\nCREATE TRIGGER IF NOT EXISTS frames_ad AFTER DELETE ON frames BEGIN\n  INSERT INTO frames_fts(frames_fts, rowid, name, digest_text, inputs, outputs)\n  VALUES ('delete', old.rowid, old.name, old.digest_text, old.inputs, old.outputs);\nEND;\n```\n\nThis follows the same FTS5 external content pattern used in `frames_au`: the special `'delete'` command removes the stale entry from the index using the `old.*` column values. Please approve the write to apply it.\n"
     },
     {
       "taskId": "sm-003",
       "taskName": "daemon_service_lifecycle",
       "weight": 1.5,
-      "passed": false,
-      "duration": 120042,
-      "error": "claude timed out after 120000ms"
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "clears_old_interval": {
+          "passed": true,
+          "reason": "The fix adds an early-return guard in start() that prevents overwriting intervalId without clearing it. Additionally, updateConfig() now always calls stop() unconditionally, ensuring the old interval is cleared before a new one is created."
+        },
+        "prevents_double_start": {
+          "passed": true,
+          "reason": "The code explicitly adds `if (this.isRunning) return;` at the beginning of start(), which prevents double-start by returning early if already running."
+        },
+        "has_getstate_method": {
+          "passed": true,
+          "reason": "A getState() method is defined in the diff that returns an object with the required properties."
+        },
+        "returns_correct_state_shape": {
+          "passed": true,
+          "reason": "The getState() method returns an object with all four required properties: isRunning, intervalMs (calculated from config.interval), lastRunTime, and errorCount."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 36969,
+      "output": "It seems write permission hasn't been granted yet. Here's what I'd apply — please approve the edit or grant write access:\n\n**Two bugs fixed + `getState()` added:**\n\n```diff\n-  // BUG: No guard against double-start ...\n   start(): void {\n+    if (this.isRunning) return;   // guard: prevents double-start / timer leak\n     this.isRunning = true;\n     ...\n   }\n\n-  // BUG: Calls stop() then start() but start() doesn't check...\n   updateConfig(config: Partial<ServiceConfig>): void {\n     const wasRunning = this.isRunning;\n-    if (wasRunning) this.stop();\n+    this.stop();                  // always stop: clears interval unconditionally\n     this.config = { ...this.config, ...config };\n     if (wasRunning && this.config.enabled) this.start();\n   }\n\n+  getState(): ServiceState {\n+    return {\n+      isRunning: this.isRunning,\n+      intervalMs: this.config.interval * 60 * 1000,\n+      lastRunTime: this.lastRunTime,\n+      errorCount: this.errorCount,\n+    };\n+  }\n```\n\n**Root causes:**\n\n1. **`start()` had no guard** — calling it twice created two `setInterval` handles; the first leaked because `this.intervalId` was overwritten before it could be cleared. Fix: early-return if already running.\n\n2. **`updateConfig()` used `if (wasRunning) this.stop()`** — the conditional was correct in intent, but the real risk was that `start()` itself didn't guard, so the stop/start cycle could still stack intervals. The belt-and-suspenders fix is: always call `stop()` unconditionally (it's a no-op when not running), then `start()` only if needed.\n"
     }
   ]
 }

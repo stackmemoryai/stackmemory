@@ -25,6 +25,10 @@ docs/            # Documentation
 - MCP Server: src/integrations/mcp/server.ts
 - Frame Manager: src/core/context/frame-manager.ts
 - Database: src/core/database/sqlite-adapter.ts
+- Snapshot: src/core/worktree/capture.ts
+- Preflight: src/core/worktree/preflight.ts
+- Conductor: src/cli/commands/orchestrator.ts
+- Shared Utils: src/core/utils/{git,text,fs}.ts
 
 ## Detailed Guides
 
@@ -55,6 +59,10 @@ npm run linear:sync    # Sync with Linear
 # StackMemory CLI
 stackmemory capture    # Save session state for handoff
 stackmemory restore    # Restore from captured state
+stackmemory snapshot save  # Post-run context snapshot (alias: snap)
+stackmemory snapshot list  # List recent snapshots
+stackmemory preflight      # File overlap check for parallel tasks (alias: pf)
+stackmemory conductor start  # Autonomous Linear→worktree→agent orchestrator
 ```
 
 ## Working Directory
@@ -72,10 +80,11 @@ After code changes:
 4. Run code to verify it works
 
 <example>
-# After adding a new MCP tool handler
-npm run lint && npm run test:run && npm run build
-# Then test the tool:
-echo '{"method":"tools/call","params":{"name":"your_tool"}}' | node dist/integrations/mcp/server.js
+# Correct validation sequence after editing src/core/context/frame-manager.ts:
+$ npm run lint        # → 0 errors, 0 warnings
+$ npm run test:run    # → all tests pass (including search-benchmark smoke)
+$ npm run build       # → dist/ updated, no TS errors
+$ stackmemory snapshot save  # → verify feature works end-to-end
 </example>
 
 Test coverage:
@@ -84,9 +93,14 @@ Test coverage:
 - Critical paths: context management, handoff, Linear sync
 
 <example>
-# New feature: src/core/context/frame-deduplicator.ts
-# Required: src/core/context/__tests__/frame-deduplicator.test.ts
-# Test both happy path and edge cases (empty input, duplicates, conflicts)
+# New feature: adding a getFrameCount() method to FrameManager
+# → requires test in src/core/context/__tests__/frame-manager.test.ts
+it('getFrameCount returns correct count after adding frames', () => {
+  const mgr = new FrameManager(db);
+  mgr.addFrame({ content: 'a' });
+  mgr.addFrame({ content: 'b' });
+  expect(mgr.getFrameCount()).toBe(2);
+});
 </example>
 
 Never: Assume success | Skip testing | Use mock data as fallback
@@ -101,15 +115,20 @@ Never: Assume success | Skip testing | Use mock data as fallback
 - Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
 <example>
-# Good commits:
-feat(mcp): add search_frames tool for context retrieval
-fix(linear): handle null assignee in webhook handler
-chore(deps): upgrade better-sqlite3 to 11.8.0
+# Good commit messages:
+feat(mcp): add get_frame_count tool to server
+fix(sqlite): correct BM25 score negation in hybrid search
+chore(deps): bump better-sqlite3 to 9.4.3
+refactor(context): extract frame deduplication to utils
 
-# Good branches:
-feature/STA-123-add-digest-export
-fix/STA-456-frame-timestamp-parsing
-chore/upgrade-typescript-5.3
+# Good branch names:
+feature/STA-123-fts5-hybrid-search
+fix/STA-456-timer-leak-promise-race
+chore/update-vitest-config
+
+# Bad — never do these:
+git commit --no-verify -m "wip"
+git push --force origin main
 </example>
 
 ## Task Management
@@ -119,32 +138,37 @@ chore/upgrade-typescript-5.3
 - Update task status immediately on completion
 
 <example>
-# Multi-step task requires TodoWrite:
-User: "Add Graphiti integration with Linear bridge"
-1. Create TodoWrite with 4 tasks:
-   - Research Graphiti API patterns
-   - Implement LinearGraphitiBridge class
-   - Add webhook handler for Linear events
-   - Write integration tests
-2. Mark task 1 in_progress, complete it
-3. Mark task 2 in_progress, etc.
+# User asks: "Add FTS5 search, wire it to MCP, and write tests"
+# → 3+ steps: use TodoWrite
+TodoWrite([
+  { id: '1', content: 'Add FTS5 search method to sqlite-adapter', status: 'pending' },
+  { id: '2', content: 'Wire search to MCP tool handler in server.ts', status: 'pending' },
+  { id: '3', content: 'Write tests in __tests__/sqlite-adapter.test.ts', status: 'pending' },
+])
+# Complete step 1 → update status to 'completed' before starting step 2
 </example>
 
 ## Security
 
 NEVER hardcode secrets - use process.env with dotenv/config
 
-<example>
-// ✓ CORRECT
+```javascript
 import 'dotenv/config';
 const API_KEY = process.env.LINEAR_API_KEY;
 if (!API_KEY) {
   console.error('LINEAR_API_KEY not set');
   process.exit(1);
 }
+```
 
-// ✗ WRONG
-const API_KEY = 'lin_api_abc123def456';
+<example>
+// BAD — never do this:
+const client = new LinearClient({ apiKey: 'lin_api_abc123xyz' });
+
+// GOOD:
+const apiKey = process.env.LINEAR_API_KEY;
+if (!apiKey) throw new Error('LINEAR_API_KEY not set');
+const client = new LinearClient({ apiKey });
 </example>
 
 Environment sources (check in order):
@@ -154,13 +178,6 @@ Environment sources (check in order):
 4. Process environment
 
 Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
-
-<example>
-# If you see this pattern, STOP and use env vars:
-const token = 'lin_api_...';
-const apiKey = 'sk-...';
-const npmToken = 'npm_...';
-</example>
 
 ## Deploy
 
@@ -188,9 +205,10 @@ Route effort by task complexity — not all code changes deserve equal scrutiny:
 - Config additions (new env var, feature flag)
 
 <example>
-# AUTOMATE tier example:
-User: "Add a new MCP tool for listing frames by tag"
-Action: Add case to server.ts switch, follow existing pattern, lint+test
+# AUTOMATE: adding a new MCP tool that follows the existing switch/case pattern
+case 'get_frame_by_id':
+  return { frame: await frameManager.getById(args.id) };
+# → just add the case, lint, test. No design review needed.
 </example>
 
 **STANDARD** — Normal workflow, lint+test+build:
@@ -199,9 +217,8 @@ Action: Add case to server.ts switch, follow existing pattern, lint+test
 - Integration wiring (adding handler to server.ts dispatch)
 
 <example>
-# STANDARD tier example:
-User: "Fix the digest generation to include frame metadata"
-Action: Modify digest-generator.ts, add tests, lint+test+build, verify output
+# STANDARD: fixing a bug where snapshot list shows stale entries
+# → read the relevant files, understand root cause, fix, lint+test+build
 </example>
 
 **CAREFUL** — Review approach before implementation:
@@ -211,9 +228,10 @@ Action: Modify digest-generator.ts, add tests, lint+test+build, verify output
 - Anything touching error handling chains
 
 <example>
-# CAREFUL tier example:
-User: "Add a new column to frames table for priority scoring"
-Action: Read schema, check migrations, discuss ALTER TABLE vs rebuild, plan rollback
+# CAREFUL: adding a new column to the frames table
+# → read sqlite-adapter.ts and schema_version migration pattern first
+# → plan the migration (increment schema_version, ALTER TABLE or recreate)
+# → confirm approach with user if destructive
 </example>
 
 **ARCHITECT** — Plan mode required, explore existing patterns first:
@@ -222,9 +240,10 @@ Action: Read schema, check migrations, discuss ALTER TABLE vs rebuild, plan roll
 - Breaking changes to MCP protocol or CLI interface
 
 <example>
-# ARCHITECT tier example:
-User: "Integrate Graphiti knowledge graph with existing frame storage"
-Action: EnterPlanMode, explore frame-manager.ts, research Graphiti API, design bridge layer
+# ARCHITECT: replacing LIKE-based search with hybrid FTS5+BM25
+# → enter plan mode, read sqlite-adapter.ts + search-benchmark.test.ts
+# → understand current scoring thresholds, BM25 sign conventions
+# → design schema migration, write plan, get approval before coding
 </example>
 
 **HUMAN** — Explicit user approval before any changes:
@@ -233,9 +252,9 @@ Action: EnterPlanMode, explore frame-manager.ts, research Graphiti API, design b
 - Publishing (npm publish, Railway deploy)
 
 <example>
-# HUMAN tier example:
-User: "Publish v1.3.0 to npm"
-Action: Ask "Ready to publish? This will run npm publish with NPM_TOKEN." Wait for approval.
+# HUMAN: "drop the old digest_cache table and run npm publish"
+# → STOP. Confirm with user: "This will permanently delete digest_cache
+#    and publish to npm. Proceed?" — wait for explicit yes.
 </example>
 
 Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
@@ -250,17 +269,12 @@ Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't unde
 - Ask 1-3 clarifying questions for complex commands (one at a time)
 
 <example>
-# Session start workflow:
-1. Read stackmemory.json for project state
-2. Run: git log --oneline -5
-3. Check git status for uncommitted work
-4. If user mentions Linear task, run: npm run linear:sync
-5. Proceed with user request
-</example>
+# Session start checklist:
+$ git log --oneline -10          # understand recent context
+$ cat stackmemory.json           # check current config/state
+$ cat .env | grep -v '^#'        # verify which API keys are present
 
-<example>
-# Complex command clarification:
-User: "Optimize the search performance"
-Response: "Which search path should I focus on? (1) FTS5 queries, (2) Hybrid search scoring, or (3) Database indexes?"
-# Wait for answer before proceeding
+# After completing a Linear task:
+$ npm run linear:sync            # update issue status in Linear
+$ stackmemory snapshot save      # capture context for next session
 </example>

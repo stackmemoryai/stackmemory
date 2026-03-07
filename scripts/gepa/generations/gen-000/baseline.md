@@ -25,6 +25,10 @@ docs/            # Documentation
 - MCP Server: src/integrations/mcp/server.ts
 - Frame Manager: src/core/context/frame-manager.ts
 - Database: src/core/database/sqlite-adapter.ts
+- Snapshot: src/core/worktree/capture.ts
+- Preflight: src/core/worktree/preflight.ts
+- Conductor: src/cli/commands/orchestrator.ts
+- Shared Utils: src/core/utils/{git,text,fs}.ts
 
 ## Detailed Guides
 
@@ -55,6 +59,10 @@ npm run linear:sync    # Sync with Linear
 # StackMemory CLI
 stackmemory capture    # Save session state for handoff
 stackmemory restore    # Restore from captured state
+stackmemory snapshot save  # Post-run context snapshot (alias: snap)
+stackmemory snapshot list  # List recent snapshots
+stackmemory preflight      # File overlap check for parallel tasks (alias: pf)
+stackmemory conductor start  # Autonomous Linear→worktree→agent orchestrator
 ```
 
 ## Working Directory
