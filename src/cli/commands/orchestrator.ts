@@ -1254,8 +1254,8 @@ export class Conductor {
       tokensPerMin,
       budgetPct5x,
       budgetPct20x,
-      minutesRemaining5x: Math.max(0, minutesRemaining5x),
-      minutesRemaining20x: Math.max(0, minutesRemaining20x),
+      minutesRemaining5x: minutesRemaining5x < 0 ? -1 : minutesRemaining5x,
+      minutesRemaining20x: minutesRemaining20x < 0 ? -1 : minutesRemaining20x,
       perAgent: Array.from(this.usage.perAgent.entries()).map(
         ([id, stats]) => ({
           id,

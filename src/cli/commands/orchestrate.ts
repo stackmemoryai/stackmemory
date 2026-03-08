@@ -77,6 +77,61 @@ export function formatElapsed(ms: number): string {
   return `${days}d ago`;
 }
 
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function budgetBar(pct: number, width = 30): string {
+  const filled = Math.min(Math.round((pct / 100) * width), width);
+  const empty = width - filled;
+  const color = pct >= 75 ? '\x1b[31m' : pct >= 50 ? '\x1b[33m' : '\x1b[32m';
+  const dim = '\x1b[2m';
+  const rst = '\x1b[0m';
+  return `${color}${'█'.repeat(filled)}${dim}${'░'.repeat(empty)}${rst} ${String(pct).padStart(3)}%`;
+}
+
+function fmtMinutes(m: number): string {
+  if (m < 0) return 'N/A';
+  if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`;
+  return `${m}m`;
+}
+
+function printUsageSummary(u: Record<string, unknown>): void {
+  const totalTokens = (u.totalTokens as number) || 0;
+  const inputTokens = (u.inputTokens as number) || 0;
+  const outputTokens = (u.outputTokens as number) || 0;
+  const estMessages = (u.estimatedMessages as number) || 0;
+  const tokensPerMin = (u.tokensPerMin as number) || 0;
+  const budgetPct5x = (u.budgetPct5x as number) || 0;
+  const budgetPct20x = (u.budgetPct20x as number) || 0;
+  const mins5x = (u.minutesRemaining5x as number) ?? -1;
+  const mins20x = (u.minutesRemaining20x as number) ?? -1;
+  const cacheHitRate = (u.cacheHitRate as number) || 0;
+
+  const b = '\x1b[1m';
+  const d = '\x1b[2m';
+  const w = '\x1b[37m';
+  const r = '\x1b[0m';
+
+  console.log(`${b}Token Usage${r}`);
+  console.log(
+    `  Input  ${w}${fmtTokens(inputTokens)}${r}  ${d}|${r}  Output  ${w}${fmtTokens(outputTokens)}${r}  ${d}|${r}  Total  ${w}${fmtTokens(totalTokens)}${r}`
+  );
+  console.log(
+    `  Rate   ${w}${fmtTokens(tokensPerMin)}/min${r}  ${d}|${r}  Messages  ${w}${estMessages}${r}  ${d}|${r}  Cache hit  ${w}${cacheHitRate}%${r}`
+  );
+  console.log('');
+  console.log(`${b}Budget (Max plan, 5h window)${r}`);
+  console.log(
+    `  5x  (225 msgs)  ${budgetBar(budgetPct5x)}  ${d}~${fmtMinutes(mins5x)} left${r}`
+  );
+  console.log(
+    `  20x (900 msgs)  ${budgetBar(budgetPct20x)}  ${d}~${fmtMinutes(mins20x)} left${r}`
+  );
+}
+
 export function createConductorCommands(): Command {
   const cmd = new Command('conductor');
   cmd.description('Conductor — autonomous agent orchestration via Linear');
@@ -485,6 +540,72 @@ export function createConductorCommands(): Command {
         process.on('SIGINT', forward);
         process.on('SIGTERM', forward);
       });
+    });
+
+  // --- usage ---
+  cmd
+    .command('usage')
+    .description('Show token usage, budget, and time-to-exhaustion')
+    .option('--json', 'Output as JSON', false)
+    .option('--scan', 'Scan Claude Code JSONL logs for historical data', false)
+    .action(async (options) => {
+      const statusPath = join(
+        process.cwd(),
+        '.stackmemory',
+        'conductor-status.json'
+      );
+
+      // If --scan, create a Conductor instance and scan JSONL logs
+      if (options.scan) {
+        const conductor = new Conductor({ repoRoot: process.cwd() });
+        await conductor.scanUsageLogs();
+        const summary = conductor.getUsageSummary();
+
+        if (options.json) {
+          console.log(JSON.stringify(summary, null, 2));
+          return;
+        }
+
+        printUsageSummary(summary);
+        return;
+      }
+
+      // Otherwise read from status file
+      if (!existsSync(statusPath)) {
+        console.log(
+          'No conductor-status.json found. Run with --scan to check JSONL logs, or start the conductor first.'
+        );
+        return;
+      }
+
+      try {
+        const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
+        const usage = data.usage || {};
+
+        if (options.json) {
+          console.log(JSON.stringify(usage, null, 2));
+          return;
+        }
+
+        printUsageSummary(usage);
+
+        // Also show rate limit status
+        const rl = data.rateLimit;
+        if (rl) {
+          console.log('');
+          if (rl.inBackoff) {
+            console.log(
+              `Rate limit: \x1b[31mBACKOFF\x1b[0m (${rl.backoffRemainingSec}s remaining, ${rl.totalHits} total hits)`
+            );
+          } else {
+            console.log(
+              `Rate limit: \x1b[32mOK\x1b[0m (${rl.totalHits} total hits)`
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Failed to read status file:', (err as Error).message);
+      }
     });
 
   // --- start ---
