@@ -53,15 +53,17 @@ log_success "Package structure valid"
 
 # Core tests + search benchmark (100-frame smoke)
 log_info "Running tests..."
-# Use JSON reporter to check actual pass/fail (dot reporter counts stderr warnings as "errors")
-TEST_JSON_FILE=$(mktemp)
-npx vitest run --reporter=json --bail=3 --retry 1 > "$TEST_JSON_FILE" 2>/dev/null || true
-TEST_FAILED=$(node -e "try{const j=JSON.parse(require('fs').readFileSync('$TEST_JSON_FILE','utf8'));console.log(j.numFailedTests||0)}catch{console.log(1)}")
-TEST_PASSED=$(node -e "try{const j=JSON.parse(require('fs').readFileSync('$TEST_JSON_FILE','utf8'));console.log(j.numPassedTests||0)}catch{console.log(0)}")
-rm -f "$TEST_JSON_FILE"
+# Run tests and capture exit code (avoid JSON reporter which can be corrupted by CLI hooks)
+TEST_OUTPUT_FILE=$(mktemp)
+npx vitest run --bail=3 --retry 1 > "$TEST_OUTPUT_FILE" 2>&1
+TEST_EXIT=$?
+# Extract pass/fail counts from summary line (e.g. "Tests  1814 passed | 17 skipped (1840)")
+TEST_PASSED=$(grep -oE '[0-9]+ passed' "$TEST_OUTPUT_FILE" | tail -1 | grep -oE '[0-9]+' || echo "0")
+TEST_FAILED=$(grep -oE '[0-9]+ failed' "$TEST_OUTPUT_FILE" | tail -1 | grep -oE '[0-9]+' || echo "0")
+rm -f "$TEST_OUTPUT_FILE"
 echo "  Tests: ${TEST_PASSED} passed, ${TEST_FAILED} failed"
-if [ "$TEST_FAILED" != "0" ] || [ "$TEST_PASSED" = "0" ]; then
-    log_error "Tests failed (${TEST_FAILED} failures)"
+if [ "$TEST_EXIT" -ne 0 ] || [ "$TEST_PASSED" = "0" ]; then
+    log_error "Tests failed (exit code ${TEST_EXIT})"
 fi
 log_success "Tests pass (${TEST_PASSED} tests)"
 
