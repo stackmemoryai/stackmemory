@@ -1027,13 +1027,18 @@ export class Conductor {
         ],
         {
           cwd: run.workspacePath,
-          env: {
-            ...process.env,
-            SYMPHONY_WORKSPACE_DIR: run.workspacePath,
-            SYMPHONY_ISSUE_ID: issue.id,
-            SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
-            SYMPHONY_ATTEMPT: String(run.attempt),
-          },
+          env: (() => {
+            const env = { ...process.env };
+            delete env.CLAUDECODE;
+            delete env.ANTHROPIC_API_KEY;
+            return {
+              ...env,
+              SYMPHONY_WORKSPACE_DIR: run.workspacePath,
+              SYMPHONY_ISSUE_ID: issue.id,
+              SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+              SYMPHONY_ATTEMPT: String(run.attempt),
+            };
+          })(),
           stdio: ['pipe', 'pipe', 'pipe'],
         }
       );
