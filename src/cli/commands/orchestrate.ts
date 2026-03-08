@@ -665,17 +665,26 @@ export function createConductorCommands(): Command {
     .command('monitor')
     .description('Interactive TUI dashboard for conductor monitoring')
     .option('--interval <seconds>', 'Auto-refresh interval in seconds', '10')
+    .option(
+      '--phase <phase>',
+      'Filter by phase (reading, planning, implementing, testing, committing)'
+    )
     .option('--no-interactive', 'Disable interactive keys (CI/pipe mode)')
     .action(async (options) => {
       const interval = parseInt(options.interval, 10) * 1000;
       const interactive = options.interactive !== false;
-      let currentMode: 'dashboard' | 'status' | 'usage' | 'json' = 'dashboard';
+      let currentMode: 'dashboard' | 'status' | 'usage' | 'json' | 'files' =
+        'dashboard';
       let paused = false;
       let refreshInterval = interval;
+      let phaseFilter: string | null = options.phase || null;
 
       const b = '\x1b[1m';
       const d = '\x1b[2m';
       const cyan = '\x1b[36m';
+      const green = '\x1b[32m';
+      const yellow = '\x1b[33m';
+      const red = '\x1b[31m';
       const r = '\x1b[0m';
 
       function readStatuses(): AgentStatusFile[] {
@@ -702,12 +711,17 @@ export function createConductorCommands(): Command {
           (a, b) =>
             new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
         );
+        // Apply phase filter
+        if (phaseFilter) {
+          return statuses.filter((s) => s.phase === phaseFilter);
+        }
         return statuses;
       }
 
       function printStatusTable(statuses: AgentStatusFile[]): void {
         if (statuses.length === 0) {
-          console.log('  No active agents');
+          const filterNote = phaseFilter ? ` (filter: ${phaseFilter})` : '';
+          console.log(`  No active agents${filterNote}`);
           return;
         }
         const header = `${'Issue'.padEnd(12)}${'Phase'.padEnd(16)}${'Tools'.padStart(7)}${'Files'.padStart(7)}${'Tokens'.padStart(9)}   Last Update`;
@@ -716,6 +730,62 @@ export function createConductorCommands(): Command {
           const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
           const line = `${s.issue.padEnd(12)}${s.phase.padEnd(16)}${String(s.toolCalls).padStart(7)}${String(s.filesModified).padStart(7)}${String(s.tokensUsed).padStart(9)}   ${formatElapsed(elapsed)}`;
           console.log(line);
+        }
+      }
+
+      function getWorktreeFiles(workspacePath: string): string[] {
+        if (!workspacePath || !existsSync(workspacePath)) return [];
+        try {
+          const output = execSync('git status --short 2>/dev/null', {
+            cwd: workspacePath,
+            timeout: 5000,
+            encoding: 'utf-8',
+          });
+          return output
+            .trim()
+            .split('\n')
+            .filter((l) => l.length > 0);
+        } catch {
+          return [];
+        }
+      }
+
+      function printFilesView(statuses: AgentStatusFile[]): void {
+        if (statuses.length === 0) {
+          const filterNote = phaseFilter ? ` (filter: ${phaseFilter})` : '';
+          console.log(`  No active agents${filterNote}`);
+          return;
+        }
+        for (const s of statuses) {
+          const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
+          const phaseColor =
+            s.phase === 'committing'
+              ? green
+              : s.phase === 'testing'
+                ? yellow
+                : s.phase === 'implementing'
+                  ? cyan
+                  : '';
+          console.log(
+            `${b}${s.issue}${r}  ${phaseColor}${s.phase}${r}  ${d}${formatElapsed(elapsed)}${r}`
+          );
+
+          const files = getWorktreeFiles(s.workspacePath || '');
+          if (files.length === 0) {
+            console.log(`  ${d}(no file changes detected)${r}`);
+          } else {
+            for (const f of files) {
+              const status = f.substring(0, 2);
+              const path = f.substring(3);
+              let color = '';
+              if (status.includes('M')) color = yellow;
+              else if (status.includes('A') || status.includes('?'))
+                color = green;
+              else if (status.includes('D')) color = red;
+              console.log(`  ${color}${status}${r} ${path}`);
+            }
+          }
+          console.log('');
         }
       }
 
@@ -740,11 +810,15 @@ export function createConductorCommands(): Command {
         console.log(
           `  Mode: ${cyan}${currentMode}${r}  |  Refresh: ${intervalSec}s`
         );
+        const filterNote = phaseFilter
+          ? `  Filter: ${cyan}${phaseFilter}${r}`
+          : '';
         if (interactive) {
           console.log(
-            `  ${d}[s]tatus [u]sage [d]ashboard [j]son [l]ogs [r]efresh [p]ause [+/-] [q]uit${r}`
+            `  ${d}[s]tatus [u]sage [f]iles [d]ashboard [j]son [l]ogs [r]efresh [p]ause [1-5]phase [0]clear [+/-] [q]uit${r}`
           );
         }
+        if (filterNote) console.log(filterNote);
         console.log(
           `${b}══════════════════════════════════════════════════${r}`
         );
@@ -773,6 +847,9 @@ export function createConductorCommands(): Command {
             console.log(JSON.stringify(usage, null, 2));
             break;
           }
+          case 'files':
+            printFilesView(statuses);
+            break;
         }
 
         console.log('');
@@ -835,8 +912,36 @@ export function createConductorCommands(): Command {
             currentMode = 'dashboard';
             await render();
             break;
+          case 'f':
+            currentMode = 'files';
+            await render();
+            break;
           case 'j':
             currentMode = 'json';
+            await render();
+            break;
+          case '1':
+            phaseFilter = 'reading';
+            await render();
+            break;
+          case '2':
+            phaseFilter = 'planning';
+            await render();
+            break;
+          case '3':
+            phaseFilter = 'implementing';
+            await render();
+            break;
+          case '4':
+            phaseFilter = 'testing';
+            await render();
+            break;
+          case '5':
+            phaseFilter = 'committing';
+            await render();
+            break;
+          case '0':
+            phaseFilter = null;
             await render();
             break;
           case 'l': {

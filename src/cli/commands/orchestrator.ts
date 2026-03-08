@@ -158,6 +158,7 @@ export interface AgentStatusFile {
   filesModified: number;
   toolCalls: number;
   tokensUsed: number;
+  workspacePath?: string;
 }
 
 // ── Helpers ──
@@ -650,6 +651,7 @@ export class Conductor {
         filesModified: run.filesModified,
         toolCalls: run.toolCalls,
         tokensUsed: run.tokensUsed,
+        workspacePath: run.workspacePath || undefined,
       };
       writeFileSync(join(dir, 'status.json'), JSON.stringify(status, null, 2));
     } catch {
