@@ -179,9 +179,12 @@ function runClaudeStreaming(prompt, cwd, turnId) {
       prompt,
     ];
 
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+    delete env.ANTHROPIC_API_KEY;
     const claude = spawn('claude', args, {
       cwd,
-      env: { ...process.env },
+      env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -306,9 +309,12 @@ function processStreamEvent(event, turnId) {
  */
 function runClaudePrint(prompt, cwd) {
   return new Promise((resolve, reject) => {
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+    delete env.ANTHROPIC_API_KEY;
     const claude = spawn('claude', ['--print', prompt], {
       cwd,
-      env: { ...process.env },
+      env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

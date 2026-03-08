@@ -36,6 +36,8 @@ import { extractKeywords } from '../../core/utils/text.js';
 
 // ── Types ──
 
+export type AgentMode = 'adapter' | 'cli';
+
 export interface ConductorConfig {
   /** Linear team ID or key */
   teamId?: string;
@@ -67,6 +69,8 @@ export interface ConductorConfig {
   maxRetries: number;
   /** Hook timeout in ms (default: 60000) */
   hookTimeoutMs: number;
+  /** Agent execution mode: 'adapter' (JSON-RPC via app-server) or 'cli' (direct claude -p) */
+  agentMode: AgentMode;
 }
 
 export interface RunningIssue {
@@ -182,7 +186,56 @@ class TeeTransform extends Transform {
 }
 
 /**
- * Infer agent phase from JSON-RPC messages and tool names.
+ * Infer agent phase from Claude Code stream-json events (cli mode).
+ */
+function inferPhaseFromStreamJson(
+  event: Record<string, unknown>
+): AgentPhase | null {
+  if (event.type !== 'assistant') return null;
+
+  const message = event.message as Record<string, unknown> | undefined;
+  const content = (message?.content || []) as Array<Record<string, unknown>>;
+
+  for (const block of content) {
+    if (block.type !== 'tool_use') continue;
+    const toolLower = ((block.name || '') as string).toLowerCase();
+
+    if (
+      toolLower.includes('read') ||
+      toolLower.includes('glob') ||
+      toolLower.includes('grep') ||
+      toolLower.includes('search')
+    ) {
+      return 'reading';
+    }
+    if (toolLower.includes('todowrite') || toolLower.includes('todo')) {
+      return 'planning';
+    }
+    if (
+      toolLower.includes('edit') ||
+      toolLower.includes('write') ||
+      toolLower.includes('bash')
+    ) {
+      // Check if this is a git commit bash command
+      if (toolLower === 'bash') {
+        const input = block.input as Record<string, unknown> | undefined;
+        const command = ((input?.command ?? '') as string).toLowerCase();
+        if (command.includes('git commit') || command.includes('git add')) {
+          return 'committing';
+        }
+      }
+      return 'implementing';
+    }
+    if (toolLower.includes('test')) {
+      return 'testing';
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Infer agent phase from JSON-RPC messages and tool names (adapter mode).
  */
 function inferPhase(msg: Record<string, unknown>): AgentPhase | null {
   const method = msg.method as string | undefined;
@@ -215,9 +268,10 @@ function inferPhase(msg: Record<string, unknown>): AgentPhase | null {
     }
   }
 
-  // Detect git commit operations
+  // Detect git commit operations (command is nested under params.arguments)
   if (method === 'item/commandExecution/started') {
-    const command = (params?.command || '') as string;
+    const args = params?.arguments as Record<string, unknown> | undefined;
+    const command = ((args?.command ?? params?.command) || '') as string;
     if (command.includes('git commit') || command.includes('git add')) {
       return 'committing';
     }
@@ -247,6 +301,7 @@ const DEFAULT_CONFIG: ConductorConfig = {
   turnTimeoutMs: 3600000,
   maxRetries: 1,
   hookTimeoutMs: 60000,
+  agentMode: 'cli',
 };
 
 // ── Orchestrator ──
@@ -924,15 +979,215 @@ export class Conductor {
 
   // ── Agent Execution ──
 
-  private runAgent(issue: LinearIssue, run: RunningIssue): Promise<void> {
+  private async runAgent(issue: LinearIssue, run: RunningIssue): Promise<void> {
+    if (this.config.agentMode === 'cli') {
+      try {
+        return await this.runAgentCLI(issue, run);
+      } catch (err) {
+        const msg = (err as Error).message || '';
+        // Fallback to adapter mode on rate limit or session quota errors
+        if (
+          msg.includes('usage limits') ||
+          msg.includes('rate_limit') ||
+          msg.includes('overloaded')
+        ) {
+          logger.warn('CLI mode hit limits, falling back to adapter', {
+            identifier: issue.identifier,
+            error: msg.slice(0, 200),
+          });
+          // Reset observability counters for retry
+          run.toolCalls = 0;
+          run.filesModified = 0;
+          run.tokensUsed = 0;
+          run.phase = 'reading';
+          return this.runAgentAdapter(issue, run);
+        }
+        throw err;
+      }
+    }
+    return this.runAgentAdapter(issue, run);
+  }
+
+  /**
+   * CLI mode: spawn `claude -p --output-format stream-json` directly.
+   * Uses whatever auth the environment provides (session quota, API key, etc).
+   */
+  private runAgentCLI(issue: LinearIssue, run: RunningIssue): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const prompt = this.buildPrompt(issue, run.attempt);
+
+      const proc = spawn(
+        'claude',
+        [
+          '-p',
+          '--output-format',
+          'stream-json',
+          '--dangerously-skip-permissions',
+          prompt,
+        ],
+        {
+          cwd: run.workspacePath,
+          env: {
+            ...process.env,
+            SYMPHONY_WORKSPACE_DIR: run.workspacePath,
+            SYMPHONY_ISSUE_ID: issue.id,
+            SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+            SYMPHONY_ATTEMPT: String(run.attempt),
+          },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }
+      );
+
+      run.process = proc;
+
+      const logStream = this.openAgentLogStream(issue.identifier);
+      run.logStream = logStream;
+      const tee = new TeeTransform(logStream);
+      proc.stdout.pipe(tee);
+
+      this.writeAgentStatus(issue.identifier, run);
+
+      let stderr = '';
+      let lastResultText = '';
+
+      const timer = setTimeout(() => {
+        logger.warn('Agent turn timeout (cli)', {
+          identifier: issue.identifier,
+          timeoutMs: this.config.turnTimeoutMs,
+        });
+        proc.kill('SIGTERM');
+        reject(new Error(`Agent timeout after ${this.config.turnTimeoutMs}ms`));
+      }, this.config.turnTimeoutMs);
+
+      let lineBuffer = '';
+      tee.on('data', (chunk: Buffer) => {
+        lineBuffer += chunk.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line) as Record<string, unknown>;
+
+            // Phase tracking from stream-json events
+            const phase = inferPhaseFromStreamJson(event);
+            if (phase) {
+              run.phase = phase;
+            }
+
+            // Count tool uses from assistant messages
+            if (event.type === 'assistant') {
+              const message = event.message as
+                | Record<string, unknown>
+                | undefined;
+              const content = (message?.content || []) as Array<
+                Record<string, unknown>
+              >;
+              for (const block of content) {
+                if (block.type === 'tool_use') {
+                  run.toolCalls++;
+                  const toolLower = (
+                    (block.name || '') as string
+                  ).toLowerCase();
+                  if (
+                    toolLower.includes('edit') ||
+                    toolLower.includes('write')
+                  ) {
+                    run.filesModified++;
+                  }
+                }
+                if (block.type === 'text' && block.text) {
+                  run.tokensUsed += Math.ceil(
+                    (block.text as string).length / 4
+                  );
+                }
+              }
+            }
+
+            // Capture final result
+            if (event.type === 'result' && event.result) {
+              lastResultText =
+                typeof event.result === 'string'
+                  ? event.result
+                  : JSON.stringify(event.result);
+            }
+
+            // Periodic status updates
+            if (run.toolCalls % 5 === 0 || phase) {
+              this.writeAgentStatus(issue.identifier, run);
+            }
+          } catch {
+            // non-JSON line, ignore
+          }
+        }
+      });
+
+      proc.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+        const lines = data
+          .toString()
+          .split('\n')
+          .filter((l: string) => l.trim());
+        for (const line of lines) {
+          logger.debug(`[${issue.identifier}] ${line}`);
+        }
+      });
+
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        reject(new Error(`Failed to spawn claude: ${err.message}`));
+      });
+
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        run.process = null;
+
+        if (run.logStream && !run.logStream.destroyed) {
+          run.logStream.end();
+        }
+
+        this.writeAgentStatus(issue.identifier, run);
+
+        if (code === 0) {
+          logger.info('Agent completed (cli)', {
+            identifier: issue.identifier,
+            toolCalls: run.toolCalls,
+            resultLength: lastResultText.length,
+          });
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `Claude exited with code ${code}: ${stderr.slice(0, 500)}`
+            )
+          );
+        }
+      });
+    });
+  }
+
+  /**
+   * Adapter mode: spawn claude-app-server.cjs via JSON-RPC protocol.
+   * Uses ANTHROPIC_API_KEY for auth.
+   */
+  private runAgentAdapter(
+    issue: LinearIssue,
+    run: RunningIssue
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const prompt = this.buildPrompt(issue, run.attempt);
 
       // Spawn claude-app-server via JSON-RPC protocol
+      // Remove CLAUDECODE to prevent nested-session detection
+      // Remove ANTHROPIC_API_KEY to use subscription auth (avoids API rate limits)
+      const env = { ...process.env };
+      delete env.CLAUDECODE;
+      delete env.ANTHROPIC_API_KEY;
       const proc = spawn('node', [this.config.appServerPath], {
         cwd: run.workspacePath,
         env: {
-          ...process.env,
+          ...env,
           SYMPHONY_WORKSPACE_DIR: run.workspacePath,
           SYMPHONY_ISSUE_ID: issue.id,
           SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,

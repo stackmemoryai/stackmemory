@@ -514,6 +514,11 @@ export function createConductorCommands(): Command {
     .option('--branch <name>', 'Base branch for worktrees', 'main')
     .option('--retries <n>', 'Max retries per issue', '1')
     .option('--turn-timeout <ms>', 'Agent turn timeout in ms', '3600000')
+    .option(
+      '--mode <mode>',
+      'Agent mode: "cli" (claude -p, session auth) or "adapter" (JSON-RPC, API key)',
+      'cli'
+    )
     .action(async (options) => {
       const conductor = new Conductor({
         teamId: options.team,
@@ -528,6 +533,7 @@ export function createConductorCommands(): Command {
         baseBranch: options.branch,
         maxRetries: parseInt(options.retries, 10),
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
+        agentMode: options.mode === 'adapter' ? 'adapter' : 'cli',
       });
 
       await conductor.start();
