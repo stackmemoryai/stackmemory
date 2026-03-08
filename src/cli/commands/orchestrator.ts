@@ -14,11 +14,14 @@ import {
   mkdirSync,
   rmSync,
   writeFileSync,
+  readdirSync,
   createWriteStream,
   type WriteStream,
 } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir, homedir } from 'os';
+import { createReadStream } from 'fs';
+import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { Transform, type TransformCallback } from 'stream';
 import { logger } from '../../core/monitoring/logger.js';
@@ -105,6 +108,38 @@ export interface ConductorStats {
     attempt: number;
     runtime: number;
   }>;
+  rateLimit: RateLimitState;
+  usage: UsageStats;
+}
+
+/** Tracks global rate limit state across all agents */
+export interface RateLimitState {
+  /** Whether the conductor is currently in backoff */
+  inBackoff: boolean;
+  /** When the backoff expires (epoch ms), 0 if not in backoff */
+  backoffUntil: number;
+  /** Number of 429s seen this session */
+  totalHits: number;
+  /** Current backoff multiplier (doubles each consecutive hit) */
+  consecutiveHits: number;
+  /** Last 429 timestamp */
+  lastHitAt: number;
+}
+
+/** Aggregated token usage from Claude Code JSONL logs */
+export interface UsageStats {
+  /** Total input tokens across all agents this session */
+  inputTokens: number;
+  /** Total output tokens across all agents this session */
+  outputTokens: number;
+  /** Total cache creation tokens */
+  cacheCreationTokens: number;
+  /** Total cache read tokens */
+  cacheReadTokens: number;
+  /** Estimated messages used (token-weighted: ~10k tokens ≈ 1 message) */
+  estimatedMessages: number;
+  /** Per-agent breakdown */
+  perAgent: Map<string, { inputTokens: number; outputTokens: number }>;
 }
 
 export type AgentPhase =
@@ -288,7 +323,7 @@ const DEFAULT_CONFIG: ConductorConfig = {
   inProgressState: 'In Progress',
   inReviewState: 'In Review',
   pollIntervalMs: 30000,
-  maxConcurrent: 3,
+  maxConcurrent: 5,
   workspaceRoot: join(tmpdir(), 'conductor_workspaces'),
   repoRoot: process.cwd(),
   baseBranch: 'main',
@@ -321,6 +356,25 @@ export class Conductor {
   private stateCache: Map<string, { id: string; name: string }> = new Map();
   private activeStatesLower: string[];
   private terminalStatesLower: string[];
+
+  /** Global rate limit backoff state */
+  private rateLimit: RateLimitState = {
+    inBackoff: false,
+    backoffUntil: 0,
+    totalHits: 0,
+    consecutiveHits: 0,
+    lastHitAt: 0,
+  };
+
+  /** Aggregated usage stats */
+  private usage: UsageStats = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    estimatedMessages: 0,
+    perAgent: new Map(),
+  };
 
   constructor(config: Partial<ConductorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -493,6 +547,8 @@ export class Conductor {
       totalAttempts: this.totalAttempts,
       uptime: Date.now() - this.startedAt,
       issues,
+      rateLimit: { ...this.rateLimit },
+      usage: { ...this.usage, perAgent: new Map(this.usage.perAgent) },
     };
   }
 
@@ -526,6 +582,32 @@ export class Conductor {
       totalAttempts: this.totalAttempts,
       maxConcurrent: this.config.maxConcurrent,
       stopping: this.stopping,
+      rateLimit: {
+        inBackoff: this.rateLimit.inBackoff,
+        backoffUntil: this.rateLimit.backoffUntil,
+        backoffRemainingSec: this.rateLimit.inBackoff
+          ? Math.max(
+              0,
+              Math.ceil((this.rateLimit.backoffUntil - Date.now()) / 1000)
+            )
+          : 0,
+        totalHits: this.rateLimit.totalHits,
+      },
+      usage: (() => {
+        const summary = this.getUsageSummary();
+        return {
+          inputTokens: summary.inputTokens,
+          outputTokens: summary.outputTokens,
+          totalTokens: summary.totalTokens,
+          estimatedMessages: summary.estimatedMessages,
+          tokensPerMin: summary.tokensPerMin,
+          budgetPct5x: summary.budgetPct5x,
+          budgetPct20x: summary.budgetPct20x,
+          minutesRemaining5x: summary.minutesRemaining5x,
+          minutesRemaining20x: summary.minutesRemaining20x,
+          cacheHitRate: summary.cacheHitRate,
+        };
+      })(),
     };
 
     try {
@@ -605,6 +687,24 @@ export class Conductor {
   private async poll(): Promise<void> {
     if (!this.client || this.stopping) return;
 
+    // Check rate limit backoff
+    if (this.rateLimit.inBackoff) {
+      const remaining = this.rateLimit.backoffUntil - Date.now();
+      if (remaining > 0) {
+        logger.info('Rate limit backoff active, skipping poll', {
+          remainingMs: remaining,
+          remainingSec: Math.ceil(remaining / 1000),
+          totalHits: this.rateLimit.totalHits,
+        });
+        return;
+      }
+      // Backoff expired — reset
+      this.rateLimit.inBackoff = false;
+      this.rateLimit.backoffUntil = 0;
+      logger.info('Rate limit backoff expired, resuming dispatch');
+      console.log('[rate-limit] Backoff expired, resuming dispatch');
+    }
+
     // Reconcile: check if any running issues moved to terminal states
     await this.reconcile();
 
@@ -636,6 +736,33 @@ export class Conductor {
 
     // Pre-flight: check file overlap between candidates + already running issues
     const toDispatch = this.preflightFilter(sorted);
+
+    // Log usage summary every poll cycle when there's activity
+    if (this.usage.inputTokens > 0) {
+      const summary = this.getUsageSummary();
+      logger.info('Usage summary', {
+        totalTokens: summary.totalTokens,
+        estimatedMessages: summary.estimatedMessages,
+        tokensPerMin: summary.tokensPerMin,
+        budgetPct5x: `${summary.budgetPct5x}%`,
+        budgetPct20x: `${summary.budgetPct20x}%`,
+        minutesRemaining5x: summary.minutesRemaining5x,
+        minutesRemaining20x: summary.minutesRemaining20x,
+        rateLimitHits: this.rateLimit.totalHits,
+      });
+
+      // Warn at 75% budget
+      if (summary.budgetPct5x >= 75 && summary.budgetPct5x < 100) {
+        console.log(
+          `[usage] ⚠ ${summary.budgetPct5x}% of Max 5x budget used — ~${summary.minutesRemaining5x}min remaining at ${summary.tokensPerMin} tok/min`
+        );
+      }
+      if (summary.budgetPct5x >= 100) {
+        console.log(
+          `[usage] 🛑 Max 5x budget likely exhausted (${summary.estimatedMessages} est. messages / 225 limit). Expect 429s.`
+        );
+      }
+    }
 
     logger.info('Dispatching issues', {
       count: toDispatch.length,
@@ -852,6 +979,11 @@ export class Conductor {
           attempt: run.attempt,
         });
 
+        // Check for rate limit — if so, don't retry, let global backoff handle it
+        if (this.handleRateLimitError(run.error, issue.identifier)) {
+          throw err;
+        }
+
         // Run after_run hook even on failure
         if (run.workspacePath) {
           await this.runHook(
@@ -879,6 +1011,258 @@ export class Conductor {
         }
       }
     }
+  }
+
+  // ── Rate Limit Detection ──
+
+  /**
+   * Check if an error indicates a rate limit (429) or usage cap.
+   * Triggers global backoff so no new agents are dispatched.
+   *
+   * Claude Max limits (approximate, shared between claude.ai + Claude Code):
+   * - Max 5x: ~225 messages per 5h window
+   * - Max 20x: ~900 messages per 5h window
+   * Messages are token-weighted: heavy agent usage ≈ 5-10x a casual message.
+   */
+  private handleRateLimitError(error: string, identifier: string): boolean {
+    const rateLimitPatterns = [
+      'usage limits',
+      'rate_limit',
+      'rate limit',
+      'overloaded',
+      '429',
+      'too many requests',
+      'quota exceeded',
+      'capacity',
+    ];
+
+    const isRateLimit = rateLimitPatterns.some((p) =>
+      error.toLowerCase().includes(p)
+    );
+
+    if (!isRateLimit) return false;
+
+    this.rateLimit.totalHits++;
+    this.rateLimit.lastHitAt = Date.now();
+
+    // Check if this is a consecutive hit (within 10 min of last)
+    const timeSinceLast = Date.now() - this.rateLimit.lastHitAt;
+    if (timeSinceLast < 600000) {
+      this.rateLimit.consecutiveHits++;
+    } else {
+      this.rateLimit.consecutiveHits = 1;
+    }
+
+    // Exponential backoff: 60s, 120s, 240s, 480s, max 900s (15min)
+    const backoffSec = Math.min(
+      60 * Math.pow(2, this.rateLimit.consecutiveHits - 1),
+      900
+    );
+    this.rateLimit.inBackoff = true;
+    this.rateLimit.backoffUntil = Date.now() + backoffSec * 1000;
+
+    logger.warn('Rate limit hit — global backoff', {
+      identifier,
+      backoffSec,
+      consecutiveHits: this.rateLimit.consecutiveHits,
+      totalHits: this.rateLimit.totalHits,
+      error: error.slice(0, 200),
+    });
+
+    console.log(
+      `[rate-limit] Hit rate limit on ${identifier} — backing off ${backoffSec}s (hit #${this.rateLimit.totalHits})`
+    );
+
+    return true;
+  }
+
+  // ── Usage Tracking ──
+
+  /**
+   * Track token usage from a stream-json event (CLI mode) or JSON-RPC message (adapter mode).
+   * Updates both global and per-agent counters.
+   */
+  private trackUsage(
+    identifier: string,
+    usage: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    }
+  ): void {
+    const input = usage.input_tokens || 0;
+    const output = usage.output_tokens || 0;
+    const cacheCreate = usage.cache_creation_input_tokens || 0;
+    const cacheRead = usage.cache_read_input_tokens || 0;
+
+    this.usage.inputTokens += input;
+    this.usage.outputTokens += output;
+    this.usage.cacheCreationTokens += cacheCreate;
+    this.usage.cacheReadTokens += cacheRead;
+
+    // Token-weighted message estimate: ~10k total tokens ≈ 1 "message"
+    this.usage.estimatedMessages = Math.ceil(
+      (this.usage.inputTokens + this.usage.outputTokens) / 10000
+    );
+
+    // Per-agent tracking
+    const agent = this.usage.perAgent.get(identifier) || {
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+    agent.inputTokens += input;
+    agent.outputTokens += output;
+    this.usage.perAgent.set(identifier, agent);
+  }
+
+  /**
+   * Scan Claude Code JSONL logs for token usage from conductor-spawned sessions.
+   * Reads logs from ~/.claude/projects/ matching conductor workspace paths.
+   */
+  async scanUsageLogs(): Promise<UsageStats> {
+    // Check both legacy and new Claude Code log paths
+    const logDirs = [
+      join(homedir(), '.claude', 'projects'),
+      join(homedir(), '.config', 'claude', 'projects'),
+    ];
+
+    for (const logDir of logDirs) {
+      if (!existsSync(logDir)) continue;
+
+      try {
+        const entries = readdirSync(logDir);
+        // Conductor workspaces have paths like /tmp/conductor_workspaces/STA-123
+        // which map to project dirs like -private-tmp-conductor_workspaces-STA-123
+        const conductorDirs = entries.filter(
+          (e) => e.includes('conductor_workspaces') || e.includes('conductor-')
+        );
+
+        for (const dir of conductorDirs) {
+          const projectDir = join(logDir, dir);
+          if (!existsSync(projectDir)) continue;
+
+          const jsonlFiles = readdirSync(projectDir).filter((f) =>
+            f.endsWith('.jsonl')
+          );
+
+          for (const file of jsonlFiles) {
+            await this.parseUsageFromJsonl(join(projectDir, file));
+          }
+        }
+      } catch (err) {
+        logger.debug('Usage log scan failed', {
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    return this.usage;
+  }
+
+  private async parseUsageFromJsonl(filePath: string): Promise<void> {
+    try {
+      const rl = createInterface({
+        input: createReadStream(filePath),
+        crlfDelay: Infinity,
+      });
+
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type === 'assistant' && entry.message?.usage) {
+            const usage = entry.message.usage;
+            const identifier = entry.sessionId?.slice(0, 8) || 'unknown';
+            this.trackUsage(identifier, usage);
+          }
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    } catch {
+      // File read error — non-fatal
+    }
+  }
+
+  /**
+   * Get current usage summary with time-to-exhaustion estimate.
+   *
+   * Claude Max limits (approximate, shared between claude.ai + Claude Code):
+   * - Max 5x:  ~225 messages per 5h window (~10k tokens per "message")
+   * - Max 20x: ~900 messages per 5h window
+   *
+   * Heavy agent usage burns 5-10x faster than casual chat.
+   */
+  getUsageSummary(): {
+    totalTokens: number;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedMessages: number;
+    cacheHitRate: number;
+    /** Tokens consumed per minute (rolling average) */
+    tokensPerMin: number;
+    /** Estimated % of 5h window budget consumed (assumes Max 5x / 225 msgs) */
+    budgetPct5x: number;
+    /** Estimated % of 5h window budget consumed (assumes Max 20x / 900 msgs) */
+    budgetPct20x: number;
+    /** Estimated minutes until Max 5x budget exhaustion at current rate */
+    minutesRemaining5x: number;
+    /** Estimated minutes until Max 20x budget exhaustion at current rate */
+    minutesRemaining20x: number;
+    perAgent: Array<{
+      id: string;
+      inputTokens: number;
+      outputTokens: number;
+    }>;
+  } {
+    const totalCache =
+      this.usage.cacheCreationTokens + this.usage.cacheReadTokens;
+    const cacheHitRate =
+      totalCache > 0 ? this.usage.cacheReadTokens / totalCache : 0;
+
+    const uptimeMin = Math.max(1, (Date.now() - this.startedAt) / 60000);
+    const totalTokens = this.usage.inputTokens + this.usage.outputTokens;
+    const tokensPerMin = Math.round(totalTokens / uptimeMin);
+    const estMessages = this.usage.estimatedMessages;
+
+    // Budget calculations (messages per 5h window)
+    const MAX_5X_MESSAGES = 225;
+    const MAX_20X_MESSAGES = 900;
+
+    const budgetPct5x = Math.round((estMessages / MAX_5X_MESSAGES) * 100);
+    const budgetPct20x = Math.round((estMessages / MAX_20X_MESSAGES) * 100);
+
+    // Time-to-exhaustion: messages remaining / messages per minute
+    const msgsPerMin = tokensPerMin > 0 ? tokensPerMin / 10000 : 0;
+    // -1 means "cannot estimate" (no data yet)
+    const minutesRemaining5x =
+      msgsPerMin > 0
+        ? Math.round((MAX_5X_MESSAGES - estMessages) / msgsPerMin)
+        : -1;
+    const minutesRemaining20x =
+      msgsPerMin > 0
+        ? Math.round((MAX_20X_MESSAGES - estMessages) / msgsPerMin)
+        : -1;
+
+    return {
+      totalTokens,
+      inputTokens: this.usage.inputTokens,
+      outputTokens: this.usage.outputTokens,
+      estimatedMessages: estMessages,
+      cacheHitRate: Math.round(cacheHitRate * 100),
+      tokensPerMin,
+      budgetPct5x,
+      budgetPct20x,
+      minutesRemaining5x: Math.max(0, minutesRemaining5x),
+      minutesRemaining20x: Math.max(0, minutesRemaining20x),
+      perAgent: Array.from(this.usage.perAgent.entries()).map(
+        ([id, stats]) => ({
+          id,
+          ...stats,
+        })
+      ),
+    };
   }
 
   // ── Workspace Management ──
@@ -977,6 +1361,22 @@ export class Conductor {
     return identifier.replace(/[^A-Za-z0-9._-]/g, '_');
   }
 
+  /**
+   * Find the real claude binary, skipping shell wrappers (cmux, claude-smd).
+   * Wrappers inject --settings with hooks that block headless -p mode.
+   */
+  private findClaudeBinary(): string {
+    const candidates = [
+      join(homedir(), '.local', 'bin', 'claude'),
+      '/usr/local/bin/claude',
+      '/opt/homebrew/bin/claude',
+    ];
+    for (const c of candidates) {
+      if (existsSync(c)) return c;
+    }
+    return 'claude'; // fallback to PATH
+  }
+
   // ── Agent Execution ──
 
   private async runAgent(issue: LinearIssue, run: RunningIssue): Promise<void> {
@@ -985,17 +1385,19 @@ export class Conductor {
         return await this.runAgentCLI(issue, run);
       } catch (err) {
         const msg = (err as Error).message || '';
-        // Fallback to adapter mode on rate limit or session quota errors
-        if (
-          msg.includes('usage limits') ||
-          msg.includes('rate_limit') ||
-          msg.includes('overloaded')
-        ) {
+
+        // Check for rate limit — triggers global backoff
+        if (this.handleRateLimitError(msg, issue.identifier)) {
+          // Don't fallback to adapter — it'll hit the same limit
+          throw err;
+        }
+
+        // Fallback to adapter mode on non-rate-limit session errors
+        if (msg.includes('usage limits') || msg.includes('overloaded')) {
           logger.warn('CLI mode hit limits, falling back to adapter', {
             identifier: issue.identifier,
             error: msg.slice(0, 200),
           });
-          // Reset observability counters for retry
           run.toolCalls = 0;
           run.filesModified = 0;
           run.tokensUsed = 0;
@@ -1016,13 +1418,17 @@ export class Conductor {
     return new Promise((resolve, reject) => {
       const prompt = this.buildPrompt(issue, run.attempt);
 
+      // Use the real claude binary, not cmux wrapper that injects hooks
+      const claudeBin = this.findClaudeBinary();
       const proc = spawn(
-        'claude',
+        claudeBin,
         [
           '-p',
           '--output-format',
           'stream-json',
           '--dangerously-skip-permissions',
+          '--settings',
+          '{"hooks":{}}',
           prompt,
         ],
         {
@@ -1044,6 +1450,7 @@ export class Conductor {
       );
 
       run.process = proc;
+      proc.stdin.end(); // Close stdin — claude -p takes prompt as arg, not stdin
 
       const logStream = this.openAgentLogStream(issue.identifier);
       run.logStream = logStream;
@@ -1086,6 +1493,15 @@ export class Conductor {
               const message = event.message as
                 | Record<string, unknown>
                 | undefined;
+
+              // Track real token usage if present
+              const msgUsage = message?.usage as
+                | Record<string, number>
+                | undefined;
+              if (msgUsage) {
+                this.trackUsage(issue.identifier, msgUsage);
+              }
+
               const content = (message?.content || []) as Array<
                 Record<string, unknown>
               >;
