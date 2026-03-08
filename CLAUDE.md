@@ -87,6 +87,12 @@ Test coverage:
 
 Never: Assume success | Skip testing | Use mock data as fallback
 
+Testing rules:
+- Run `npm run test:run` via subagent or background task — never inline (blocks context)
+- ESLint: use `catch {}` not `catch (_err) {}` (lint rule)
+- `vi.clearAllMocks()` resets `mockReturnValue` — re-set mocks in `beforeEach`
+- Pre-commit hook runs: lint + parallel vitest + build — fix issues before commit, never skip
+
 ## Git Rules (CRITICAL)
 
 - NEVER use `--no-verify` on git push or commit
@@ -170,6 +176,13 @@ Route effort by task complexity — not all code changes deserve equal scrutiny:
 - Publishing (npm publish, Railway deploy)
 
 Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
+
+## Session Budget
+
+- Max 1 major topic per session — split unrelated work into separate sessions
+- Run /compact or summarize at ~50% context usage to avoid overflow
+- Plan-execute sessions (low interaction, high edits) are most efficient
+- Avoid exploratory marathons with topic-switching — burns 30-40% extra tokens
 
 ## Workflow
 

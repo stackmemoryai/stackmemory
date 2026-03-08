@@ -6,49 +6,49 @@
       "taskId": "eval-001",
       "taskName": "simple_function",
       "weight": 1,
-      "passed": true,
-      "passRate": 0.6666666666666666,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "has_function": {
-          "passed": true,
-          "reason": "A real, working function named isPalindrome is defined with proper TypeScript syntax and implementation"
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "handles_edge_cases": {
-          "passed": true,
-          "reason": "The function handles edge cases by converting to lowercase, removing non-alphanumeric characters, and comparing cleaned strings - this covers spaces, punctuation, and case sensitivity"
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "is_tested": {
           "passed": false,
-          "reason": "No test cases or assertions are provided; the output contains only the function definition without any testing code"
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 8230,
-      "output": "```typescript\nfunction isPalindrome(s: string): boolean {\n  const cleaned = s.toLowerCase().replace(/[^a-z0-9]/g, '');\n  return cleaned === cleaned.split('').reverse().join('');\n}\n```\n"
+      "judgeMode": "regex",
+      "duration": 6236,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHFLVHf4LRx9owtsUat\"}\n"
     },
     {
       "taskId": "eval-002",
       "taskName": "refactor_code",
       "weight": 1.5,
       "passed": false,
-      "passRate": 0,
+      "passRate": 0.3333333333333333,
       "criteria": {
         "uses_async": {
           "passed": false,
-          "reason": "No async/await code is present in the output. The AI only requested the input code without providing any refactored solution."
+          "reason": "regex heuristic"
         },
         "preserves_behavior": {
           "passed": false,
-          "reason": "No refactored code was provided, so behavior cannot be preserved or verified."
+          "reason": "regex heuristic"
         },
         "no_nested_callbacks": {
-          "passed": false,
-          "reason": "No code transformation was performed. The output contains no callbacks or async/await implementation to evaluate."
+          "passed": true,
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 9716,
-      "output": "Please share the code you'd like me to refactor.\n"
+      "judgeMode": "regex",
+      "duration": 5342,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHFn1T5TkkCFboDp1aH\"}\n"
     },
     {
       "taskId": "eval-003",
@@ -59,20 +59,20 @@
       "criteria": {
         "bug_fixed": {
           "passed": false,
-          "reason": "No code was provided to fix, so no bug was actually corrected. The AI only requested the code instead of fixing anything."
+          "reason": "regex heuristic"
         },
         "no_new_bugs": {
           "passed": false,
-          "reason": "Cannot evaluate since no code fix was attempted or provided."
+          "reason": "regex heuristic"
         },
         "explains_fix": {
           "passed": false,
-          "reason": "No explanation of any fix was provided. The AI only asked for the missing code to be shared."
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 8553,
-      "output": "I don't see any code or file provided. Could you share the code with the off-by-one error you'd like me to fix?\n"
+      "judgeMode": "regex",
+      "duration": 4389,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHGFTCjb8PsbsYzRS1W\"}\n"
     },
     {
       "taskId": "eval-004",
@@ -83,24 +83,24 @@
       "criteria": {
         "has_pagination": {
           "passed": false,
-          "reason": "No pagination implementation provided. The AI only asked a clarifying question without delivering any code."
+          "reason": "regex heuristic"
         },
         "has_limit": {
           "passed": false,
-          "reason": "No limit parameter implemented. The output contains no code or functional implementation."
+          "reason": "regex heuristic"
         },
         "has_offset": {
           "passed": false,
-          "reason": "No offset parameter implemented. The output contains no code or functional implementation."
+          "reason": "regex heuristic"
         },
         "backwards_compatible": {
           "passed": false,
-          "reason": "No implementation provided, so backwards compatibility cannot be verified. The output is a clarifying question, not a solution."
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 11867,
-      "output": "Which API endpoint would you like to add pagination to? Can you point me to the file or describe the endpoint?\n"
+      "judgeMode": "regex",
+      "duration": 6872,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHGkbeXvwXwxysZTdhR\"}\n"
     },
     {
       "taskId": "eval-005",
@@ -111,20 +111,20 @@
       "criteria": {
         "identifies_security_issue": {
           "passed": false,
-          "reason": "No security issue was identified. The AI asked for clarification instead of reviewing any code."
+          "reason": "regex heuristic"
         },
         "identifies_performance_issue": {
           "passed": false,
-          "reason": "No performance issue was identified. The AI requested a PR reference rather than providing analysis."
+          "reason": "regex heuristic"
         },
         "actionable_feedback": {
           "passed": false,
-          "reason": "No actionable feedback was provided. The output is a request for missing information, not constructive review guidance."
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 13805,
-      "output": "Which PR would you like me to review? Please provide a PR URL, number, or branch name.\n"
+      "judgeMode": "regex",
+      "duration": 10308,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHHXPvni9SXWYQD2ML2\"}\n"
     },
     {
       "taskId": "sm-001",
@@ -135,84 +135,84 @@
       "criteria": {
         "has_switch_case": {
           "passed": false,
-          "reason": "No switch/case code is present in the output; only a request for approval is shown"
+          "reason": "regex heuristic"
         },
         "has_zod_schema": {
           "passed": false,
-          "reason": "No Zod schema definition is provided in the output"
+          "reason": "regex heuristic"
         },
         "validates_input": {
           "passed": false,
-          "reason": "No input validation logic is implemented in the output"
+          "reason": "regex heuristic"
         },
         "returns_typed_response": {
           "passed": false,
-          "reason": "No typed response structure is defined in the output"
+          "reason": "regex heuristic"
         },
         "handles_not_found": {
           "passed": false,
-          "reason": "No error handling or not-found logic is present in the output"
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 23532,
-      "output": "Please approve the file write so I can apply the edit.\n"
+      "judgeMode": "regex",
+      "duration": 6548,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHHpuPC36UFe4w8R6LA\"}\n"
     },
     {
       "taskId": "sm-002",
       "taskName": "fix_fts5_trigger_bug",
       "weight": 1.8,
-      "passed": true,
-      "passRate": 1,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "has_delete_trigger": {
-          "passed": true,
-          "reason": "A DELETE trigger named 'frames_ad' is explicitly defined with CREATE TRIGGER IF NOT EXISTS syntax for the frames table."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "uses_fts_delete_syntax": {
-          "passed": true,
-          "reason": "The trigger uses the FTS5 delete command by inserting 'delete' as the first value into the frames_fts virtual table, which is the correct syntax for removing entries from an FTS5 index."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "references_old_row": {
-          "passed": true,
-          "reason": "The trigger body references old.rowid, old.name, old.digest_text, and old.inputs, old.outputs to capture the deleted row's values before deletion."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "matches_column_list": {
-          "passed": true,
-          "reason": "The INSERT statement includes all the same columns (rowid, name, digest_text, inputs, outputs) that appear in the existing INSERT and UPDATE triggers, maintaining consistency with the established pattern."
+          "passed": false,
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 27425,
-      "output": "The edit is ready — it replaces the bug comment with:\n\n```sql\n-- Sync trigger: DELETE\nCREATE TRIGGER IF NOT EXISTS frames_ad AFTER DELETE ON frames BEGIN\n  INSERT INTO frames_fts(frames_fts, rowid, name, digest_text, inputs, outputs)\n  VALUES ('delete', old.rowid, old.name, old.digest_text, old.inputs, old.outputs);\nEND;\n```\n\nThis follows the same FTS5 external content pattern used in `frames_au`: the special `'delete'` command removes the stale entry from the index using the `old.*` column values. Please approve the write to apply it.\n"
+      "judgeMode": "regex",
+      "duration": 6290,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHJHsrxx3PXJcuPnJio\"}\n"
     },
     {
       "taskId": "sm-003",
       "taskName": "daemon_service_lifecycle",
       "weight": 1.5,
-      "passed": true,
-      "passRate": 1,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "clears_old_interval": {
-          "passed": true,
-          "reason": "The fix adds an early-return guard in start() that prevents overwriting intervalId without clearing it. Additionally, updateConfig() now always calls stop() unconditionally, ensuring the old interval is cleared before a new one is created."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "prevents_double_start": {
-          "passed": true,
-          "reason": "The code explicitly adds `if (this.isRunning) return;` at the beginning of start(), which prevents double-start by returning early if already running."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "has_getstate_method": {
-          "passed": true,
-          "reason": "A getState() method is defined in the diff that returns an object with the required properties."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "returns_correct_state_shape": {
-          "passed": true,
-          "reason": "The getState() method returns an object with all four required properties: isRunning, intervalMs (calculated from config.interval), lastRunTime, and errorCount."
+          "passed": false,
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 36969,
-      "output": "It seems write permission hasn't been granted yet. Here's what I'd apply — please approve the edit or grant write access:\n\n**Two bugs fixed + `getState()` added:**\n\n```diff\n-  // BUG: No guard against double-start ...\n   start(): void {\n+    if (this.isRunning) return;   // guard: prevents double-start / timer leak\n     this.isRunning = true;\n     ...\n   }\n\n-  // BUG: Calls stop() then start() but start() doesn't check...\n   updateConfig(config: Partial<ServiceConfig>): void {\n     const wasRunning = this.isRunning;\n-    if (wasRunning) this.stop();\n+    this.stop();                  // always stop: clears interval unconditionally\n     this.config = { ...this.config, ...config };\n     if (wasRunning && this.config.enabled) this.start();\n   }\n\n+  getState(): ServiceState {\n+    return {\n+      isRunning: this.isRunning,\n+      intervalMs: this.config.interval * 60 * 1000,\n+      lastRunTime: this.lastRunTime,\n+      errorCount: this.errorCount,\n+    };\n+  }\n```\n\n**Root causes:**\n\n1. **`start()` had no guard** — calling it twice created two `setInterval` handles; the first leaked because `this.intervalId` was overwritten before it could be cleared. Fix: early-return if already running.\n\n2. **`updateConfig()` used `if (wasRunning) this.stop()`** — the conditional was correct in intent, but the real risk was that `start()` itself didn't guard, so the stop/start cycle could still stack intervals. The belt-and-suspenders fix is: always call `stop()` unconditionally (it's a no-op when not running), then `start()` only if needed.\n"
+      "judgeMode": "regex",
+      "duration": 6657,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHJmYFr5sCJFhW9h9Qm\"}\n"
     }
   ]
 }

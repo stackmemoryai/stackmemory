@@ -176,6 +176,7 @@ function runClaudeStreaming(prompt, cwd, turnId) {
       '-p',
       '--output-format', 'stream-json',
       '--dangerously-skip-permissions',
+      '--settings', '{"hooks":{}}',
       prompt,
     ];
 

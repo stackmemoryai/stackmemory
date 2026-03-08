@@ -6,49 +6,49 @@
       "taskId": "eval-001",
       "taskName": "simple_function",
       "weight": 1,
-      "passed": true,
-      "passRate": 0.6666666666666666,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "has_function": {
-          "passed": true,
-          "reason": "A real, working function named isPalindrome is defined with proper TypeScript syntax and implementation"
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "handles_edge_cases": {
-          "passed": true,
-          "reason": "The code handles edge cases by converting to lowercase, removing non-alphanumeric characters, and comparing cleaned strings - covers cases like mixed case, spaces, and punctuation"
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "is_tested": {
           "passed": false,
-          "reason": "No test cases or test calls are provided in the output; only the function definition exists without any testing code"
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 8242,
-      "output": "```typescript\nfunction isPalindrome(s: string): boolean {\n  const cleaned = s.toLowerCase().replace(/[^a-z0-9]/g, '');\n  return cleaned === cleaned.split('').reverse().join('');\n}\n```\n"
+      "judgeMode": "regex",
+      "duration": 6738,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHGBLeVSCWt7cJ2sEAb\"}\n"
     },
     {
       "taskId": "eval-002",
       "taskName": "refactor_code",
       "weight": 1.5,
       "passed": false,
-      "passRate": 0,
+      "passRate": 0.3333333333333333,
       "criteria": {
         "uses_async": {
           "passed": false,
-          "reason": "No async/await code is present in the output. The AI only asks for clarification instead of providing refactored code."
+          "reason": "regex heuristic"
         },
         "preserves_behavior": {
           "passed": false,
-          "reason": "No refactored code was provided, so behavior cannot be preserved or verified."
+          "reason": "regex heuristic"
         },
         "no_nested_callbacks": {
-          "passed": false,
-          "reason": "No code was refactored at all. The output is a request for input rather than a solution."
+          "passed": true,
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 8332,
-      "output": "Which file or code snippet would you like me to refactor?\n"
+      "judgeMode": "regex",
+      "duration": 6973,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHGokedMoB4cyiFA121\"}\n"
     },
     {
       "taskId": "eval-003",
@@ -59,20 +59,20 @@
       "criteria": {
         "bug_fixed": {
           "passed": false,
-          "reason": "No code was fixed; the AI requested clarification instead of fixing the bug"
+          "reason": "regex heuristic"
         },
         "no_new_bugs": {
           "passed": false,
-          "reason": "No code was provided to evaluate for new bugs"
+          "reason": "regex heuristic"
         },
         "explains_fix": {
           "passed": false,
-          "reason": "No explanation of any fix was provided; the AI only asked for more information"
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 9222,
-      "output": "Could you point me to the file and loop you'd like me to fix? Or share the relevant code snippet?\n"
+      "judgeMode": "regex",
+      "duration": 10853,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHHTwZeHvRNRhDMzVzG\"}\n"
     },
     {
       "taskId": "eval-004",
@@ -83,24 +83,24 @@
       "criteria": {
         "has_pagination": {
           "passed": false,
-          "reason": "No pagination code is implemented. The AI only asks for clarification instead of providing a working solution."
+          "reason": "regex heuristic"
         },
         "has_limit": {
           "passed": false,
-          "reason": "No limit parameter is defined or implemented in the output."
+          "reason": "regex heuristic"
         },
         "has_offset": {
           "passed": false,
-          "reason": "No offset parameter is defined or implemented in the output."
+          "reason": "regex heuristic"
         },
         "backwards_compatible": {
           "passed": false,
-          "reason": "No code is provided to evaluate backwards compatibility. The output is a clarification request rather than a solution."
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 9128,
-      "output": "Which API endpoint should I add pagination to? Please share the file path or endpoint name.\n"
+      "judgeMode": "regex",
+      "duration": 5779,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHHxLrrmUqXyWRyvNX4\"}\n"
     },
     {
       "taskId": "eval-005",
@@ -111,20 +111,20 @@
       "criteria": {
         "identifies_security_issue": {
           "passed": false,
-          "reason": "The output does not identify any security issue. Instead, it asks for PR details and provides no analysis."
+          "reason": "regex heuristic"
         },
         "identifies_performance_issue": {
           "passed": false,
-          "reason": "The output does not identify any performance issue. It only requests information rather than providing a review."
+          "reason": "regex heuristic"
         },
         "actionable_feedback": {
           "passed": false,
-          "reason": "The output provides no actionable feedback. It is a request for input, not a code review with concrete suggestions or findings."
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 17368,
-      "output": "Which PR would you like me to review? Please share the PR URL, PR number, or branch name.\n"
+      "judgeMode": "regex",
+      "duration": 6181,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHJQcftjSrVHj8nKxsp\"}\n"
     },
     {
       "taskId": "sm-001",
@@ -135,28 +135,28 @@
       "criteria": {
         "has_switch_case": {
           "passed": false,
-          "reason": "Only described in text; no actual switch/case code block is provided in the output"
+          "reason": "regex heuristic"
         },
         "has_zod_schema": {
           "passed": false,
-          "reason": "Schema is mentioned but not actually defined in code; only described as text"
+          "reason": "regex heuristic"
         },
         "validates_input": {
           "passed": false,
-          "reason": "Validation is discussed but no actual validation code is shown in the output"
+          "reason": "regex heuristic"
         },
         "returns_typed_response": {
           "passed": false,
-          "reason": "Return format is described but no actual return statement or typed response object is provided"
+          "reason": "regex heuristic"
         },
         "handles_not_found": {
           "passed": false,
-          "reason": "Error handling is mentioned ('throws if not found') but no actual try/catch or error handling code is shown"
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 28686,
-      "output": "Please approve the file write permission and I'll apply the change. The edit adds a `get_frame_summary` case between `close_frame` and `default` that:\n\n1. Validates `frameId` with `z.object({ frameId: z.string().min(1) })`\n2. Looks up the frame, throws if not found\n3. Returns `{ frameId, name, status, eventCount: frame.events.length }`\n"
+      "judgeMode": "regex",
+      "duration": 4675,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHJtsnUUPF3pPMQY7uy\"}\n"
     },
     {
       "taskId": "sm-002",
@@ -167,52 +167,52 @@
       "criteria": {
         "has_delete_trigger": {
           "passed": false,
-          "reason": "No DELETE trigger is provided in the output, only a request for permission"
+          "reason": "regex heuristic"
         },
         "uses_fts_delete_syntax": {
           "passed": false,
-          "reason": "No FTS5 DELETE syntax is present in the output"
+          "reason": "regex heuristic"
         },
         "references_old_row": {
           "passed": false,
-          "reason": "No reference to OLD row values in any trigger code"
+          "reason": "regex heuristic"
         },
         "matches_column_list": {
           "passed": false,
-          "reason": "No column list or trigger definition is included in the output"
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 37943,
-      "output": "Please approve the write permission so I can apply the fix.\n"
+      "judgeMode": "regex",
+      "duration": 6137,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHKAmFvAN62p9tugpsP\"}\n"
     },
     {
       "taskId": "sm-003",
       "taskName": "daemon_service_lifecycle",
       "weight": 1.5,
-      "passed": true,
-      "passRate": 1,
+      "passed": false,
+      "passRate": 0,
       "criteria": {
         "clears_old_interval": {
-          "passed": true,
-          "reason": "The fix adds `if (this.isRunning) this.stop();` at the top of `start()`, which ensures any existing interval is cleared via `stop()` before a new one is created. This directly addresses the timer leak."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "prevents_double_start": {
-          "passed": true,
-          "reason": "The guard `if (this.isRunning) this.stop();` prevents double-start by checking the running state and stopping the old interval before proceeding, making `start()` idempotent."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "has_getstate_method": {
-          "passed": true,
-          "reason": "A complete `getState()` method is defined in the output that returns an object with the required properties. The method is shown as actual code, not just a TODO or mention."
+          "passed": false,
+          "reason": "regex heuristic"
         },
         "returns_correct_state_shape": {
-          "passed": true,
-          "reason": "The `getState()` method returns an object with all four required properties: `isRunning`, `intervalMs`, `lastRunTime`, and `errorCount`. The intervalMs calculation matches the service's interval conversion logic."
+          "passed": false,
+          "reason": "regex heuristic"
         }
       },
-      "judgeMode": "llm",
-      "duration": 39514,
-      "output": "It seems write permission isn't granted. Here are both changes needed — apply them manually or grant write access:\n\n**Fix 1 — `start()`: guard against double-start (lines 25–31)**\n\n```ts\n// Before\n// BUG: No guard against double-start — calling start() twice\n// creates two intervals but only stores the second one.\n// The first interval leaks and keeps running forever.\nstart(): void {\n  this.isRunning = true;\n  const intervalMs = this.config.interval * 60 * 1000;\n\n// After\nstart(): void {\n  if (this.isRunning) this.stop();\n  this.isRunning = true;\n  const intervalMs = this.config.interval * 60 * 1000;\n```\n\n**Fix 2 — remove stale `updateConfig` comment and add `getState()` (lines 47–57)**\n\n```ts\n// Before\n// BUG: Calls stop() then start() but start() doesn't check\n// if already running, so if stop() fails to clear the interval\n// (e.g., intervalId is undefined), we leak.\nupdateConfig(config: Partial<ServiceConfig>): void {\n  const wasRunning = this.isRunning;\n  if (wasRunning) this.stop();\n  this.config = { ...this.config, ...config };\n  if (wasRunning && this.config.enabled) this.start();\n}\n\n// TODO: Add getState() method returning ServiceState\n\n// After\nupdateConfig(config: Partial<ServiceConfig>): void {\n  const wasRunning = this.isRunning;\n  if (wasRunning) this.stop();\n  this.config = { ...this.config, ...config };\n  if (wasRunning && this.config.enabled) this.start();\n}\n\ngetState(): ServiceState {\n  return {\n    isRunning: this.isRunning,\n    intervalMs: this.config.interval * 60 * 1000,\n    lastRunTime: this.lastRunTime,\n    errorCount: this.errorCount,\n  };\n}\n```\n\n---\n\n**Root cause:** `start()` unconditionally called `setInterval` without checking `isRunning`. Any call path that triggers `start()` while the service is already running (direct double-call, or `updateConfig` if `stop()` somehow left `isRunning = true`) would orphan the old interval — `intervalId` gets overwritten so `clearInterval` can never reach it.\n\n**The fix:** `if (this.isRunning) this.stop("
+      "judgeMode": "regex",
+      "duration": 6263,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYrHKepxihvYkrrfWmRoU\"}\n"
     }
   ]
 }
