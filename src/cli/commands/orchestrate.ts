@@ -660,5 +660,250 @@ export function createConductorCommands(): Command {
       await conductor.start();
     });
 
+  // --- monitor ---
+  cmd
+    .command('monitor')
+    .description('Interactive TUI dashboard for conductor monitoring')
+    .option('--interval <seconds>', 'Auto-refresh interval in seconds', '10')
+    .option('--no-interactive', 'Disable interactive keys (CI/pipe mode)')
+    .action(async (options) => {
+      const interval = parseInt(options.interval, 10) * 1000;
+      const interactive = options.interactive !== false;
+      let currentMode: 'dashboard' | 'status' | 'usage' | 'json' = 'dashboard';
+      let paused = false;
+      let refreshInterval = interval;
+
+      const b = '\x1b[1m';
+      const d = '\x1b[2m';
+      const cyan = '\x1b[36m';
+      const r = '\x1b[0m';
+
+      function readStatuses(): AgentStatusFile[] {
+        const agentsDir = join(
+          homedir(),
+          '.stackmemory',
+          'conductor',
+          'agents'
+        );
+        if (!existsSync(agentsDir)) return [];
+        const entries = readdirSync(agentsDir, { withFileTypes: true });
+        const statuses: AgentStatusFile[] = [];
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const statusPath = join(agentsDir, entry.name, 'status.json');
+          if (!existsSync(statusPath)) continue;
+          try {
+            statuses.push(JSON.parse(readFileSync(statusPath, 'utf-8')));
+          } catch {
+            // skip corrupt files
+          }
+        }
+        statuses.sort(
+          (a, b) =>
+            new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
+        );
+        return statuses;
+      }
+
+      function printStatusTable(statuses: AgentStatusFile[]): void {
+        if (statuses.length === 0) {
+          console.log('  No active agents');
+          return;
+        }
+        const header = `${'Issue'.padEnd(12)}${'Phase'.padEnd(16)}${'Tools'.padStart(7)}${'Files'.padStart(7)}${'Tokens'.padStart(9)}   Last Update`;
+        console.log(header);
+        for (const s of statuses) {
+          const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
+          const line = `${s.issue.padEnd(12)}${s.phase.padEnd(16)}${String(s.toolCalls).padStart(7)}${String(s.filesModified).padStart(7)}${String(s.tokensUsed).padStart(9)}   ${formatElapsed(elapsed)}`;
+          console.log(line);
+        }
+      }
+
+      async function getUsage(): Promise<Record<string, unknown>> {
+        const conductor = new Conductor({ repoRoot: process.cwd() });
+        await conductor.scanUsageLogs();
+        return conductor.getUsageSummary() as Record<string, unknown>;
+      }
+
+      async function render(): Promise<void> {
+        // Clear screen
+        process.stdout.write('\x1b[2J\x1b[H');
+
+        const pauseTag = paused ? ' [PAUSED]' : '';
+        const intervalSec = Math.round(refreshInterval / 1000);
+        console.log(
+          `${b}══════════════════════════════════════════════════${r}`
+        );
+        console.log(
+          `${b}  Conductor Monitor${r}  ${new Date().toLocaleTimeString()}${pauseTag}`
+        );
+        console.log(
+          `  Mode: ${cyan}${currentMode}${r}  |  Refresh: ${intervalSec}s`
+        );
+        if (interactive) {
+          console.log(
+            `  ${d}[s]tatus [u]sage [d]ashboard [j]son [l]ogs [r]efresh [p]ause [+/-] [q]uit${r}`
+          );
+        }
+        console.log(
+          `${b}══════════════════════════════════════════════════${r}`
+        );
+        console.log('');
+
+        const statuses = readStatuses();
+
+        switch (currentMode) {
+          case 'dashboard': {
+            printStatusTable(statuses);
+            console.log('');
+            const usage = await getUsage();
+            printUsageSummary(usage);
+            break;
+          }
+          case 'status':
+            printStatusTable(statuses);
+            break;
+          case 'usage': {
+            const usage = await getUsage();
+            printUsageSummary(usage);
+            break;
+          }
+          case 'json': {
+            const usage = await getUsage();
+            console.log(JSON.stringify(usage, null, 2));
+            break;
+          }
+        }
+
+        console.log('');
+        console.log(
+          `${d}──────────────────────────────────────────────────${r}`
+        );
+      }
+
+      // Initial render
+      await render();
+
+      if (!interactive) {
+        // Non-interactive: just loop with setInterval
+        const timer = setInterval(async () => {
+          if (!paused) await render();
+        }, refreshInterval);
+        await new Promise<void>((resolve) => {
+          process.on('SIGINT', () => {
+            clearInterval(timer);
+            resolve();
+          });
+          process.on('SIGTERM', () => {
+            clearInterval(timer);
+            resolve();
+          });
+        });
+        return;
+      }
+
+      // Interactive mode: raw stdin for keypress handling
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(true);
+      }
+      process.stdin.resume();
+      process.stdin.setEncoding('utf-8');
+
+      let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+      function scheduleRefresh(): void {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(async () => {
+          if (!paused) await render();
+          scheduleRefresh();
+        }, refreshInterval);
+      }
+
+      scheduleRefresh();
+
+      process.stdin.on('data', async (key: string) => {
+        switch (key) {
+          case 's':
+            currentMode = 'status';
+            await render();
+            break;
+          case 'u':
+            currentMode = 'usage';
+            await render();
+            break;
+          case 'd':
+            currentMode = 'dashboard';
+            await render();
+            break;
+          case 'j':
+            currentMode = 'json';
+            await render();
+            break;
+          case 'l': {
+            // Show log picker
+            process.stdout.write('\x1b[2J\x1b[H');
+            const statuses = readStatuses();
+            if (statuses.length === 0) {
+              console.log('No active agents to show logs for.');
+            } else {
+              console.log('Active issues:');
+              console.log('');
+              for (const s of statuses) {
+                console.log(`  ${s.issue}  (${s.phase})`);
+              }
+              console.log('');
+              console.log('Use: stackmemory conductor logs <ISSUE-ID> -f');
+            }
+            console.log('\nPress any key to return...');
+            // Wait for next keypress to return
+            await new Promise<void>((resolve) => {
+              process.stdin.once('data', () => resolve());
+            });
+            await render();
+            break;
+          }
+          case 'r':
+            await render();
+            break;
+          case 'p':
+            paused = !paused;
+            await render();
+            break;
+          case '+':
+          case '=':
+            refreshInterval += 5000;
+            await render();
+            scheduleRefresh();
+            break;
+          case '-':
+          case '_':
+            if (refreshInterval > 5000) refreshInterval -= 5000;
+            await render();
+            scheduleRefresh();
+            break;
+          case 'q':
+          case '\x03': // Ctrl+C
+            if (refreshTimer) clearTimeout(refreshTimer);
+            if (process.stdin.isTTY) process.stdin.setRawMode(false);
+            process.exit(0);
+            break;
+        }
+      });
+
+      // Keep alive
+      await new Promise<void>((resolve) => {
+        process.on('SIGINT', () => {
+          if (refreshTimer) clearTimeout(refreshTimer);
+          if (process.stdin.isTTY) process.stdin.setRawMode(false);
+          resolve();
+        });
+        process.on('SIGTERM', () => {
+          if (refreshTimer) clearTimeout(refreshTimer);
+          if (process.stdin.isTTY) process.stdin.setRawMode(false);
+          resolve();
+        });
+      });
+    });
+
   return cmd;
 }
