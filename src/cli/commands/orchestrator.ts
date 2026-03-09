@@ -1381,6 +1381,33 @@ export class Conductor {
 
   // ── Agent Execution ──
 
+  /**
+   * Build environment variables for an agent process.
+   * Injects PORTLESS_URL if portless is available, giving each worktree
+   * a stable named localhost URL for service discovery.
+   */
+  private buildAgentEnv(
+    issue: LinearIssue,
+    run: RunningIssue
+  ): NodeJS.ProcessEnv {
+    const env = { ...process.env };
+    delete env['CLAUDECODE'];
+    delete env['ANTHROPIC_API_KEY'];
+
+    // Inject portless URL for worktree service discovery
+    const wsKey = this.sanitizeIdentifier(issue.identifier);
+
+    return {
+      ...env,
+      SYMPHONY_WORKSPACE_DIR: run.workspacePath,
+      SYMPHONY_ISSUE_ID: issue.id,
+      SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+      SYMPHONY_ATTEMPT: String(run.attempt),
+      PORTLESS_URL: `http://${wsKey}.localhost:1355`,
+      PORTLESS_NAME: wsKey,
+    };
+  }
+
   private async runAgent(issue: LinearIssue, run: RunningIssue): Promise<void> {
     if (this.config.agentMode === 'cli') {
       try {
@@ -1435,18 +1462,7 @@ export class Conductor {
         ],
         {
           cwd: run.workspacePath,
-          env: (() => {
-            const env = { ...process.env };
-            delete env.CLAUDECODE;
-            delete env.ANTHROPIC_API_KEY;
-            return {
-              ...env,
-              SYMPHONY_WORKSPACE_DIR: run.workspacePath,
-              SYMPHONY_ISSUE_ID: issue.id,
-              SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
-              SYMPHONY_ATTEMPT: String(run.attempt),
-            };
-          })(),
+          env: this.buildAgentEnv(issue, run),
           stdio: ['pipe', 'pipe', 'pipe'],
         }
       );
@@ -1602,20 +1618,9 @@ export class Conductor {
       const prompt = this.buildPrompt(issue, run.attempt);
 
       // Spawn claude-app-server via JSON-RPC protocol
-      // Remove CLAUDECODE to prevent nested-session detection
-      // Remove ANTHROPIC_API_KEY to use subscription auth (avoids API rate limits)
-      const env = { ...process.env };
-      delete env.CLAUDECODE;
-      delete env.ANTHROPIC_API_KEY;
       const proc = spawn('node', [this.config.appServerPath], {
         cwd: run.workspacePath,
-        env: {
-          ...env,
-          SYMPHONY_WORKSPACE_DIR: run.workspacePath,
-          SYMPHONY_ISSUE_ID: issue.id,
-          SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
-          SYMPHONY_ATTEMPT: String(run.attempt),
-        },
+        env: this.buildAgentEnv(issue, run),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
