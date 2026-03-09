@@ -1,14 +1,14 @@
 {
   "currentGeneration": 1,
   "bestVariant": "baseline",
-  "bestScore": 0.04424778761061947,
+  "bestScore": 0.48967551622418876,
   "targetPath": "/Users/jwu/Dev/rize/sol/CLAUDE.md",
   "history": [
     {
       "generation": 0,
       "variant": "baseline",
       "action": "init",
-      "timestamp": "2026-03-08T20:55:25.777Z"
+      "timestamp": "2026-03-09T15:20:49.782Z"
     },
     {
       "generation": 1,
@@ -19,7 +19,7 @@
         "variant-c",
         "variant-d"
       ],
-      "timestamp": "2026-03-08T20:56:32.495Z"
+      "timestamp": "2026-03-09T15:23:14.976Z"
     },
     {
       "generation": 1,
@@ -27,11 +27,23 @@
       "scores": [
         {
           "variant": "baseline",
-          "score": 0.04424778761061947
+          "score": 0.48967551622418876
+        },
+        {
+          "variant": "variant-b",
+          "score": 0.48967551622418876
+        },
+        {
+          "variant": "variant-a",
+          "score": 0.3716814159292035
+        },
+        {
+          "variant": "variant-c",
+          "score": 0.35693215339233036
         }
       ],
       "best": "baseline",
-      "timestamp": "2026-03-08T20:58:11.649Z"
+      "timestamp": "2026-03-09T15:41:55.313Z"
     }
   ]
 }

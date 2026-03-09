@@ -103,38 +103,6 @@ Located at `api/app/graphql/{api,private}/v1/`
 - Use `test()` instead of `it()` in tests
 - Use `toBeCalled()` instead of `toHaveBeenCalledWith()` in jest assertions
 
-## LSP Setup (Code Intelligence)
-
-Claude Code uses LSP plugins for go-to-definition, find-references, and real-time diagnostics.
-
-### Installed Plugins
-- **vtsls** (JS/TS) - `vtsls@claude-code-lsps` from boostvolt marketplace
-- **ruby-lsp** (Ruby) - `ruby-lsp@ruby-skills` + `ruby-skills@ruby-skills` from st0012 marketplace
-
-### Prerequisites
-```bash
-# TypeScript/JS language server
-npm install -g @vtsls/language-server
-
-# Ruby language server (use rbenv gem, not system)
-/Users/jwu/.rbenv/versions/3.3.5/bin/gem install ruby-lsp
-```
-
-### Known Issues
-- Official `typescript-lsp@claude-plugins-official` is broken (missing plugin.json) — use `vtsls@claude-code-lsps` instead
-- Ruby LSP launch script patched at `~/.claude/plugins/cache/ruby-skills/ruby-lsp/1.0.0/scripts/launch-ruby-lsp.sh` — macOS lacks GNU `timeout` which breaks the version manager detection. Patch hardcodes rbenv PATH.
-- Plugin auto-updates may overwrite the patch — re-apply if Ruby LSP stops working
-
-### Reinstall Commands
-```bash
-claude plugin marketplace add boostvolt/claude-code-lsps
-claude plugin install vtsls@claude-code-lsps
-
-claude plugin marketplace add st0012/ruby-skills
-claude plugin install ruby-lsp@ruby-skills
-claude plugin install ruby-skills@ruby-skills
-```
-
 ## Key Configuration Files
 
 - `api/config/database.yml` - Database connections (primary + timescale)
