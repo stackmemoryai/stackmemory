@@ -23,7 +23,11 @@ import { homedir, tmpdir } from 'os';
 import Database from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
 import { Conductor } from './orchestrator.js';
-import { getAgentStatusDir, type AgentStatusFile } from './orchestrator.js';
+import {
+  getAgentStatusDir,
+  type AgentPhase,
+  type AgentStatusFile,
+} from './orchestrator.js';
 
 /** Global store for cross-workspace context */
 function getGlobalStorePath(): string {
@@ -90,6 +94,116 @@ function budgetBar(pct: number, width = 30): string {
   const dim = '\x1b[2m';
   const rst = '\x1b[0m';
   return `${color}${'█'.repeat(filled)}${dim}${'░'.repeat(empty)}${rst} ${String(pct).padStart(3)}%`;
+}
+
+// ── ANSI helpers ──
+const c = {
+  r: '\x1b[0m', // reset
+  b: '\x1b[1m', // bold
+  d: '\x1b[2m', // dim
+  i: '\x1b[3m', // italic
+  u: '\x1b[4m', // underline
+  // Linear-inspired palette
+  purple: '\x1b[38;5;141m',
+  blue: '\x1b[38;5;75m',
+  cyan: '\x1b[38;5;80m',
+  green: '\x1b[38;5;114m',
+  yellow: '\x1b[38;5;221m',
+  orange: '\x1b[38;5;215m',
+  red: '\x1b[38;5;203m',
+  pink: '\x1b[38;5;176m',
+  gray: '\x1b[38;5;245m',
+  white: '\x1b[38;5;255m',
+  bg: {
+    purple: '\x1b[48;5;53m',
+    blue: '\x1b[48;5;24m',
+    green: '\x1b[48;5;22m',
+    red: '\x1b[48;5;52m',
+    yellow: '\x1b[48;5;58m',
+    gray: '\x1b[48;5;236m',
+  },
+};
+
+// Linear-style status icons per phase
+const phaseIcon: Record<AgentPhase, string> = {
+  reading: '◔',
+  planning: '◑',
+  implementing: '◕',
+  testing: '●',
+  committing: '✓',
+};
+
+const phaseColor: Record<AgentPhase, string> = {
+  reading: c.cyan,
+  planning: c.blue,
+  implementing: c.yellow,
+  testing: c.pink,
+  committing: c.green,
+};
+
+/** Check if a process is still alive */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Phase-to-progress mapping with color and estimated completion */
+function phaseProgress(
+  phase: AgentPhase,
+  toolCalls: number,
+  stale: boolean,
+  alive: boolean
+): { icon: string; color: string; pct: number; label: string } {
+  const basePct: Record<AgentPhase, number> = {
+    reading: 10,
+    planning: 25,
+    implementing: 50,
+    testing: 75,
+    committing: 90,
+  };
+  let pct = basePct[phase] || 0;
+  if (phase === 'implementing') {
+    pct += Math.min(Math.floor((toolCalls / 80) * 25), 25);
+  }
+  if (phase === 'committing') {
+    pct = 90 + Math.min(Math.floor((toolCalls / 60) * 10), 9);
+  }
+
+  const labels: Record<AgentPhase, string> = {
+    reading: 'Reading',
+    planning: 'Planning',
+    implementing: 'Implementing',
+    testing: 'Testing',
+    committing: 'Committing',
+  };
+
+  let label = labels[phase] || phase;
+  let color = phaseColor[phase] || '';
+  let icon = phaseIcon[phase] || '○';
+
+  if (!alive) {
+    label = 'Dead';
+    color = c.red;
+    icon = '✗';
+  } else if (stale) {
+    label = 'Stalled';
+    color = c.orange;
+    icon = '⏸';
+  }
+
+  return { icon, color, pct, label };
+}
+
+/** Gradient progress bar */
+function progressBar(pct: number, width: number): string {
+  const filled = Math.min(Math.round((pct / 100) * width), width);
+  const empty = width - filled;
+  const col = pct >= 90 ? c.green : pct >= 50 ? c.yellow : c.cyan;
+  return `${col}${'━'.repeat(filled)}${c.d}${'╌'.repeat(empty)}${c.r}`;
 }
 
 function fmtMinutes(m: number): string {
@@ -494,15 +608,200 @@ export function createConductorCommands(): Command {
           new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
       );
 
-      // Render table
-      const header = `${'Issue'.padEnd(12)}${'Phase'.padEnd(16)}${'Tools'.padStart(7)}${'Files'.padStart(7)}${'Tokens'.padStart(9)}   Last Update`;
-      console.log(header);
+      // Compact grid display
+      const active = statuses.filter((s) => isProcessAlive(s.pid));
+      const stalled = statuses.filter(
+        (s) =>
+          isProcessAlive(s.pid) &&
+          Date.now() - new Date(s.lastUpdate).getTime() > 5 * 60 * 1000
+      );
+      const dead = statuses.filter((s) => !isProcessAlive(s.pid));
+      const healthy = active.length - stalled.length;
+
+      const parts: string[] = [];
+      if (healthy > 0) parts.push(`${c.green}● ${healthy}${c.r}`);
+      if (stalled.length > 0)
+        parts.push(`${c.orange}⏸ ${stalled.length}${c.r}`);
+      if (dead.length > 0) parts.push(`${c.red}✗ ${dead.length}${c.r}`);
+
+      console.log(`\n  ${c.b}${c.white}Conductor${c.r}  ${parts.join(' ')}\n`);
+
+      // Grid: 2 columns if terminal is wide enough, else single column
+      const cols = (process.stdout.columns || 80) >= 90 ? 2 : 1;
+      const rows: string[][] = [];
 
       for (const s of statuses) {
         const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-        const lastUpdate = formatElapsed(elapsed);
-        const line = `${s.issue.padEnd(12)}${s.phase.padEnd(16)}${String(s.toolCalls).padStart(7)}${String(s.filesModified).padStart(7)}${String(s.tokensUsed).padStart(9)}   ${lastUpdate}`;
-        console.log(line);
+        const staleFlag = elapsed > 5 * 60 * 1000;
+        const alive = isProcessAlive(s.pid);
+        const { icon, color, pct, label } = phaseProgress(
+          s.phase,
+          s.toolCalls,
+          staleFlag,
+          alive
+        );
+        const bar = progressBar(pct, 8);
+        const timeColor = !alive ? c.red : staleFlag ? c.orange : c.gray;
+
+        const cell = [
+          `${color}${icon}${c.r} ${c.b}${s.issue}${c.r} ${color}${label}${c.r}`,
+          `  ${bar} ${c.d}${pct}%${c.r} ${c.gray}${s.toolCalls}t ${s.filesModified}f${c.r} ${timeColor}${formatElapsed(elapsed)}${c.r}`,
+        ];
+        rows.push(cell);
+      }
+
+      if (cols === 2) {
+        for (let i = 0; i < rows.length; i += 2) {
+          const left = rows[i];
+          const right = rows[i + 1];
+          // Pad left column to fixed visible width (40 chars + ANSI)
+          const pad = 42;
+          if (right) {
+            console.log(
+              `  ${left[0].padEnd(pad + 30)}${c.gray}│${c.r} ${right[0]}`
+            );
+            console.log(
+              `  ${left[1].padEnd(pad + 30)}${c.gray}│${c.r} ${right[1]}`
+            );
+          } else {
+            console.log(`  ${left[0]}`);
+            console.log(`  ${left[1]}`);
+          }
+          if (i + 2 < rows.length) {
+            console.log(`  ${c.gray}${'╌'.repeat(38)}┼${'╌'.repeat(38)}${c.r}`);
+          }
+        }
+      } else {
+        for (let i = 0; i < rows.length; i++) {
+          console.log(`  ${rows[i][0]}`);
+          console.log(`  ${rows[i][1]}`);
+          if (i < rows.length - 1) {
+            console.log(`  ${c.gray}${'╌'.repeat(38)}${c.r}`);
+          }
+        }
+      }
+
+      console.log('');
+    });
+
+  // --- finalize ---
+  cmd
+    .command('finalize')
+    .description('Clean up completed/dead agents that conductor missed')
+    .option('--dry-run', 'Show what would be done without doing it', false)
+    .action(async (options) => {
+      const agentsDir = join(homedir(), '.stackmemory', 'conductor', 'agents');
+      if (!existsSync(agentsDir)) {
+        console.log('No agent status files found');
+        return;
+      }
+
+      const entries = readdirSync(agentsDir, { withFileTypes: true });
+      const statuses: (AgentStatusFile & { dir: string })[] = [];
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const statusPath = join(agentsDir, entry.name, 'status.json');
+        if (!existsSync(statusPath)) continue;
+        try {
+          const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
+          statuses.push({ ...(data as AgentStatusFile), dir: entry.name });
+        } catch {
+          // skip
+        }
+      }
+
+      // Find agents that are dead or stale
+      const needsFinalize = statuses.filter((s) => {
+        const alive = isProcessAlive(s.pid);
+        const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
+        return !alive || elapsed > 60 * 60 * 1000;
+      });
+
+      if (needsFinalize.length === 0) {
+        console.log(
+          `${c.green}All agents are healthy — nothing to finalize.${c.r}`
+        );
+        return;
+      }
+
+      console.log(
+        `\n  ${c.b}Finalizing ${needsFinalize.length} agent(s)${c.r}\n`
+      );
+
+      for (const s of needsFinalize) {
+        const alive = isProcessAlive(s.pid);
+        const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
+        const elapsedStr = formatElapsed(elapsed).replace(' ago', '');
+
+        // Check for commits in worktree
+        let hasCommits = false;
+        if (s.workspacePath && existsSync(s.workspacePath)) {
+          try {
+            const log = execSync('git log origin/main..HEAD --oneline', {
+              cwd: s.workspacePath,
+              encoding: 'utf-8',
+              timeout: 10000,
+            });
+            hasCommits = log.trim().length > 0;
+          } catch {
+            // can't check
+          }
+        }
+
+        const statusIcon = !alive
+          ? `${c.red}✗ dead${c.r}`
+          : `${c.orange}⏸ stalled ${elapsedStr}${c.r}`;
+        const commitStatus = hasCommits
+          ? `${c.green}has commits → In Review${c.r}`
+          : `${c.gray}no commits → mark failed${c.r}`;
+
+        console.log(`  ${c.b}${s.issue}${c.r}  ${statusIcon}  ${commitStatus}`);
+
+        if (options.dryRun) continue;
+
+        // Kill if still alive
+        if (alive) {
+          try {
+            process.kill(s.pid, 'SIGTERM');
+            console.log(`     ${c.gray}Sent SIGTERM to pid ${s.pid}${c.r}`);
+          } catch {
+            // already dead
+          }
+        }
+
+        // Update status file to mark finalized
+        const statusPath = join(agentsDir, s.dir, 'status.json');
+        try {
+          const updated = { ...s };
+          delete (updated as Record<string, unknown>)['dir'];
+          writeFileSync(
+            statusPath,
+            JSON.stringify(
+              { ...updated, lastUpdate: new Date().toISOString() },
+              null,
+              2
+            )
+          );
+        } catch {
+          // skip
+        }
+
+        if (hasCommits) {
+          console.log(
+            `     ${c.cyan}→ Move ${s.issue} to "In Review" in Linear${c.r}`
+          );
+        }
+      }
+
+      if (options.dryRun) {
+        console.log(
+          `\n  ${c.d}Dry run — no changes made. Remove --dry-run to execute.${c.r}`
+        );
+      } else {
+        console.log(
+          `\n  ${c.green}Done.${c.r} Run ${c.cyan}conductor status${c.r} to verify.`
+        );
       }
     });
 
@@ -679,13 +978,7 @@ export function createConductorCommands(): Command {
       let refreshInterval = interval;
       let phaseFilter: string | null = options.phase || null;
 
-      const b = '\x1b[1m';
-      const d = '\x1b[2m';
-      const cyan = '\x1b[36m';
-      const green = '\x1b[32m';
-      const yellow = '\x1b[33m';
-      const red = '\x1b[31m';
-      const r = '\x1b[0m';
+      // Use module-level color constants (c.b, c.d, c.r, etc.)
 
       function readStatuses(): AgentStatusFile[] {
         const agentsDir = join(
@@ -724,12 +1017,20 @@ export function createConductorCommands(): Command {
           console.log(`  No active agents${filterNote}`);
           return;
         }
-        const header = `${'Issue'.padEnd(12)}${'Phase'.padEnd(16)}${'Tools'.padStart(7)}${'Files'.padStart(7)}${'Tokens'.padStart(9)}   Last Update`;
-        console.log(header);
         for (const s of statuses) {
           const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-          const line = `${s.issue.padEnd(12)}${s.phase.padEnd(16)}${String(s.toolCalls).padStart(7)}${String(s.filesModified).padStart(7)}${String(s.tokensUsed).padStart(9)}   ${formatElapsed(elapsed)}`;
-          console.log(line);
+          const stale = elapsed > 5 * 60 * 1000;
+          const alive = isProcessAlive(s.pid);
+          const prog = phaseProgress(s.phase, s.toolCalls, stale, alive);
+          const bar = progressBar(prog.pct, 10);
+
+          const timeColor = !alive ? c.red : stale ? c.orange : c.gray;
+          console.log(
+            `  ${prog.color}${prog.icon}${c.r}  ${c.b}${s.issue}${c.r}  ${prog.color}${prog.label}${c.r}  ${timeColor}${formatElapsed(elapsed)}${c.r}`
+          );
+          console.log(
+            `     ${bar} ${c.d}${prog.pct}%${c.r}  ${c.gray}${s.toolCalls} tools  ${s.filesModified} files  ${fmtTokens(s.tokensUsed)} tok${c.r}`
+          );
         }
       }
 
@@ -758,31 +1059,27 @@ export function createConductorCommands(): Command {
         }
         for (const s of statuses) {
           const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-          const phaseColor =
-            s.phase === 'committing'
-              ? green
-              : s.phase === 'testing'
-                ? yellow
-                : s.phase === 'implementing'
-                  ? cyan
-                  : '';
+          const stale = elapsed > 5 * 60 * 1000;
+          const alive = isProcessAlive(s.pid);
+          const prog = phaseProgress(s.phase, s.toolCalls, stale, alive);
+
           console.log(
-            `${b}${s.issue}${r}  ${phaseColor}${s.phase}${r}  ${d}${formatElapsed(elapsed)}${r}`
+            `  ${prog.color}${prog.icon}${c.r}  ${c.b}${s.issue}${c.r}  ${prog.color}${prog.label}${c.r}  ${c.gray}${formatElapsed(elapsed)}${c.r}`
           );
 
           const files = getWorktreeFiles(s.workspacePath || '');
           if (files.length === 0) {
-            console.log(`  ${d}(no file changes detected)${r}`);
+            console.log(`     ${c.d}(no file changes)${c.r}`);
           } else {
             for (const f of files) {
               const status = f.substring(0, 2);
               const path = f.substring(3);
-              let color = '';
-              if (status.includes('M')) color = yellow;
+              let col = '';
+              if (status.includes('M')) col = c.yellow;
               else if (status.includes('A') || status.includes('?'))
-                color = green;
-              else if (status.includes('D')) color = red;
-              console.log(`  ${color}${status}${r} ${path}`);
+                col = c.green;
+              else if (status.includes('D')) col = c.red;
+              console.log(`     ${col}${status}${c.r} ${path}`);
             }
           }
           console.log('');
@@ -802,25 +1099,22 @@ export function createConductorCommands(): Command {
         const pauseTag = paused ? ' [PAUSED]' : '';
         const intervalSec = Math.round(refreshInterval / 1000);
         console.log(
-          `${b}══════════════════════════════════════════════════${r}`
+          `${c.purple}${c.b}  ━━━ Conductor Monitor ━━━${c.r}  ${c.gray}${new Date().toLocaleTimeString()}${pauseTag}${c.r}`
         );
         console.log(
-          `${b}  Conductor Monitor${r}  ${new Date().toLocaleTimeString()}${pauseTag}`
-        );
-        console.log(
-          `  Mode: ${cyan}${currentMode}${r}  |  Refresh: ${intervalSec}s`
+          `  ${c.gray}Mode:${c.r} ${c.cyan}${currentMode}${c.r}  ${c.gray}│${c.r}  ${c.gray}Refresh:${c.r} ${intervalSec}s`
         );
         const filterNote = phaseFilter
-          ? `  Filter: ${cyan}${phaseFilter}${r}`
+          ? `  ${c.gray}Filter:${c.r} ${c.cyan}${phaseFilter}${c.r}`
           : '';
         if (interactive) {
           console.log(
-            `  ${d}[s]tatus [u]sage [f]iles [d]ashboard [j]son [l]ogs [r]efresh [p]ause [1-5]phase [0]clear [+/-] [q]uit${r}`
+            `  ${c.d}[s]tatus [u]sage [f]iles [d]ashboard [j]son [l]ogs [r]efresh [p]ause [1-5]phase [0]clear [+/-] [q]uit${c.r}`
           );
         }
         if (filterNote) console.log(filterNote);
         console.log(
-          `${b}══════════════════════════════════════════════════${r}`
+          `${c.gray}  ─────────────────────────────────────────────────${c.r}`
         );
         console.log('');
 

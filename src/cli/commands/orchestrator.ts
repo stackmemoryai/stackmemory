@@ -12,6 +12,7 @@ import { spawn, execSync, type ChildProcess } from 'child_process';
 import {
   existsSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
   readdirSync,
@@ -706,6 +707,9 @@ export class Conductor {
       logger.info('Rate limit backoff expired, resuming dispatch');
       console.log('[rate-limit] Backoff expired, resuming dispatch');
     }
+
+    // Check for stale agents (no update in 1 hour)
+    await this.checkStaleAgents();
 
     // Reconcile: check if any running issues moved to terminal states
     await this.reconcile();
@@ -1989,6 +1993,141 @@ export class Conductor {
   }
 
   // ── Reconciliation ──
+
+  /**
+   * Check for stale agents — no status update in 1 hour.
+   * If the process is dead, clean up. If alive but stuck, kill and free the slot.
+   */
+  private async checkStaleAgents(): Promise<void> {
+    if (this.running.size === 0) return;
+
+    const staleThresholdMs = 60 * 60 * 1000; // 1 hour
+    const now = Date.now();
+
+    for (const [issueId, run] of this.running) {
+      const agentDir = getAgentStatusDir(run.issue.identifier);
+      const statusPath = join(agentDir, 'status.json');
+
+      let lastUpdate = run.startedAt;
+      try {
+        const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
+        lastUpdate = new Date(data.lastUpdate).getTime();
+      } catch {
+        // No status file — use startedAt
+      }
+
+      const elapsed = now - lastUpdate;
+      if (elapsed < staleThresholdMs) continue;
+
+      const elapsedMin = Math.round(elapsed / 60000);
+      const pid = run.process?.pid;
+      let alive = false;
+      if (pid) {
+        try {
+          process.kill(pid, 0);
+          alive = true;
+        } catch {
+          // process is dead
+        }
+      }
+
+      if (!alive) {
+        // Process died without cleanup — finalize it
+        logger.warn('Stale agent process is dead, cleaning up', {
+          identifier: run.issue.identifier,
+          pid,
+          staleMins: elapsedMin,
+        });
+        console.log(
+          `[${run.issue.identifier}] Agent dead after ${elapsedMin}m — finalizing`
+        );
+
+        // Check if it left commits behind
+        await this.finalizeStaleAgent(run);
+        this.running.delete(issueId);
+      } else {
+        // Process alive but no activity for 1h — kill it
+        logger.warn('Stale agent still alive but stuck, killing', {
+          identifier: run.issue.identifier,
+          pid,
+          staleMins: elapsedMin,
+        });
+        console.log(
+          `[${run.issue.identifier}] Agent stuck for ${elapsedMin}m — killing pid ${pid}`
+        );
+        run.process?.kill('SIGTERM');
+
+        // Give it 10s to exit gracefully
+        await new Promise<void>((resolve) => setTimeout(resolve, 10000));
+        if (run.process && !run.process.killed) {
+          run.process.kill('SIGKILL');
+        }
+
+        await this.finalizeStaleAgent(run);
+        this.running.delete(issueId);
+      }
+    }
+  }
+
+  /**
+   * Finalize an agent that completed or died without proper cleanup.
+   * Checks for commits, transitions Linear issue, takes snapshot.
+   */
+  private async finalizeStaleAgent(run: RunningIssue): Promise<void> {
+    const wsPath = run.workspacePath;
+    if (!wsPath || !existsSync(wsPath)) {
+      this.completed.add(run.issue.id);
+      return;
+    }
+
+    // Check if the agent left commits on the branch
+    let hasCommits = false;
+    try {
+      const log = execSync(
+        `git log origin/${this.config.baseBranch}..HEAD --oneline`,
+        { cwd: wsPath, encoding: 'utf-8', timeout: 10000 }
+      );
+      hasCommits = log.trim().length > 0;
+    } catch {
+      // Can't determine — assume no commits
+    }
+
+    if (hasCommits) {
+      logger.info('Stale agent had commits, transitioning to In Review', {
+        identifier: run.issue.identifier,
+      });
+      console.log(
+        `[${run.issue.identifier}] Found commits — moving to In Review`
+      );
+      this.takeSnapshot(wsPath, run.issue);
+      await this.transitionIssue(run.issue, this.config.inReviewState).catch(
+        (err) => {
+          logger.error('Failed to transition stale agent issue', {
+            identifier: run.issue.identifier,
+            error: (err as Error).message,
+          });
+        }
+      );
+      this.completeCount++;
+    } else {
+      logger.info('Stale agent had no commits, marking as failed', {
+        identifier: run.issue.identifier,
+      });
+      console.log(
+        `[${run.issue.identifier}] No commits found — marking failed`
+      );
+      this.failCount++;
+    }
+
+    // Update status file
+    this.writeAgentStatus(run.issue.identifier, {
+      ...run,
+      status: hasCommits ? 'completed' : 'failed',
+      phase: hasCommits ? 'committing' : run.phase,
+    });
+
+    this.completed.add(run.issue.id);
+  }
 
   private async reconcile(): Promise<void> {
     if (!this.client || this.running.size === 0) return;
