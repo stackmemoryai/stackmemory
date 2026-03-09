@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+/**
+ * Gemini-SM CLI Launcher (ESM)
+ * Delegates to built CLI in dist without requiring tsx.
+ */
+import('../dist/src/cli/gemini-sm.js');
