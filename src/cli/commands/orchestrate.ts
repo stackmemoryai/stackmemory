@@ -25,6 +25,8 @@ import { logger } from '../../core/monitoring/logger.js';
 import { Conductor } from './orchestrator.js';
 import {
   getAgentStatusDir,
+  getOutcomesLogPath,
+  type AgentOutcomeEntry,
   type AgentPhase,
   type AgentStatusFile,
 } from './orchestrator.js';
@@ -822,6 +824,234 @@ export function createConductorCommands(): Command {
         process.on('SIGINT', forward);
         process.on('SIGTERM', forward);
       });
+    });
+
+  // --- learn ---
+  cmd
+    .command('learn')
+    .description(
+      'Analyze agent outcomes and generate improved prompt templates'
+    )
+    .option('--last <n>', 'Analyze last N outcomes (default: all)', '0')
+    .option('--failures-only', 'Only analyze failures', false)
+    .option('--export', 'Export analysis as JSON', false)
+    .action(async (options) => {
+      const logPath = getOutcomesLogPath();
+      if (!existsSync(logPath)) {
+        console.log(
+          `${c.yellow}No outcomes log found.${c.r} Run conductor to generate data.`
+        );
+        return;
+      }
+
+      const raw = readFileSync(logPath, 'utf-8')
+        .trim()
+        .split('\n')
+        .filter((l) => l.length > 0);
+
+      let outcomes: AgentOutcomeEntry[] = raw.map(
+        (line) => JSON.parse(line) as AgentOutcomeEntry
+      );
+
+      if (options.failuresOnly) {
+        outcomes = outcomes.filter((o) => o.outcome === 'failure');
+      }
+
+      const lastN = parseInt(options.last, 10);
+      if (lastN > 0) {
+        outcomes = outcomes.slice(-lastN);
+      }
+
+      if (outcomes.length === 0) {
+        console.log(`${c.gray}No matching outcomes to analyze.${c.r}`);
+        return;
+      }
+
+      // Aggregate stats
+      const total = outcomes.length;
+      const successes = outcomes.filter((o) => o.outcome === 'success').length;
+      const failures = outcomes.filter((o) => o.outcome === 'failure').length;
+      const successRate = Math.round((successes / total) * 100);
+
+      const avgTokens = Math.round(
+        outcomes.reduce((s, o) => s + o.tokensUsed, 0) / total
+      );
+      const avgDuration = Math.round(
+        outcomes.reduce((s, o) => s + o.durationMs, 0) / total / 60000
+      );
+      const avgTools = Math.round(
+        outcomes.reduce((s, o) => s + o.toolCalls, 0) / total
+      );
+
+      // Phase distribution at failure
+      const failPhases: Record<string, number> = {};
+      for (const o of outcomes.filter((o) => o.outcome === 'failure')) {
+        failPhases[o.phase] = (failPhases[o.phase] || 0) + 1;
+      }
+
+      // Retry analysis
+      const retries = outcomes.filter((o) => o.attempt > 1);
+      const retrySuccessRate =
+        retries.length > 0
+          ? Math.round(
+              (retries.filter((o) => o.outcome === 'success').length /
+                retries.length) *
+                100
+            )
+          : 0;
+
+      // Error pattern extraction
+      const errorPatterns: Record<string, number> = {};
+      for (const o of outcomes.filter(
+        (o) => o.outcome === 'failure' && o.errorTail
+      )) {
+        // Extract key error patterns from tail
+        const tail = o.errorTail!;
+        if (tail.includes('lint'))
+          errorPatterns['lint_failure'] =
+            (errorPatterns['lint_failure'] || 0) + 1;
+        else if (tail.includes('test'))
+          errorPatterns['test_failure'] =
+            (errorPatterns['test_failure'] || 0) + 1;
+        else if (tail.includes('timeout') || tail.includes('timed out'))
+          errorPatterns['timeout'] = (errorPatterns['timeout'] || 0) + 1;
+        else if (tail.includes('conflict'))
+          errorPatterns['git_conflict'] =
+            (errorPatterns['git_conflict'] || 0) + 1;
+        else if (tail.includes('429') || tail.includes('rate'))
+          errorPatterns['rate_limit'] = (errorPatterns['rate_limit'] || 0) + 1;
+        else errorPatterns['unknown'] = (errorPatterns['unknown'] || 0) + 1;
+      }
+
+      if (options.export) {
+        const analysis = {
+          total,
+          successes,
+          failures,
+          successRate,
+          avgTokens,
+          avgDurationMin: avgDuration,
+          avgToolCalls: avgTools,
+          failPhases,
+          retrySuccessRate,
+          errorPatterns,
+          outcomes,
+        };
+        console.log(JSON.stringify(analysis, null, 2));
+        return;
+      }
+
+      // Display report
+      console.log(`\n  ${c.b}${c.purple}Conductor Learning Report${c.r}\n`);
+
+      const rateColor =
+        successRate >= 80 ? c.green : successRate >= 50 ? c.yellow : c.red;
+      console.log(
+        `  ${c.b}Outcomes${c.r}  ${c.white}${total}${c.r} total  ${c.green}${successes}${c.r} success  ${c.red}${failures}${c.r} failed  ${rateColor}${successRate}%${c.r} success rate`
+      );
+      console.log(
+        `  ${c.b}Averages${c.r}  ${c.white}${avgDuration}m${c.r} duration  ${c.white}${fmtTokens(avgTokens)}${c.r} tokens  ${c.white}${avgTools}${c.r} tool calls`
+      );
+
+      if (retries.length > 0) {
+        console.log(
+          `  ${c.b}Retries${c.r}   ${c.white}${retries.length}${c.r} attempts  ${c.white}${retrySuccessRate}%${c.r} retry success rate`
+        );
+      }
+
+      // Failure phase breakdown
+      if (failures > 0) {
+        console.log(`\n  ${c.b}Failure Phases${c.r}`);
+        const sorted = Object.entries(failPhases).sort((a, b) => b[1] - a[1]);
+        for (const [phase, count] of sorted) {
+          const pct = Math.round((count / failures) * 100);
+          const bar = progressBar(pct, 10);
+          console.log(
+            `    ${phaseIcon[phase as AgentPhase] || '○'} ${phase.padEnd(14)} ${bar} ${c.white}${count}${c.r} ${c.gray}(${pct}%)${c.r}`
+          );
+        }
+      }
+
+      // Error patterns
+      if (Object.keys(errorPatterns).length > 0) {
+        console.log(`\n  ${c.b}Error Patterns${c.r}`);
+        const sorted = Object.entries(errorPatterns).sort(
+          (a, b) => b[1] - a[1]
+        );
+        for (const [pattern, count] of sorted) {
+          console.log(
+            `    ${c.red}●${c.r} ${pattern.padEnd(16)} ${c.white}${count}${c.r}`
+          );
+        }
+      }
+
+      // Recommendations
+      console.log(`\n  ${c.b}Recommendations${c.r}`);
+      const recs: string[] = [];
+
+      if (errorPatterns['lint_failure'] > 0) {
+        recs.push(
+          'Add explicit lint rules to prompt template (ESLint conventions, import style)'
+        );
+      }
+      if (errorPatterns['test_failure'] > 0) {
+        recs.push(
+          'Add "run tests before committing" emphasis, include test command in prompt'
+        );
+      }
+      if (errorPatterns['timeout'] > 0) {
+        recs.push(
+          'Reduce scope per issue or increase turnTimeoutMs in conductor config'
+        );
+      }
+      if (failPhases['implementing'] > failures * 0.5) {
+        recs.push(
+          'Agents stall during implementation — add examples or break issues smaller'
+        );
+      }
+      if (failPhases['reading'] > 0) {
+        recs.push(
+          'Agents fail during reading — improve issue descriptions or add context pointers'
+        );
+      }
+      if (retrySuccessRate < 30 && retries.length > 2) {
+        recs.push(
+          'Low retry success — consider better prior-attempt context injection'
+        );
+      }
+      if (successRate >= 80) {
+        recs.push(
+          'High success rate — current prompt template is working well'
+        );
+      }
+
+      if (recs.length === 0) {
+        recs.push('Collect more data for actionable recommendations');
+      }
+
+      for (const rec of recs) {
+        console.log(`    ${c.cyan}→${c.r} ${rec}`);
+      }
+
+      // Prompt template hint
+      const templatePath = join(
+        homedir(),
+        '.stackmemory',
+        'conductor',
+        'prompt-template.md'
+      );
+      if (!existsSync(templatePath)) {
+        console.log(
+          `\n  ${c.d}Tip: Create ${templatePath} to customize agent prompts.${c.r}`
+        );
+        console.log(
+          `  ${c.d}Variables: {{ISSUE_ID}} {{TITLE}} {{DESCRIPTION}} {{LABELS}} {{PRIORITY}} {{ATTEMPT}} {{PRIOR_CONTEXT}}${c.r}`
+        );
+      } else {
+        console.log(`\n  ${c.d}Using custom template: ${templatePath}${c.r}`);
+      }
+
+      console.log('');
     });
 
   // --- usage ---

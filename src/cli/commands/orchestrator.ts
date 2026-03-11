@@ -10,6 +10,7 @@
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -160,6 +161,34 @@ export interface AgentStatusFile {
   toolCalls: number;
   tokensUsed: number;
   workspacePath?: string;
+}
+
+/** Learning: structured failure/success log entry for prompt evolution */
+export interface AgentOutcomeEntry {
+  timestamp: string;
+  issue: string;
+  attempt: number;
+  outcome: 'success' | 'failure' | 'partial';
+  phase: AgentPhase;
+  toolCalls: number;
+  filesModified: number;
+  tokensUsed: number;
+  durationMs: number;
+  hasCommits: boolean;
+  errorTail?: string; // last 5 lines of output.log on failure
+  promptHash?: string; // hash of the prompt template used
+}
+
+/** Get the conductor failures/outcomes log path */
+export function getOutcomesLogPath(): string {
+  return join(homedir(), '.stackmemory', 'conductor', 'outcomes.jsonl');
+}
+
+/** Append a structured outcome to the learning log */
+function logAgentOutcome(entry: AgentOutcomeEntry): void {
+  const dir = join(homedir(), '.stackmemory', 'conductor');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  appendFileSync(getOutcomesLogPath(), JSON.stringify(entry) + '\n');
 }
 
 // ── Helpers ──
@@ -961,6 +990,18 @@ export class Conductor {
         // Success
         run.status = 'completed';
         this.completeCount++;
+        logAgentOutcome({
+          timestamp: new Date().toISOString(),
+          issue: issue.identifier,
+          attempt: run.attempt,
+          outcome: 'success',
+          phase: run.phase,
+          toolCalls: run.toolCalls,
+          filesModified: run.filesModified,
+          tokensUsed: run.tokensUsed,
+          durationMs: Date.now() - run.startedAt,
+          hasCommits: true,
+        });
         await this.runHook(
           'after-run',
           run.workspacePath,
@@ -1825,7 +1866,50 @@ export class Conductor {
     }
   }
 
+  /**
+   * Build the agent prompt. If a custom template exists at
+   * ~/.stackmemory/conductor/prompt-template.md, use it with variable
+   * substitution. Otherwise fall back to the default template.
+   *
+   * Template variables: {{ISSUE_ID}}, {{TITLE}}, {{DESCRIPTION}},
+   * {{LABELS}}, {{PRIORITY}}, {{ATTEMPT}}, {{PRIOR_CONTEXT}}
+   */
   private buildPrompt(issue: LinearIssue, attempt: number): string {
+    const templatePath = join(
+      homedir(),
+      '.stackmemory',
+      'conductor',
+      'prompt-template.md'
+    );
+
+    const priority =
+      ['None', 'Urgent', 'High', 'Medium', 'Low'][issue.priority] || 'None';
+    const labels =
+      issue.labels.length > 0 ? issue.labels.map((l) => l.name).join(', ') : '';
+    const priorContext =
+      attempt > 1
+        ? `This is attempt ${attempt}. Check .stackmemory/conductor-context.md for context from prior attempts.`
+        : '';
+
+    // Try custom template first
+    if (existsSync(templatePath)) {
+      try {
+        let template = readFileSync(templatePath, 'utf-8');
+        template = template
+          .replace(/\{\{ISSUE_ID\}\}/g, issue.identifier)
+          .replace(/\{\{TITLE\}\}/g, issue.title)
+          .replace(/\{\{DESCRIPTION\}\}/g, issue.description || '')
+          .replace(/\{\{LABELS\}\}/g, labels)
+          .replace(/\{\{PRIORITY\}\}/g, priority)
+          .replace(/\{\{ATTEMPT\}\}/g, String(attempt))
+          .replace(/\{\{PRIOR_CONTEXT\}\}/g, priorContext);
+        return template;
+      } catch {
+        // Fall through to default
+      }
+    }
+
+    // Default template
     const lines = [
       `You are working on Linear issue ${issue.identifier}: ${issue.title}`,
       '',
@@ -1835,19 +1919,14 @@ export class Conductor {
       lines.push('## Description', '', issue.description, '');
     }
 
-    if (issue.labels.length > 0) {
-      lines.push(`Labels: ${issue.labels.map((l) => l.name).join(', ')}`);
+    if (labels) {
+      lines.push(`Labels: ${labels}`);
     }
 
-    lines.push(
-      `Priority: ${['None', 'Urgent', 'High', 'Medium', 'Low'][issue.priority] || 'None'}`
-    );
+    lines.push(`Priority: ${priority}`);
 
-    if (attempt > 1) {
-      lines.push(
-        '',
-        `This is attempt ${attempt}. Check .stackmemory/conductor-context.md for context from prior attempts.`
-      );
+    if (priorContext) {
+      lines.push('', priorContext);
     }
 
     lines.push(
@@ -2091,6 +2170,40 @@ export class Conductor {
     } catch {
       // Can't determine — assume no commits
     }
+
+    // Extract error tail from output.log for failure analysis
+    let errorTail: string | undefined;
+    if (!hasCommits) {
+      try {
+        const logPath = join(
+          getAgentStatusDir(run.issue.identifier),
+          'output.log'
+        );
+        if (existsSync(logPath)) {
+          const content = readFileSync(logPath, 'utf-8');
+          const lines = content.trim().split('\n');
+          errorTail = lines.slice(-5).join('\n');
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    // Log structured outcome for learning
+    const durationMs = Date.now() - run.startedAt;
+    logAgentOutcome({
+      timestamp: new Date().toISOString(),
+      issue: run.issue.identifier,
+      attempt: run.attempt,
+      outcome: hasCommits ? 'success' : 'failure',
+      phase: run.phase,
+      toolCalls: run.toolCalls,
+      filesModified: run.filesModified,
+      tokensUsed: run.tokensUsed,
+      durationMs,
+      hasCommits,
+      errorTail,
+    });
 
     if (hasCommits) {
       logger.info('Stale agent had commits, transitioning to In Review', {
