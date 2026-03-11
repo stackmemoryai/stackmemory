@@ -96,6 +96,10 @@ function budgetBar(pct: number, width = 30): string {
   return `${color}${'█'.repeat(filled)}${dim}${'░'.repeat(empty)}${rst} ${String(pct).padStart(3)}%`;
 }
 
+// ── Constants ──
+const STALE_UI_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes - UI "stalled" indicator
+const STALE_FINALIZE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour - finalize threshold
+
 // ── ANSI helpers ──
 const c = {
   r: '\x1b[0m', // reset
@@ -206,6 +210,42 @@ function progressBar(pct: number, width: number): string {
   return `${col}${'━'.repeat(filled)}${c.d}${'╌'.repeat(empty)}${c.r}`;
 }
 
+/** Scan all agent status files, returning parsed statuses with dir name */
+function scanAgentStatuses(): (AgentStatusFile & { dir: string })[] {
+  const agentsDir = join(homedir(), '.stackmemory', 'conductor', 'agents');
+  if (!existsSync(agentsDir)) return [];
+  const entries = readdirSync(agentsDir, { withFileTypes: true });
+  const statuses: (AgentStatusFile & { dir: string })[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const statusPath = join(agentsDir, entry.name, 'status.json');
+    if (!existsSync(statusPath)) continue;
+    try {
+      const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
+      statuses.push({ ...(data as AgentStatusFile), dir: entry.name });
+    } catch {
+      // skip corrupt files
+    }
+  }
+  statuses.sort(
+    (a, b) =>
+      new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
+  );
+  return statuses;
+}
+
+/** Enrich a status entry with computed liveness fields */
+function enrichStatus(s: AgentStatusFile): {
+  elapsed: number;
+  alive: boolean;
+  stale: boolean;
+} {
+  const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
+  const alive = isProcessAlive(s.pid);
+  const stale = alive && elapsed > STALE_UI_THRESHOLD_MS;
+  return { elapsed, alive, stale };
+}
+
 function fmtMinutes(m: number): string {
   if (m < 0) return 'N/A';
   if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`;
@@ -224,25 +264,20 @@ function printUsageSummary(u: Record<string, unknown>): void {
   const mins20x = (u.minutesRemaining20x as number) ?? -1;
   const cacheHitRate = (u.cacheHitRate as number) || 0;
 
-  const b = '\x1b[1m';
-  const d = '\x1b[2m';
-  const w = '\x1b[37m';
-  const r = '\x1b[0m';
-
-  console.log(`${b}Token Usage${r}`);
+  console.log(`${c.b}Token Usage${c.r}`);
   console.log(
-    `  Input  ${w}${fmtTokens(inputTokens)}${r}  ${d}|${r}  Output  ${w}${fmtTokens(outputTokens)}${r}  ${d}|${r}  Total  ${w}${fmtTokens(totalTokens)}${r}`
+    `  Input  ${c.white}${fmtTokens(inputTokens)}${c.r}  ${c.d}|${c.r}  Output  ${c.white}${fmtTokens(outputTokens)}${c.r}  ${c.d}|${c.r}  Total  ${c.white}${fmtTokens(totalTokens)}${c.r}`
   );
   console.log(
-    `  Rate   ${w}${fmtTokens(tokensPerMin)}/min${r}  ${d}|${r}  Messages  ${w}${estMessages}${r}  ${d}|${r}  Cache hit  ${w}${cacheHitRate}%${r}`
+    `  Rate   ${c.white}${fmtTokens(tokensPerMin)}/min${c.r}  ${c.d}|${c.r}  Messages  ${c.white}${estMessages}${c.r}  ${c.d}|${c.r}  Cache hit  ${c.white}${cacheHitRate}%${c.r}`
   );
   console.log('');
-  console.log(`${b}Budget (Max plan, 5h window)${r}`);
+  console.log(`${c.b}Budget (Max plan, 5h window)${c.r}`);
   console.log(
-    `  5x  (225 msgs)  ${budgetBar(budgetPct5x)}  ${d}~${fmtMinutes(mins5x)} left${r}`
+    `  5x  (225 msgs)  ${budgetBar(budgetPct5x)}  ${c.d}~${fmtMinutes(mins5x)} left${c.r}`
   );
   console.log(
-    `  20x (900 msgs)  ${budgetBar(budgetPct20x)}  ${d}~${fmtMinutes(mins20x)} left${r}`
+    `  20x (900 msgs)  ${budgetBar(budgetPct20x)}  ${c.d}~${fmtMinutes(mins20x)} left${c.r}`
   );
 }
 
@@ -576,46 +611,18 @@ export function createConductorCommands(): Command {
     .command('status')
     .description('Show running agent status table')
     .action(async () => {
-      const agentsDir = join(homedir(), '.stackmemory', 'conductor', 'agents');
-      if (!existsSync(agentsDir)) {
-        console.log('No agent status files found');
-        return;
-      }
-
-      const entries = readdirSync(agentsDir, { withFileTypes: true });
-      const statuses: AgentStatusFile[] = [];
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const statusPath = join(agentsDir, entry.name, 'status.json');
-        if (!existsSync(statusPath)) continue;
-        try {
-          const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
-          statuses.push(data as AgentStatusFile);
-        } catch {
-          // skip corrupt files
-        }
-      }
+      const statuses = scanAgentStatuses();
 
       if (statuses.length === 0) {
         console.log('No agent status files found');
         return;
       }
 
-      // Sort by lastUpdate descending (most recent first)
-      statuses.sort(
-        (a, b) =>
-          new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
-      );
-
-      // Compact grid display
-      const active = statuses.filter((s) => isProcessAlive(s.pid));
-      const stalled = statuses.filter(
-        (s) =>
-          isProcessAlive(s.pid) &&
-          Date.now() - new Date(s.lastUpdate).getTime() > 5 * 60 * 1000
-      );
-      const dead = statuses.filter((s) => !isProcessAlive(s.pid));
+      // Compute liveness once per entry
+      const enriched = statuses.map((s) => ({ ...s, ...enrichStatus(s) }));
+      const active = enriched.filter((s) => s.alive);
+      const stalled = enriched.filter((s) => s.stale);
+      const dead = enriched.filter((s) => !s.alive);
       const healthy = active.length - stalled.length;
 
       const parts: string[] = [];
@@ -630,22 +637,19 @@ export function createConductorCommands(): Command {
       const cols = (process.stdout.columns || 80) >= 90 ? 2 : 1;
       const rows: string[][] = [];
 
-      for (const s of statuses) {
-        const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-        const staleFlag = elapsed > 5 * 60 * 1000;
-        const alive = isProcessAlive(s.pid);
+      for (const s of enriched) {
         const { icon, color, pct, label } = phaseProgress(
           s.phase,
           s.toolCalls,
-          staleFlag,
-          alive
+          s.stale,
+          s.alive
         );
         const bar = progressBar(pct, 8);
-        const timeColor = !alive ? c.red : staleFlag ? c.orange : c.gray;
+        const timeColor = !s.alive ? c.red : s.stale ? c.orange : c.gray;
 
         const cell = [
           `${color}${icon}${c.r} ${c.b}${s.issue}${c.r} ${color}${label}${c.r}`,
-          `  ${bar} ${c.d}${pct}%${c.r} ${c.gray}${s.toolCalls}t ${s.filesModified}f${c.r} ${timeColor}${formatElapsed(elapsed)}${c.r}`,
+          `  ${bar} ${c.d}${pct}%${c.r} ${c.gray}${s.toolCalls}t ${s.filesModified}f${c.r} ${timeColor}${formatElapsed(s.elapsed)}${c.r}`,
         ];
         rows.push(cell);
       }
@@ -690,33 +694,14 @@ export function createConductorCommands(): Command {
     .description('Clean up completed/dead agents that conductor missed')
     .option('--dry-run', 'Show what would be done without doing it', false)
     .action(async (options) => {
-      const agentsDir = join(homedir(), '.stackmemory', 'conductor', 'agents');
-      if (!existsSync(agentsDir)) {
-        console.log('No agent status files found');
-        return;
-      }
+      const statuses = scanAgentStatuses();
 
-      const entries = readdirSync(agentsDir, { withFileTypes: true });
-      const statuses: (AgentStatusFile & { dir: string })[] = [];
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const statusPath = join(agentsDir, entry.name, 'status.json');
-        if (!existsSync(statusPath)) continue;
-        try {
-          const data = JSON.parse(readFileSync(statusPath, 'utf-8'));
-          statuses.push({ ...(data as AgentStatusFile), dir: entry.name });
-        } catch {
-          // skip
-        }
-      }
-
-      // Find agents that are dead or stale
-      const needsFinalize = statuses.filter((s) => {
-        const alive = isProcessAlive(s.pid);
-        const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-        return !alive || elapsed > 60 * 60 * 1000;
-      });
+      // Find agents that are dead or stale (1 hour threshold for finalize)
+      const needsFinalize = statuses
+        .map((s) => ({ ...s, ...enrichStatus(s) }))
+        .filter((s) => {
+          return !s.alive || s.elapsed > STALE_FINALIZE_THRESHOLD_MS;
+        });
 
       if (needsFinalize.length === 0) {
         console.log(
@@ -730,9 +715,7 @@ export function createConductorCommands(): Command {
       );
 
       for (const s of needsFinalize) {
-        const alive = isProcessAlive(s.pid);
-        const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-        const elapsedStr = formatElapsed(elapsed).replace(' ago', '');
+        const elapsedStr = formatElapsed(s.elapsed).replace(' ago', '');
 
         // Check for commits in worktree
         let hasCommits = false;
@@ -749,7 +732,7 @@ export function createConductorCommands(): Command {
           }
         }
 
-        const statusIcon = !alive
+        const statusIcon = !s.alive
           ? `${c.red}✗ dead${c.r}`
           : `${c.orange}⏸ stalled ${elapsedStr}${c.r}`;
         const commitStatus = hasCommits
@@ -761,7 +744,7 @@ export function createConductorCommands(): Command {
         if (options.dryRun) continue;
 
         // Kill if still alive
-        if (alive) {
+        if (s.alive) {
           try {
             process.kill(s.pid, 'SIGTERM');
             console.log(`     ${c.gray}Sent SIGTERM to pid ${s.pid}${c.r}`);
@@ -981,30 +964,7 @@ export function createConductorCommands(): Command {
       // Use module-level color constants (c.b, c.d, c.r, etc.)
 
       function readStatuses(): AgentStatusFile[] {
-        const agentsDir = join(
-          homedir(),
-          '.stackmemory',
-          'conductor',
-          'agents'
-        );
-        if (!existsSync(agentsDir)) return [];
-        const entries = readdirSync(agentsDir, { withFileTypes: true });
-        const statuses: AgentStatusFile[] = [];
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const statusPath = join(agentsDir, entry.name, 'status.json');
-          if (!existsSync(statusPath)) continue;
-          try {
-            statuses.push(JSON.parse(readFileSync(statusPath, 'utf-8')));
-          } catch {
-            // skip corrupt files
-          }
-        }
-        statuses.sort(
-          (a, b) =>
-            new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()
-        );
-        // Apply phase filter
+        const statuses = scanAgentStatuses() as AgentStatusFile[];
         if (phaseFilter) {
           return statuses.filter((s) => s.phase === phaseFilter);
         }
@@ -1018,9 +978,7 @@ export function createConductorCommands(): Command {
           return;
         }
         for (const s of statuses) {
-          const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-          const stale = elapsed > 5 * 60 * 1000;
-          const alive = isProcessAlive(s.pid);
+          const { elapsed, alive, stale } = enrichStatus(s);
           const prog = phaseProgress(s.phase, s.toolCalls, stale, alive);
           const bar = progressBar(prog.pct, 10);
 
@@ -1058,9 +1016,7 @@ export function createConductorCommands(): Command {
           return;
         }
         for (const s of statuses) {
-          const elapsed = Date.now() - new Date(s.lastUpdate).getTime();
-          const stale = elapsed > 5 * 60 * 1000;
-          const alive = isProcessAlive(s.pid);
+          const { elapsed, alive, stale } = enrichStatus(s);
           const prog = phaseProgress(s.phase, s.toolCalls, stale, alive);
 
           console.log(
@@ -1086,10 +1042,10 @@ export function createConductorCommands(): Command {
         }
       }
 
+      const cachedConductor = new Conductor({ repoRoot: process.cwd() });
       async function getUsage(): Promise<Record<string, unknown>> {
-        const conductor = new Conductor({ repoRoot: process.cwd() });
-        await conductor.scanUsageLogs();
-        return conductor.getUsageSummary() as Record<string, unknown>;
+        await cachedConductor.scanUsageLogs();
+        return cachedConductor.getUsageSummary() as Record<string, unknown>;
       }
 
       async function render(): Promise<void> {
@@ -1148,7 +1104,7 @@ export function createConductorCommands(): Command {
 
         console.log('');
         console.log(
-          `${d}──────────────────────────────────────────────────${r}`
+          `${c.d}──────────────────────────────────────────────────${c.r}`
         );
       }
 
