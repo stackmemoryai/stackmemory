@@ -32,6 +32,16 @@ import {
   type AgentPhase,
   type AgentStatusFile,
 } from './orchestrator.js';
+import {
+  openTracesDb,
+  listSessions,
+  getSessionTurns,
+  getPhaseBreakdown,
+  getToolFrequencies,
+  getFailureTurns,
+  getTraceStats,
+  classifyErrorText,
+} from './conductor-traces.js';
 
 /** Global store for cross-workspace context */
 function getGlobalStorePath(): string {
@@ -89,6 +99,21 @@ function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+/** Format token count with unit suffix (alias for trace commands) */
+function formatTokens(n: number): string {
+  return fmtTokens(n) + ' tok';
+}
+
+/** Format duration in ms to human-readable */
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
 }
 
 function budgetBar(pct: number, width = 30): string {
@@ -459,6 +484,70 @@ export function predictDifficulty(
   return { difficulty, confidence, reasons };
 }
 
+/** Evidence item from trace-based failure analysis */
+interface TraceEvidenceItem {
+  issue: string;
+  phase: string;
+  tools: string[];
+  preview: string;
+}
+
+/**
+ * Extract error patterns from traces instead of heuristic errorTail parsing.
+ * Queries the traces DB for the last N turns of each failed issue session
+ * and uses the shared classifyErrorText for consistent pattern detection.
+ */
+function analyzeErrorsFromTraces(failedIssues: string[]): {
+  patterns: Record<string, number>;
+  evidence: TraceEvidenceItem[];
+} {
+  const patterns: Record<string, number> = {};
+  const evidence: TraceEvidenceItem[] = [];
+
+  let db: ReturnType<typeof openTracesDb> | undefined;
+  try {
+    db = openTracesDb();
+  } catch {
+    return { patterns, evidence };
+  }
+
+  try {
+    for (const issueId of failedIssues) {
+      const turns = getFailureTurns(issueId, 3, db);
+      if (turns.length === 0) continue;
+
+      for (const turn of turns) {
+        const preview = turn.message_preview || '';
+        const tools = turn.tool_names
+          ? (JSON.parse(turn.tool_names) as string[])
+          : [];
+
+        const pattern = classifyErrorText(preview);
+        if (pattern) {
+          patterns[pattern] = (patterns[pattern] || 0) + 1;
+        }
+
+        if (evidence.length < 15) {
+          evidence.push({
+            issue: issueId,
+            phase: turn.phase || 'unknown',
+            tools,
+            preview: preview.slice(0, 300),
+          });
+        }
+      }
+    }
+  } finally {
+    db.close();
+  }
+
+  if (Object.keys(patterns).length === 0 && failedIssues.length > 0) {
+    patterns['unknown'] = failedIssues.length;
+  }
+
+  return { patterns, evidence };
+}
+
 /** Load outcomes from disk */
 function loadOutcomes(): AgentOutcomeEntry[] {
   const logPath = getOutcomesLogPath();
@@ -525,6 +614,13 @@ interface EvolveInput {
   recs: string[];
   outcomes: AgentOutcomeEntry[];
   dryRun?: boolean;
+  /** Evidence from traces — actual tool calls and content from failure turns */
+  traceEvidence?: Array<{
+    issue: string;
+    phase: string;
+    tools: string[];
+    preview: string;
+  }>;
 }
 
 /**
@@ -627,6 +723,7 @@ async function evolvePromptTemplate(input: EvolveInput): Promise<void> {
     recs,
     outcomes,
     dryRun,
+    traceEvidence,
   } = input;
 
   // Read current template (or use default)
@@ -651,16 +748,28 @@ async function evolvePromptTemplate(input: EvolveInput): Promise<void> {
     .map(([pattern, count]) => `  - ${pattern}: ${count} occurrences`)
     .join('\n');
 
-  // Sample error tails from recent failures
-  const failedOutcomes = outcomes
-    .filter((o) => o.outcome === 'failure' && o.errorTail)
-    .slice(-5);
-  const errorTails = failedOutcomes
-    .map(
-      (o) =>
-        `  [${o.issue} attempt ${o.attempt}, phase: ${o.phase}]\n  ${o.errorTail}`
-    )
-    .join('\n\n');
+  // Build failure evidence: prefer traces, fall back to errorTail
+  let failureEvidenceSection: string;
+  if (traceEvidence && traceEvidence.length > 0) {
+    const evidenceLines = traceEvidence.slice(0, 10).map((ev) => {
+      const tools = ev.tools.length > 0 ? ev.tools.join(', ') : 'none';
+      return `  [${ev.issue}, phase: ${ev.phase}, tools: ${tools}]\n  ${ev.preview.slice(0, 200)}`;
+    });
+    failureEvidenceSection = `ACTUAL FAILURE EVIDENCE (from conversation traces):
+${evidenceLines.join('\n\n')}`;
+  } else {
+    const failedOutcomes = outcomes
+      .filter((o) => o.outcome === 'failure' && o.errorTail)
+      .slice(-5);
+    const errorTails = failedOutcomes
+      .map(
+        (o) =>
+          `  [${o.issue} attempt ${o.attempt}, phase: ${o.phase}]\n  ${o.errorTail}`
+      )
+      .join('\n\n');
+    failureEvidenceSection = `SAMPLE ERROR TAILS FROM RECENT FAILURES:
+${errorTails || '  (none)'}`;
+  }
 
   const mutationPrompt = `You are optimizing a prompt template for autonomous AI coding agents managed by a conductor system.
 
@@ -679,8 +788,7 @@ ${failPhaseSummary || '  (none)'}
 ERROR PATTERNS:
 ${errorSummary || '  (none)'}
 
-SAMPLE ERROR TAILS FROM RECENT FAILURES:
-${errorTails || '  (none)'}
+${failureEvidenceSection}
 
 RECOMMENDATIONS FROM ANALYSIS:
 ${recs.map((r) => `- ${r}`).join('\n')}
@@ -1359,6 +1467,10 @@ export function createConductorCommands(): Command {
       false
     )
     .option(
+      '--no-evidence',
+      'Disable trace-based evidence display (on by default when traces.db exists)'
+    )
+    .option(
       '--predict',
       'Show difficulty predictions alongside actual outcomes',
       false
@@ -1428,27 +1540,29 @@ export function createConductorCommands(): Command {
             )
           : 0;
 
-      // Error pattern extraction
-      const errorPatterns: Record<string, number> = {};
-      for (const o of outcomes.filter(
-        (o) => o.outcome === 'failure' && o.errorTail
-      )) {
-        // Extract key error patterns from tail
-        const tail = o.errorTail!;
-        if (tail.includes('lint'))
-          errorPatterns['lint_failure'] =
-            (errorPatterns['lint_failure'] || 0) + 1;
-        else if (tail.includes('test'))
-          errorPatterns['test_failure'] =
-            (errorPatterns['test_failure'] || 0) + 1;
-        else if (tail.includes('timeout') || tail.includes('timed out'))
-          errorPatterns['timeout'] = (errorPatterns['timeout'] || 0) + 1;
-        else if (tail.includes('conflict'))
-          errorPatterns['git_conflict'] =
-            (errorPatterns['git_conflict'] || 0) + 1;
-        else if (tail.includes('429') || tail.includes('rate'))
-          errorPatterns['rate_limit'] = (errorPatterns['rate_limit'] || 0) + 1;
-        else errorPatterns['unknown'] = (errorPatterns['unknown'] || 0) + 1;
+      // Error pattern extraction — prefer trace-based evidence over heuristic
+      const failedIssueIds = [
+        ...new Set(
+          outcomes.filter((o) => o.outcome === 'failure').map((o) => o.issue)
+        ),
+      ];
+      const traceAnalysis = analyzeErrorsFromTraces(failedIssueIds);
+      let errorPatterns = traceAnalysis.patterns;
+      let traceEvidence = traceAnalysis.evidence;
+
+      // Fallback to heuristic errorTail parsing if no traces available
+      if (
+        Object.keys(errorPatterns).length === 0 ||
+        (Object.keys(errorPatterns).length === 1 && errorPatterns['unknown'])
+      ) {
+        errorPatterns = {};
+        traceEvidence = [];
+        for (const o of outcomes.filter(
+          (o) => o.outcome === 'failure' && o.errorTail
+        )) {
+          const pattern = classifyErrorText(o.errorTail as string) ?? 'unknown';
+          errorPatterns[pattern] = (errorPatterns[pattern] || 0) + 1;
+        }
       }
 
       if (options.export) {
@@ -1502,15 +1616,42 @@ export function createConductorCommands(): Command {
 
       // Error patterns
       if (Object.keys(errorPatterns).length > 0) {
-        console.log(`\n  ${c.b}Error Patterns${c.r}`);
+        const sourceLabel =
+          traceEvidence.length > 0 ? '(from traces)' : '(from errorTail)';
+        console.log(
+          `\n  ${c.b}Error Patterns${c.r} ${c.d}${sourceLabel}${c.r}`
+        );
         const sorted = Object.entries(errorPatterns).sort(
           (a, b) => b[1] - a[1]
         );
         for (const [pattern, count] of sorted) {
           console.log(
-            `    ${c.red}●${c.r} ${pattern.padEnd(16)} ${c.white}${count}${c.r}`
+            `    ${c.red}●${c.r} ${pattern.padEnd(20)} ${c.white}${count}${c.r}`
           );
         }
+      }
+
+      // Evidence: actual tool calls and content from failure traces
+      if (options.evidence && traceEvidence.length > 0) {
+        console.log(
+          `\n  ${c.b}Failure Evidence${c.r} ${c.d}(from traces)${c.r}`
+        );
+        for (const ev of traceEvidence.slice(0, 15)) {
+          const tools = ev.tools.length > 0 ? ev.tools.join(', ') : '-';
+          console.log(
+            `    ${c.cyan}${ev.issue}${c.r} [${ev.phase}] tools: ${tools}`
+          );
+          if (ev.preview) {
+            const lines = ev.preview.split('\n').slice(0, 3);
+            for (const line of lines) {
+              console.log(`      ${c.d}${line.slice(0, 100)}${c.r}`);
+            }
+          }
+        }
+      } else if (options.evidence && traceEvidence.length === 0) {
+        console.log(
+          `\n  ${c.d}No trace data available. Run conductor with trace logging enabled to collect evidence.${c.r}`
+        );
       }
 
       // Recommendations
@@ -1592,6 +1733,7 @@ export function createConductorCommands(): Command {
           recs,
           outcomes,
           dryRun: options.dryRun,
+          traceEvidence,
         });
       }
 
@@ -2231,6 +2373,252 @@ export function createConductorCommands(): Command {
         process.on('SIGINT', cleanup);
         process.on('SIGTERM', cleanup);
       });
+    });
+
+  // --- traces ---
+  cmd
+    .command('traces <issue-id>')
+    .description('Show conversation traces for an agent run')
+    .option('--session <id>', 'Show specific session')
+    .option('--json', 'Output as JSON', false)
+    .option('--tools', 'Show tool frequency breakdown', false)
+    .option('--failures', 'Show failure-turn details', false)
+    .option('-n, --tail <count>', 'Failure tail turns', '5')
+    .action(
+      (
+        issueId: string,
+        options: {
+          session?: string;
+          json: boolean;
+          tools: boolean;
+          failures: boolean;
+          tail: string;
+        }
+      ) => {
+        const db = openTracesDb();
+
+        try {
+          if (options.tools) {
+            const freq = getToolFrequencies(issueId, db);
+            if (freq.length === 0) {
+              console.log(`No traces found for ${issueId}`);
+              return;
+            }
+            console.log(
+              `\n  ${c.b}Tool Frequency${c.r} — ${c.cyan}${issueId}${c.r}\n`
+            );
+            for (const { tool_name, count } of freq.slice(0, 20)) {
+              const bar = '━'.repeat(Math.min(count, 40));
+              console.log(
+                `  ${c.d}${tool_name.padEnd(20)}${c.r} ${bar} ${count}`
+              );
+            }
+            console.log('');
+            return;
+          }
+
+          if (options.failures) {
+            const turns = getFailureTurns(
+              issueId,
+              parseInt(options.tail, 10),
+              db
+            );
+            if (turns.length === 0) {
+              console.log(`No traces found for ${issueId}`);
+              return;
+            }
+            console.log(
+              `\n  ${c.b}Failure Turns${c.r} — ${c.cyan}${issueId}${c.r}\n`
+            );
+            for (const t of turns) {
+              const tools = t.tool_names
+                ? (JSON.parse(t.tool_names) as string[]).join(', ')
+                : '-';
+              const ts = new Date(t.timestamp).toISOString().slice(11, 19);
+              console.log(
+                `  ${c.d}[${ts}]${c.r} turn ${t.turn_number} | phase: ${t.phase || '-'} | tools: ${tools}`
+              );
+              if (t.message_preview) {
+                const preview = t.message_preview.slice(0, 200);
+                console.log(`    ${c.d}${preview}${c.r}`);
+              }
+            }
+            console.log('');
+            return;
+          }
+
+          // Session detail view
+          if (options.session) {
+            const turns = getSessionTurns(options.session, db);
+            if (turns.length === 0) {
+              console.log(`No turns found for session ${options.session}`);
+              return;
+            }
+
+            if (options.json) {
+              console.log(JSON.stringify(turns, null, 2));
+              return;
+            }
+
+            const phases = getPhaseBreakdown(options.session, db);
+            console.log(
+              `\n  ${c.b}Session${c.r} ${c.cyan}${options.session}${c.r}`
+            );
+            console.log(`  ${turns.length} turns\n`);
+
+            if (phases.length > 0) {
+              console.log(`  ${c.b}Phase Breakdown${c.r}`);
+              for (const p of phases) {
+                console.log(
+                  `  ${(p.phase || 'unknown').padEnd(14)} ${String(p.turns).padStart(3)} turns  ${String(p.tool_calls).padStart(4)} tools  ${formatTokens(p.input_tokens + p.output_tokens)}`
+                );
+              }
+              console.log('');
+            }
+
+            console.log(`  ${c.b}Turn Log${c.r}`);
+            for (const t of turns) {
+              const tools = t.tool_names
+                ? (JSON.parse(t.tool_names) as string[]).join(', ')
+                : '-';
+              const ts = new Date(t.timestamp).toISOString().slice(11, 19);
+              const tokens = t.input_tokens + t.output_tokens;
+              console.log(
+                `  ${c.d}${String(t.turn_number).padStart(3)}${c.r} [${ts}] ${(t.phase || '-').padEnd(12)} tools: ${tools.padEnd(30)} ${formatTokens(tokens)}`
+              );
+            }
+            console.log('');
+            return;
+          }
+
+          // Default: list sessions for this issue
+          const sessions = listSessions(issueId, db);
+          if (sessions.length === 0) {
+            console.log(`No traces found for ${issueId}`);
+            return;
+          }
+
+          if (options.json) {
+            console.log(JSON.stringify(sessions, null, 2));
+            return;
+          }
+
+          console.log(
+            `\n  ${c.b}Trace Sessions${c.r} — ${c.cyan}${issueId}${c.r}\n`
+          );
+          for (const s of sessions) {
+            const dur = s.duration_ms > 0 ? formatDuration(s.duration_ms) : '-';
+            const tokens = formatTokens(
+              s.total_input_tokens + s.total_output_tokens
+            );
+            const time = new Date(s.started_at).toISOString().slice(0, 19);
+            console.log(
+              `  ${c.d}attempt ${s.attempt}${c.r}  ${s.total_turns} turns  ${s.total_tool_calls} tools  ${tokens}  ${dur}  ${c.d}${time}${c.r}`
+            );
+            console.log(`    ${c.d}session: ${s.session_id}${c.r}`);
+            console.log(`    phases: ${s.phases.join(' → ')}`);
+            console.log('');
+          }
+        } finally {
+          db.close();
+        }
+      }
+    );
+
+  // --- replay ---
+  cmd
+    .command('replay <session-id>')
+    .description('Replay a full agent conversation from traces')
+    .option('-n, --turns <count>', 'Show only last N turns')
+    .option('--json', 'Output raw event JSON', false)
+    .action((sessionId: string, options: { turns?: string; json: boolean }) => {
+      const db = openTracesDb();
+      try {
+        let turns = getSessionTurns(sessionId, db);
+        if (turns.length === 0) {
+          console.error(`No traces found for session ${sessionId}`);
+          return;
+        }
+
+        if (options.turns) {
+          const n = parseInt(options.turns, 10);
+          turns = turns.slice(-n);
+        }
+
+        if (options.json) {
+          for (const t of turns) {
+            console.log(t.event_json);
+          }
+          return;
+        }
+
+        console.log(
+          `\n  ${c.b}Replay${c.r} ${c.cyan}${sessionId}${c.r} — ${turns.length} turns\n`
+        );
+
+        for (const t of turns) {
+          const ts = new Date(t.timestamp).toISOString().slice(11, 19);
+          const tokens = t.input_tokens + t.output_tokens;
+
+          // Header
+          console.log(
+            `${c.purple}── Turn ${t.turn_number} ──${c.r} [${ts}] ${t.phase || ''} ${tokens > 0 ? formatTokens(tokens) : ''}`
+          );
+
+          // Tool calls
+          if (t.tool_names) {
+            const tools = JSON.parse(t.tool_names) as string[];
+            for (const tool of tools) {
+              console.log(`  ${c.cyan}▸ ${tool}${c.r}`);
+            }
+          }
+
+          // Text preview
+          if (t.message_preview) {
+            const lines = t.message_preview.split('\n');
+            for (const line of lines.slice(0, 10)) {
+              console.log(`  ${c.d}${line}${c.r}`);
+            }
+            if (lines.length > 10) {
+              console.log(
+                `  ${c.d}... (${lines.length - 10} more lines)${c.r}`
+              );
+            }
+          }
+
+          console.log('');
+        }
+      } finally {
+        db.close();
+      }
+    });
+
+  // --- trace-stats ---
+  cmd
+    .command('trace-stats')
+    .description('Show aggregate trace statistics')
+    .option('--json', 'Output as JSON', false)
+    .action((options: { json: boolean }) => {
+      const stats = getTraceStats();
+      if (options.json) {
+        console.log(JSON.stringify(stats, null, 2));
+        return;
+      }
+
+      console.log(`\n  ${c.b}Conductor Trace Stats${c.r}\n`);
+      console.log(`  Sessions:  ${stats.total_sessions}`);
+      console.log(`  Turns:     ${stats.total_turns}`);
+      console.log(`  Issues:    ${stats.issues_traced}`);
+      console.log(
+        `  Tokens:    ${formatTokens((stats.total_input_tokens || 0) + (stats.total_output_tokens || 0))}`
+      );
+      console.log(
+        `    Input:   ${formatTokens(stats.total_input_tokens || 0)}`
+      );
+      console.log(
+        `    Output:  ${formatTokens(stats.total_output_tokens || 0)}`
+      );
+      console.log('');
     });
 
   return cmd;

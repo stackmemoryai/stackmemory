@@ -39,6 +39,11 @@ import {
 } from '../../core/worktree/preflight.js';
 import { ContextCapture } from '../../core/worktree/capture.js';
 import { extractKeywords } from '../../core/utils/text.js';
+import {
+  TraceCollector,
+  stringifyEventTruncated,
+  type TurnData,
+} from './conductor-traces.js';
 
 // ── Types ──
 
@@ -1865,6 +1870,20 @@ export class Conductor {
       const tee = new TeeTransform(logStream);
       proc.stdout.pipe(tee);
 
+      // Trace collector: logs every turn to SQLite for replay & analysis
+      let traceCollector: TraceCollector | undefined;
+      try {
+        traceCollector = new TraceCollector({
+          issueId: issue.identifier,
+          attempt: run.attempt,
+        });
+      } catch {
+        // Non-fatal: tracing is best-effort
+        logger.warn('Failed to initialize trace collector', {
+          identifier: issue.identifier,
+        });
+      }
+
       this.writeAgentStatus(issue.identifier, run);
 
       let stderr = '';
@@ -1896,7 +1915,7 @@ export class Conductor {
               run.phase = phase;
             }
 
-            // Count tool uses from assistant messages
+            // Count tool uses from assistant messages — extract once, share with tracer
             if (event.type === 'assistant') {
               const message = event.message as
                 | Record<string, unknown>
@@ -1913,24 +1932,56 @@ export class Conductor {
               const content = (message?.content || []) as Array<
                 Record<string, unknown>
               >;
+              const turnToolNames: string[] = [];
+              let turnFilesModified = 0;
+              const turnTextParts: string[] = [];
+
               for (const block of content) {
                 if (block.type === 'tool_use') {
                   run.toolCalls++;
-                  const toolLower = (
-                    (block.name || '') as string
-                  ).toLowerCase();
+                  const name = (block.name || '') as string;
+                  turnToolNames.push(name);
+                  const toolLower = name.toLowerCase();
                   if (
                     toolLower.includes('edit') ||
                     toolLower.includes('write')
                   ) {
                     run.filesModified++;
+                    turnFilesModified++;
                   }
                 }
                 if (block.type === 'text' && block.text) {
-                  run.tokensUsed += Math.ceil(
-                    (block.text as string).length / 4
+                  const text = block.text as string;
+                  run.tokensUsed += Math.ceil(text.length / 4);
+                  turnTextParts.push(text);
+                }
+              }
+
+              // Record turn to trace DB with pre-extracted data (best-effort)
+              try {
+                if (traceCollector) {
+                  const turnData: TurnData = {
+                    toolNames: turnToolNames,
+                    toolCount: turnToolNames.length,
+                    filesModified: turnFilesModified,
+                    textPreview:
+                      turnTextParts.length > 0
+                        ? turnTextParts.join('\n').slice(0, 500)
+                        : null,
+                    inputTokens: msgUsage?.input_tokens ?? 0,
+                    outputTokens: msgUsage?.output_tokens ?? 0,
+                    cacheCreationTokens:
+                      msgUsage?.cache_creation_input_tokens ?? 0,
+                    cacheReadTokens: msgUsage?.cache_read_input_tokens ?? 0,
+                  };
+                  traceCollector.recordTurn(
+                    turnData,
+                    phase,
+                    stringifyEventTruncated(event)
                   );
                 }
+              } catch {
+                // Non-fatal
               }
             }
 
@@ -1940,6 +1991,13 @@ export class Conductor {
                 typeof event.result === 'string'
                   ? event.result
                   : JSON.stringify(event.result);
+
+              // Record result to trace DB (best-effort)
+              try {
+                traceCollector?.recordResult(event);
+              } catch {
+                // Non-fatal
+              }
             }
 
             // Periodic status updates
@@ -1965,11 +2023,13 @@ export class Conductor {
 
       proc.on('error', (err) => {
         clearTimeout(timer);
+        traceCollector?.close();
         reject(new Error(`Failed to spawn claude: ${err.message}`));
       });
 
       proc.on('close', (code) => {
         clearTimeout(timer);
+        traceCollector?.close();
         run.process = null;
 
         if (run.logStream && !run.logStream.destroyed) {

@@ -69,6 +69,9 @@ stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure
 stackmemory conductor status   # Live agent status dashboard
 stackmemory conductor monitor  # Real-time TUI with phase tracking
 stackmemory conductor finalize # Clean up dead/stale agents
+stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
+stackmemory conductor replay <session-id> # Replay full agent conversation from traces
+stackmemory conductor trace-stats         # Aggregate trace statistics
 stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias: watch)
 ```
 
@@ -161,6 +164,7 @@ The conductor manages autonomous coding agents via Linear issues:
 - `evolution-log.jsonl` — History of `--evolve` mutations applied to the prompt template
 - `agents/<issue-id>/status.json` — Per-agent status files
 - `agents/<issue-id>/output.log` — Agent stdout/stderr
+- `traces.db` — SQLite database with per-turn conversation traces (tool calls, tokens, phases, content previews)
 
 **Learning loop**:
 1. Agents run → outcomes logged to `outcomes.jsonl`
