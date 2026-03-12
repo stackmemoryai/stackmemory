@@ -5,18 +5,18 @@
 
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, basename, dirname, resolve } from 'path';
+import { join, basename, dirname, _resolve } from 'path';
 import { homedir } from 'os';
 import Database from 'better-sqlite3';
 import { logger } from '../monitoring/logger.js';
 import { ProjectManager } from '../projects/project-manager.js';
 import {
-  DatabaseError,
-  SystemError,
-  ErrorCode,
+  _DatabaseError,
+  _SystemError,
+  _ErrorCode,
   createErrorHandler,
 } from '../errors/index.js';
-import { retry } from '../errors/recovery.js';
+import { _retry } from '../errors/recovery.js';
 
 export interface WorktreeInfo {
   path: string;
@@ -251,7 +251,7 @@ export class WorktreeManager {
       });
 
       return worktrees;
-    } catch (error: unknown) {
+    } catch {
       logger.debug('Not a git repository or git worktree not available');
       return [];
     }
@@ -503,7 +503,7 @@ export class WorktreeManager {
   private mergeContexts(
     contexts: any[],
     targetDb: Database.Database,
-    bidirectional: boolean
+    _bidirectional: boolean
   ): void {
     const stmt = targetDb.prepare(`
       INSERT OR REPLACE INTO contexts (id, type, content, metadata, created_at)

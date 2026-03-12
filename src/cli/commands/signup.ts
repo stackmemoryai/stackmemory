@@ -19,7 +19,7 @@ export function registerSignupCommand(program: Command): void {
         try {
           await open(signupUrl);
           console.log(chalk.green('✓ Opened: ') + chalk.cyan(signupUrl));
-        } catch (error) {
+        } catch {
           console.log(chalk.yellow('Could not open browser automatically.'));
           console.log(chalk.gray('Please visit: ') + chalk.cyan(signupUrl));
         }

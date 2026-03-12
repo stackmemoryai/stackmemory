@@ -13,7 +13,7 @@ import {
   LoopVisualization,
   IterationTrace,
   ContextFlowDiagram,
-  PerformanceMetrics,
+  _PerformanceMetrics,
   DebugReport,
 } from '../types.js';
 
@@ -266,12 +266,12 @@ export class RalphDebugger {
       const statePath = path.join(session.ralphDir, 'state.json');
       const iterationPath = path.join(session.ralphDir, 'iteration.txt');
 
-      let currentState: any = {};
+      let _currentState: any = {};
       let currentIteration = 0;
 
       try {
         const stateData = await fs.readFile(statePath, 'utf8');
-        currentState = JSON.parse(stateData);
+        _currentState = JSON.parse(stateData);
 
         const iterData = await fs.readFile(iterationPath, 'utf8');
         currentIteration = parseInt(iterData.trim()) || 0;
@@ -570,7 +570,7 @@ export class RalphDebugger {
 
   // Helper methods
   private determineIterationPhase(
-    ralphDir: string
+    _ralphDir: string
   ): 'starting' | 'working' | 'reviewing' | 'completed' {
     // Determine current phase based on file states
     return 'working'; // Simplified implementation

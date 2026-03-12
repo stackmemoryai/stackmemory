@@ -10,7 +10,7 @@ import chalk from 'chalk';
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { execSync, execFileSync } from 'child_process';
+import { _execSync, execFileSync } from 'child_process';
 import { WorktreeManager } from '../../core/worktree/worktree-manager.js';
 import { ProjectManager } from '../../core/projects/project-manager.js';
 import { logger } from '../../core/monitoring/logger.js';
@@ -135,7 +135,7 @@ async function runOnboarding(): Promise<OnboardingConfig> {
         // Lazy load open to avoid ES module issues
         const mod = await import('open');
         await mod.default(signupUrl);
-      } catch (e) {
+      } catch {
         console.log(
           chalk.yellow(
             'Could not open browser automatically. Please sign up and obtain your DATABASE_URL.'
@@ -456,7 +456,7 @@ async function applyConfiguration(config: OnboardingConfig): Promise<void> {
           '    Tip: export DATABASE_URL from this file in your shell profile.'
         )
       );
-    } catch (e) {
+    } catch {
       console.log(chalk.yellow('  ⚠ Could not write hosted DB env file'));
     }
   }
@@ -494,7 +494,7 @@ exec stackmemory "$@"
       execFileSync('ln', ['-s', sourcePath, binPath]);
       console.log(chalk.green('  ✓ Created claude-sm command'));
     }
-  } catch (error: unknown) {
+  } catch {
     console.log(
       chalk.yellow('  ⚠ Could not create claude-sm symlink (may need sudo)')
     );
@@ -597,7 +597,7 @@ fi
       execFileSync('ln', ['-s', codexSourcePath, codexBinPath]);
       console.log(chalk.green('  ✓ Created codex-sm command'));
     }
-  } catch (error: unknown) {
+  } catch {
     console.log(
       chalk.yellow('  ⚠ Could not create codex-sm symlink (may need sudo)')
     );

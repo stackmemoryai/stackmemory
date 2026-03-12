@@ -505,7 +505,7 @@ Date: ${new Date(decision.timestamp).toLocaleDateString()}
   /**
    * Get examples of a specific pattern
    */
-  private async getPatternExamples(pattern: string): Promise<string[]> {
+  private async getPatternExamples(_pattern: string): Promise<string[]> {
     // Would search for concrete examples of this pattern
     // For now, return empty array
     return [];

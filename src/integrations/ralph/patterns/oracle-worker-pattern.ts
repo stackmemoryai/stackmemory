@@ -264,7 +264,7 @@ Remember: Your intelligence is expensive. Focus on high-value strategic thinking
       const workerModel = this.selectWorkerForTask(task);
 
       // Create worker-specific prompt
-      const workerPrompt = this.buildWorkerPrompt(task, workerModel);
+      const _workerPrompt = this.buildWorkerPrompt(task, workerModel);
 
       allocatedTasks.push({
         ...task,
@@ -302,7 +302,7 @@ Remember: Your intelligence is expensive. Focus on high-value strategic thinking
    */
   private buildWorkerPrompt(
     task: TaskDecomposition,
-    worker: ModelConfig
+    _worker: ModelConfig
   ): string {
     return `
 # WORKER ROLE: Focused Task Execution
@@ -388,7 +388,7 @@ Execute your task now.
    */
   private async integrateResults(
     workerResults: PromiseSettledResult<any>[],
-    reviewResult: any
+    _reviewResult: any
   ): Promise<string> {
     const swarmId = uuidv4();
 
@@ -409,7 +409,7 @@ Execute your task now.
   /**
    * Parse task decomposition from Oracle output
    */
-  private parseTaskDecomposition(output: string): TaskDecomposition[] {
+  private parseTaskDecomposition(_output: string): TaskDecomposition[] {
     // Parse JSON from Oracle output
     // Implementation would extract the JSON task decomposition
     return [];
@@ -448,7 +448,7 @@ Execute your task now.
    * Calculate what this would cost with all-Oracle approach
    */
   private calculateTraditionalCost(): number {
-    const totalSpent =
+    const _totalSpent =
       this.costTracker.oracleSpent +
       this.costTracker.workerSpent +
       this.costTracker.reviewerSpent;

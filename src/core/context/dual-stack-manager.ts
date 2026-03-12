@@ -3,7 +3,7 @@
  * Manages both individual and shared team stacks for collaboration
  */
 
-import type { Frame, Event, Anchor } from './frame-types.js';
+import type { Frame, _Event, _Anchor } from './frame-types.js';
 import { FrameManager } from './index.js';
 import type { DatabaseAdapter } from '../database/database-adapter.js';
 import { SQLiteAdapter } from '../database/sqlite-adapter.js';
@@ -13,8 +13,8 @@ import {
   validateInput,
   CreateSharedStackSchema,
   SwitchStackSchema,
-  type CreateSharedStackInput,
-  type SwitchStackInput,
+  type _CreateSharedStackInput,
+  type _SwitchStackInput,
 } from './validation.js';
 import { PermissionManager } from './permission-manager.js';
 
@@ -74,7 +74,7 @@ export class DualStackManager {
     adapter: DatabaseAdapter,
     projectId: string,
     userId: string,
-    defaultTeamId?: string
+    _defaultTeamId?: string
   ) {
     this.adapter = adapter;
     this.permissionManager = new PermissionManager();
@@ -1094,7 +1094,7 @@ export class DualStackManager {
               )
             );
             stacks.push(context);
-          } catch (permissionError: unknown) {
+          } catch {
             // Skip stacks user doesn't have access to
             logger.debug('User lacks access to stack', {
               stackId: context.stackId,

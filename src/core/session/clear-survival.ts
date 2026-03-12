@@ -9,7 +9,7 @@
  * 4. Maintaining continuity across session resets
  */
 
-import { Frame, Trace, Context, Digest } from '../types';
+import { Frame, Trace, _Context, _Digest } from '../types';
 import { FrameManager } from '../frame/frame-manager';
 import { DatabaseManager } from '../storage/database-manager';
 import { HandoffGenerator } from './handoff-generator';
@@ -111,7 +111,7 @@ export class ClearSurvival {
     try {
       const frames = await this.frameManager.getAllFrames();
       const activeFrames = frames.filter((f) => f.status === 'open').length;
-      const sessionId = await this.dbManager.getCurrentSessionId();
+      const _sessionId = await this.dbManager.getCurrentSessionId();
 
       // Estimate based on frame count (simplified)
       const estimatedTokens = frames.length * 100; // Rough estimate
@@ -124,7 +124,7 @@ export class ClearSurvival {
         sessionCount: 1,
         percentageUsed,
       };
-    } catch (error) {
+    } catch {
       // Fallback for testing or when DB is not available
       return {
         totalFrames: 50,
@@ -626,7 +626,7 @@ export class ClearSurvival {
       );
       const content = await fs.readFile(latestPath, 'utf-8');
       return JSON.parse(content) as ContinuityLedger;
-    } catch (error: unknown) {
+    } catch {
       return null;
     }
   }

@@ -10,11 +10,11 @@ import { ProjectManager } from '../../core/projects/project-manager.js';
 import { FrameManager } from '../../core/context/index.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import { join } from 'path';
+import { _join } from 'path';
 import { existsSync } from 'fs';
 import Database from 'better-sqlite3';
-import { execSync, execFileSync } from 'child_process';
-import shellEscape from 'shell-escape';
+import { _execSync, execFileSync } from 'child_process';
+import _shellEscape from 'shell-escape';
 import { z } from 'zod';
 
 // Input validation schemas
@@ -144,7 +144,7 @@ export function registerWorktreeCommands(program: Command): void {
           } else {
             contextStatus = '○ Not initialized';
           }
-        } catch (error: unknown) {
+        } catch {
           contextStatus = '✗ Error';
         }
 

@@ -209,7 +209,7 @@ export class RalphStackMemoryBridge {
     this.state.activeLoop = reconciledState;
 
     // Load context from StackMemory
-    const context = await this.loadIterationContext(reconciledState);
+    const _context = await this.loadIterationContext(reconciledState);
 
     logger.info('Loop resumed', {
       loopId,
@@ -539,7 +539,7 @@ export class RalphStackMemoryBridge {
   /**
    * Setup lifecycle hooks
    */
-  private setupLifecycleHooks(options?: BridgeOptions): void {
+  private setupLifecycleHooks(_options?: BridgeOptions): void {
     const hooks: LifecycleHooks = {
       preIteration: async (context) => {
         logger.debug('Pre-iteration hook', {
@@ -821,7 +821,7 @@ export class RalphStackMemoryBridge {
   ): Promise<any> {
     // Extract task information
     const task = context.task.task || 'Complete assigned work';
-    const criteria = context.task.criteria || 'Meet completion criteria';
+    const _criteria = context.task.criteria || 'Meet completion criteria';
 
     // Generate basic plan based on analysis
     const steps = [];
@@ -862,7 +862,7 @@ export class RalphStackMemoryBridge {
    */
   private async executeIterationChanges(
     plan: any,
-    context: IterationContext
+    _context: IterationContext
   ): Promise<any[]> {
     const changes = [];
 
@@ -895,7 +895,7 @@ export class RalphStackMemoryBridge {
   /**
    * Validate iteration results
    */
-  private async validateIterationResults(changes: any[]): Promise<any> {
+  private async validateIterationResults(_changes: any[]): Promise<any> {
     const validation = {
       testsPass: true,
       lintClean: true,
@@ -919,7 +919,7 @@ export class RalphStackMemoryBridge {
             const { execSync } = await import('child_process');
             execSync('npm run lint', { stdio: 'pipe', timeout: 30000 });
             validation.lintClean = true;
-          } catch (error: any) {
+          } catch {
             validation.lintClean = false;
             validation.warnings.push('Lint warnings detected');
           }
@@ -930,7 +930,7 @@ export class RalphStackMemoryBridge {
             const { execSync } = await import('child_process');
             execSync('npm run build', { stdio: 'pipe', timeout: 60000 });
             validation.buildSuccess = true;
-          } catch (error: any) {
+          } catch {
             validation.buildSuccess = false;
             validation.errors.push('Build failed');
           }
@@ -1095,13 +1095,13 @@ export class RalphStackMemoryBridge {
     return `Still need to address:\n${evaluation.unmet.map((c: string) => `- ${c}`).join('\n')}`;
   }
 
-  private async loadRelevantFrames(loopId: string): Promise<Frame[]> {
+  private async loadRelevantFrames(_loopId: string): Promise<Frame[]> {
     // This would load frames from StackMemory
     // Placeholder implementation
     return [];
   }
 
-  private async loadRecentIterations(loopId: string): Promise<any[]> {
+  private async loadRecentIterations(_loopId: string): Promise<any[]> {
     // Load recent iteration summaries
     return [];
   }
@@ -1116,7 +1116,7 @@ export class RalphStackMemoryBridge {
     return [];
   }
 
-  private async loadSessionFrames(sessionId: string): Promise<Frame[]> {
+  private async loadSessionFrames(_sessionId: string): Promise<Frame[]> {
     // Load frames from session
     return [];
   }
@@ -1143,19 +1143,19 @@ export class RalphStackMemoryBridge {
   }
 
   private async updateStateFrame(
-    oldState: RalphLoopState,
-    newState: RalphLoopState
+    _oldState: RalphLoopState,
+    _newState: RalphLoopState
   ): Promise<void> {
     // Update state in StackMemory
     logger.debug('State frame updated');
   }
 
-  private async saveErrorFrame(error: Error, context: any): Promise<void> {
+  private async saveErrorFrame(_error: Error, _context: any): Promise<void> {
     // Save error as frame
     logger.debug('Error frame saved');
   }
 
-  private async closeRootFrame(state: RalphLoopState): Promise<void> {
+  private async closeRootFrame(_state: RalphLoopState): Promise<void> {
     // Close the root frame
     logger.debug('Root frame closed');
   }

@@ -11,9 +11,9 @@ import Redis from 'ioredis';
 import BetterSqlite3 from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
 import { metrics } from '../../core/monitoring/metrics.js';
-import { getUserModel, UserModel, User } from '../../models/user.model.js';
+import { getUserModel, UserModel, _User } from '../../models/user.model.js';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -22,7 +22,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 

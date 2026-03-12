@@ -3,13 +3,13 @@
  * Checks npm registry for newer versions
  */
 
-import { execSync, execFileSync } from 'child_process';
+import { _execSync, execFileSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { logger } from '../monitoring/logger.js';
 import {
-  SystemError,
+  _SystemError,
   ErrorCode,
   getErrorMessage,
   wrapError,

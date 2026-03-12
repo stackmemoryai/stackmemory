@@ -12,7 +12,7 @@ import {
   DEFAULT_TRACE_CONFIG,
   TRACE_PATTERNS,
   TraceMetadata,
-  TraceScoringFactors,
+  _TraceScoringFactors,
   CompressedTrace,
   CompressionStrategy,
 } from './types.js';
@@ -66,7 +66,7 @@ export class TraceDetector {
    * Add a tool call and check if it belongs to current trace
    */
   addToolCall(tool: ToolCall): void {
-    const now = Date.now();
+    const _now = Date.now();
 
     // Check if this tool belongs to the current trace
     if (this.shouldStartNewTrace(tool)) {

@@ -2,16 +2,16 @@ import Database from 'better-sqlite3';
 import {
   TaskAnalytics,
   TaskMetrics,
-  TimeRange,
+  _TimeRange,
   AnalyticsQuery,
 } from '../types/metrics.js';
 import {
   DatabaseError,
-  SystemError,
+  _SystemError,
   ErrorCode,
   createErrorHandler,
 } from '../../../core/errors/index.js';
-import { retry } from '../../../core/errors/recovery.js';
+import { _retry } from '../../../core/errors/recovery.js';
 
 export class MetricsQueries {
   private db: Database.Database;
@@ -60,7 +60,7 @@ export class MetricsQueries {
         CREATE INDEX IF NOT EXISTS idx_task_assignee ON task_analytics(assignee_id);
       `);
     } catch (error: unknown) {
-      const dbError = errorHandler(error, {
+      const _dbError = errorHandler(error, {
         operation: 'initializeTables',
         schema: 'task_analytics',
       });

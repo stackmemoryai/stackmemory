@@ -13,13 +13,13 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
-  ListObjectsV2Command,
+  _ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { createClient as createRedisClient } from 'redis';
 import { Pool } from 'pg';
 import { Logger } from '../monitoring/logger.js';
 import { Frame } from '../context/index.js';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as _uuidv4 } from 'uuid';
 import { compress, decompress } from '../utils/compression.js';
 
 export interface StorageTier {

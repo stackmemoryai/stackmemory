@@ -3,7 +3,7 @@ import { LinearClient } from '../../../integrations/linear/client.js';
 import { LinearTaskManager } from '../../tasks/linear-task-manager.js';
 import Database from 'better-sqlite3';
 import {
-  TaskMetrics,
+  _TaskMetrics,
   TeamMetrics,
   TaskAnalytics,
   DashboardState,
@@ -14,7 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -23,7 +23,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 

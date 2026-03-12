@@ -8,13 +8,13 @@ interface Frame {
 
 // Simulated database
 const db = {
-  prepare(sql: string) {
+  prepare(_sql: string) {
     return {
-      get(...params: unknown[]): Frame | undefined {
+      get(..._params: unknown[]): Frame | undefined {
         // May throw: SQLITE_BUSY, SQLITE_CONSTRAINT, SQLITE_CORRUPT
         throw new Error('SQLITE_BUSY: database is locked');
       },
-      run(...params: unknown[]) {
+      run(..._params: unknown[]) {
         // May throw various SQLite errors
       },
     };

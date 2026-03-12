@@ -6,7 +6,7 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { SessionManager } from '../../core/session/session-manager.js';
-import { FrameManager } from '../../core/context/index.js';
+import { _FrameManager } from '../../core/context/index.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';

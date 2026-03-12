@@ -8,7 +8,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import Database from 'better-sqlite3';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { _readFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,7 +30,7 @@ import { MCPHandlerFactory, MCPHandlerDependencies } from './handlers/index.js';
 import { MCPToolDefinitions } from './tool-definitions.js';
 import { ToolScoringMiddleware } from './middleware/tool-scoring.js';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -39,7 +39,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 

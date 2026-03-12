@@ -9,7 +9,7 @@ import { logger } from '../monitoring/logger.js';
 import {
   IntegrationError,
   ErrorCode,
-  StackMemoryError,
+  _StackMemoryError,
 } from '../errors/index.js';
 import { Frame, FrameContext } from '../context/frame-types.js';
 
@@ -823,7 +823,7 @@ export function createLinearPlugin(): IntegrationPlugin {
       return frames;
     },
 
-    watch(callback: (frame: ContextFrame) => void): () => void {
+    watch(_callback: (frame: ContextFrame) => void): () => void {
       // Would integrate with LinearWebhookHandler
       context?.logger.info('Watch mode enabled');
 

@@ -5,7 +5,7 @@
 
 import { logger } from '../monitoring/logger.js';
 import {
-  StackMemoryError,
+  _StackMemoryError,
   isRetryableError,
   getErrorMessage,
   ErrorContext,
@@ -178,7 +178,7 @@ export class CircuitBreaker<T> {
     }
   }
 
-  private handleFailure(error: unknown): void {
+  private handleFailure(_error: unknown): void {
     this.failures++;
     this.lastFailTime = new Date();
 

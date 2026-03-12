@@ -11,7 +11,7 @@ import { LinearAuthManager } from './auth.js';
 import chalk from 'chalk';
 import { IntegrationError, ErrorCode } from '../../core/errors/index.js';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -23,7 +23,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 

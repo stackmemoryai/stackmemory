@@ -45,7 +45,7 @@ export function createLogCommand(): Command {
     .action(async (options) => {
       const projectRoot = process.cwd();
       const dbPath = join(projectRoot, '.stackmemory', 'context.db');
-      const tasksPath = join(projectRoot, '.stackmemory', 'tasks.jsonl');
+      const _tasksPath = join(projectRoot, '.stackmemory', 'tasks.jsonl');
 
       if (!existsSync(dbPath)) {
         console.log(

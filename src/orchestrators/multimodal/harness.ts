@@ -100,7 +100,7 @@ export async function runSpike(
 
   let approved = false;
   let lastCommand = '';
-  let lastOutput = '';
+  let _lastOutput = '';
   let lastCritique: CritiqueResult = {
     approved: true,
     issues: [],
@@ -129,14 +129,14 @@ export async function runSpike(
       );
       ok = impl.ok;
       lastCommand = impl.command;
-      lastOutput = impl.output;
+      _lastOutput = impl.output;
     } else {
       const impl = await implementWithClaude(implPrompt, {
         model: options.plannerModel,
       });
       ok = impl.ok;
       lastCommand = `claude:${options.plannerModel || 'sonnet'} prompt`; // logical label
-      lastOutput = impl.output;
+      _lastOutput = impl.output;
     }
 
     // Capture actual code changes for the critic

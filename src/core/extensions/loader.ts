@@ -7,7 +7,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { logger } from '../monitoring/logger.js';
-import { ValidationError, ErrorCode } from '../errors/index.js';
+import { _ValidationError, _ErrorCode } from '../errors/index.js';
 import type {
   Extension,
   ExtensionContext,
@@ -233,7 +233,7 @@ export class ExtensionLoader {
   private async loadFromSource(
     type: ExtensionSourceType,
     uri: string,
-    options: ExtensionLoadOptions
+    _options: ExtensionLoadOptions
   ): Promise<ExtensionLoadResult> {
     switch (type) {
       case 'url':
@@ -393,7 +393,7 @@ export class ExtensionLoader {
   private async loadFromNpm(packageName: string): Promise<ExtensionLoadResult> {
     try {
       // Parse package name and version
-      const { name, version } = this.parseNpmPackage(packageName);
+      const { name, _version } = this.parseNpmPackage(packageName);
 
       // Try to import the package
       // In a real implementation, this would use a package manager or CDN
@@ -417,7 +417,7 @@ export class ExtensionLoader {
           const entryPoint = packageJson.main || 'index.js';
           const entryPath = path.join(nodeModulesPath, entryPoint);
           module = await import(pathToFileURL(entryPath).href);
-        } catch (innerError) {
+        } catch {
           return {
             success: false,
             error: `Package not found: ${name}. Try running: npm install ${name}`,
@@ -449,7 +449,7 @@ export class ExtensionLoader {
    */
   private async evaluateExtensionCode(
     code: string,
-    sourceUrl: string
+    _sourceUrl: string
   ): Promise<Extension> {
     // Create a data URL for dynamic import
     const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
@@ -665,14 +665,14 @@ export class ExtensionLoader {
 
       // State management (always available, scoped to extension)
       state: {
-        get: async <T>(key: string): Promise<T | undefined> => {
+        get: async <T>(_key: string): Promise<T | undefined> => {
           // In a full implementation, this would use persistent storage
           return undefined;
         },
-        set: async <T>(key: string, value: T): Promise<void> => {
+        set: async <T>(_key: string, _value: T): Promise<void> => {
           // In a full implementation, this would use persistent storage
         },
-        delete: async (key: string): Promise<void> => {
+        delete: async (_key: string): Promise<void> => {
           // In a full implementation, this would use persistent storage
         },
       },
@@ -711,7 +711,7 @@ export class ExtensionLoader {
     // Add frames access if permitted
     if (permSet.has('frames:read') || permSet.has('frames:write')) {
       context.frames = {
-        get: async (frameId: string) => {
+        get: async (_frameId: string) => {
           // In a full implementation, this would access the frame manager
           return undefined;
         },
@@ -721,11 +721,11 @@ export class ExtensionLoader {
       };
 
       if (permSet.has('frames:write')) {
-        context.frames.create = async (options) => {
+        context.frames.create = async (_options) => {
           // In a full implementation, this would create a frame
           throw new Error('Frame creation not implemented');
         };
-        context.frames.update = async (frameId, data) => {
+        context.frames.update = async (_frameId, _data) => {
           // In a full implementation, this would update a frame
           throw new Error('Frame update not implemented');
         };

@@ -379,7 +379,7 @@ async function listCheckpoints(): Promise<void> {
       console.log(
         '💡 Verify: stackmemory context rehydrate --verify -c <checkpoint-id>'
       );
-    } catch (err) {
+    } catch {
       console.log('📭 No rehydration checkpoints directory found');
       console.log(
         '💡 Create first checkpoint with: stackmemory context rehydrate --create'
@@ -497,7 +497,7 @@ async function captureStackTraces(): Promise<any[]> {
   try {
     const traces: any[] = [];
     const fs = await import('fs/promises');
-    const { execSync } = await import('child_process');
+    const { _execSync } = await import('child_process');
 
     // 1. StackMemory-specific error logs
     const stackMemoryLogs = [

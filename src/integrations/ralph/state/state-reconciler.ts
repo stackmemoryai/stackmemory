@@ -160,7 +160,7 @@ export class StateReconciler {
       const currentCommit = execSync('git rev-parse HEAD', {
         encoding: 'utf8',
       }).trim();
-      const branch = execSync('git branch --show-current', {
+      const _branch = execSync('git branch --show-current', {
         encoding: 'utf8',
       }).trim();
       const uncommittedChanges = execSync('git status --porcelain', {

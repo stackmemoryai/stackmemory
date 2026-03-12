@@ -457,7 +457,7 @@ export class HybridDigestGenerator {
   private determinePriority(
     input: DigestInput
   ): DigestGenerationRequest['priority'] {
-    const { frame, anchors, events } = input;
+    const { _frame, anchors, events } = input;
 
     // High priority for frames with many decisions or errors
     const decisionCount = anchors.filter((a) => a.type === 'DECISION').length;

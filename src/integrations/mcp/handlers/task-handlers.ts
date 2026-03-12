@@ -133,7 +133,7 @@ export class TaskHandlers {
       const {
         status,
         priority,
-        limit = 20,
+        _limit = 20,
         include_completed = false,
         tags = [],
         search,
@@ -207,7 +207,7 @@ export class TaskHandlers {
   /**
    * Get task metrics and analytics
    */
-  async handleGetTaskMetrics(args: any): Promise<any> {
+  async handleGetTaskMetrics(_args: any): Promise<any> {
     try {
       const metrics = await this.deps.taskStore.getMetrics();
 

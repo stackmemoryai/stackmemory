@@ -60,7 +60,7 @@ export class DiffMemClient {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const errorBody = await response.text().catch(() => '');
+          const _errorBody = await response.text().catch(() => '');
           throw new DiffMemClientError(
             `Request failed: ${response.statusText}`,
             'HTTP_ERROR',

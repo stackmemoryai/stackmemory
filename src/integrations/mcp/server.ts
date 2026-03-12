@@ -11,12 +11,12 @@ import Database from 'better-sqlite3';
 import {
   validateInput,
   StartFrameSchema,
-  CloseFrameSchema,
+  _CloseFrameSchema,
   AddAnchorSchema,
   CreateTaskSchema,
-  UpdateTaskStatusSchema,
-  AddDecisionSchema,
-  GetContextSchema,
+  _UpdateTaskStatusSchema,
+  _AddDecisionSchema,
+  _GetContextSchema,
 } from './schemas.js';
 import {
   readFileSync,
@@ -48,7 +48,7 @@ export {
 } from '../../features/tasks/linear-task-manager.js';
 import { BrowserMCPIntegration } from '../../features/browser/browser-mcp.js';
 import { TraceDetector } from '../../core/trace/trace-detector.js';
-import { ToolCall, Trace } from '../../core/trace/types.js';
+import { ToolCall, _Trace } from '../../core/trace/types.js';
 import { LLMContextRetrieval } from '../../core/retrieval/index.js';
 import { DiscoveryHandlers } from './handlers/discovery-handlers.js';
 import { DiffMemHandlers } from './handlers/diffmem-handlers.js';
@@ -68,7 +68,7 @@ import {
   DEFAULT_MAX_ITERS,
 } from '../../orchestrators/multimodal/constants.js';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -77,7 +77,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
@@ -3119,7 +3119,7 @@ class LocalStackMemoryMCP {
     };
   }
 
-  private async handleGetTraceStatistics(args: any) {
+  private async handleGetTraceStatistics(_args: any) {
     this.traceDetector.flush();
     const stats = this.traceDetector.getStatistics();
 
@@ -3144,7 +3144,7 @@ ${typeBreakdown}`,
     };
   }
 
-  private async handleFlushTraces(args: any) {
+  private async handleFlushTraces(_args: any) {
     this.traceDetector.flush();
 
     return {

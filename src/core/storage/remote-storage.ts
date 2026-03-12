@@ -7,14 +7,14 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
-  DeleteObjectCommand,
+  _DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
 import { logger } from '../monitoring/logger.js';
-import { Trace, CompressedTrace } from '../trace/types.js';
+import { _Trace, _CompressedTrace } from '../trace/types.js';
 import Database from 'better-sqlite3';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -23,7 +23,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 

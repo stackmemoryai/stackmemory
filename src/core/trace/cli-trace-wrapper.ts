@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import { trace } from './debug-trace.js';
 import { logger } from '../monitoring/logger.js';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -16,7 +16,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
@@ -50,7 +50,7 @@ export function wrapCommand(command: Command): Command {
     await trace.command(commandPath, context, async () => {
       try {
         // Call the original action with wrapped handler
-        const result = await originalAction.apply(null, args as unknown[]);
+        const _result = await originalAction.apply(null, args as unknown[]);
 
         // Log successful completion
         logger.info(`CLI Command Completed: ${commandPath}`, {

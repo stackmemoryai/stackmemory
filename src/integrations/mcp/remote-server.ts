@@ -439,7 +439,7 @@ class RemoteStackMemoryMCP {
   }
 
   private async handleGetContext(args: any) {
-    const { query = '', limit = 10 } = args;
+    const { _query = '', limit = 10 } = args;
 
     const contexts = Array.from(this.contexts.values())
       .sort((a, b) => b.importance - a.importance)

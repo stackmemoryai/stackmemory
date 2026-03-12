@@ -10,11 +10,11 @@ import {
   AIGeneratedDigest,
   DigestConfig,
   DigestInput,
-  DigestGenerationRequest,
-  DigestQueueStats,
+  _DigestGenerationRequest,
+  _DigestQueueStats,
   DigestLLMProvider,
-  DigestStatus,
-  DEFAULT_DIGEST_CONFIG,
+  _DigestStatus,
+  _DEFAULT_DIGEST_CONFIG,
 } from './types.js';
 import { HybridDigestGenerator } from './hybrid-digest-generator.js';
 import { logger } from '../monitoring/logger.js';
@@ -199,7 +199,7 @@ export class EnhancedHybridDigestGenerator extends HybridDigestGenerator {
     }
 
     // Build enhanced prompt for 40% AI content
-    const prompt = this.buildEnhancedPrompt(input, deterministic);
+    const _prompt = this.buildEnhancedPrompt(input, deterministic);
 
     // Generate with LLM
     const response = await this.llmProvider.generateSummary(
@@ -253,7 +253,7 @@ export class EnhancedHybridDigestGenerator extends HybridDigestGenerator {
   /**
    * Extract key decisions from AI response
    */
-  private extractKeyDecisions(response: AIGeneratedDigest): string[] {
+  private extractKeyDecisions(_response: AIGeneratedDigest): string[] {
     // This would parse the AI response for decision patterns
     // For now, return placeholder
     return [];
@@ -273,7 +273,7 @@ export class EnhancedHybridDigestGenerator extends HybridDigestGenerator {
   /**
    * Extract next steps from AI response
    */
-  private extractNextSteps(response: AIGeneratedDigest): string[] {
+  private extractNextSteps(_response: AIGeneratedDigest): string[] {
     // Parse AI response for next steps
     return [];
   }

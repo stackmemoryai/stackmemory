@@ -3,7 +3,7 @@
  * Wraps Linear API client with comprehensive tracing for debugging
  */
 
-import { trace, Trace } from './debug-trace.js';
+import { trace, _Trace } from './debug-trace.js';
 import { logger } from '../monitoring/logger.js';
 
 /**

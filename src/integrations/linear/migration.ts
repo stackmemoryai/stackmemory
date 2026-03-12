@@ -271,7 +271,7 @@ export class LinearMigrator {
     targetTeamId: string
   ): Promise<any> {
     // Map states from source to target format
-    const stateMapping: Record<string, string> = {
+    const _stateMapping: Record<string, string> = {
       backlog: 'backlog',
       unstarted: 'unstarted',
       started: 'started',

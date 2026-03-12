@@ -11,8 +11,8 @@
 import {
   LinearTaskManager,
   PebblesTask,
-  TaskStatus,
-  TaskPriority,
+  _TaskStatus,
+  _TaskPriority,
 } from '../../features/tasks/linear-task-manager.js';
 import { logger } from '../../core/monitoring/logger.js';
 import { FrameManager } from '../../core/context/index.js';
@@ -285,8 +285,8 @@ export class AgentTaskManager {
    */
   private async runVerifier(
     verifierId: string,
-    action: string,
-    context: Record<string, any>
+    _action: string,
+    _context: Record<string, any>
   ): Promise<VerificationResult> {
     // This would integrate with actual verifiers
     // For now, return mock result
@@ -475,7 +475,7 @@ export class AgentTaskManager {
    * Generate feedback from verification results
    */
   private generateFeedback(results: VerificationResult[]): string {
-    const failed = results.filter((r) => !r.passed);
+    const _failed = results.filter((r) => !r.passed);
     const warnings = results.filter(
       (r) => !r.passed && r.severity === 'warning'
     );
@@ -538,7 +538,7 @@ export class AgentTaskManager {
     });
 
     // Check if task can be considered complete
-    const task = this.taskStore.getTask(session.taskId);
+    const _task = this.taskStore.getTask(session.taskId);
     const isComplete = this.assessTaskCompletion(session);
 
     if (isComplete) {

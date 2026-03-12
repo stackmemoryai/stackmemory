@@ -5,7 +5,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import type { Frame, Event } from '../context/frame-types.js';
+import type { Frame, _Event } from '../context/frame-types.js';
 import { ConflictDetector } from './conflict-detector.js';
 import { StackDiffVisualizer, PreviewResult } from './stack-diff.js';
 import { ResolutionEngine, ResolutionContext } from './resolution-engine.js';

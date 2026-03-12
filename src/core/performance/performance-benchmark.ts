@@ -136,15 +136,15 @@ export class PerformanceBenchmark {
 
     // Benchmark cache access
     const accessStart = performance.now();
-    let hits = 0;
-    let misses = 0;
+    let _hits = 0;
+    let _misses = 0;
 
     for (let i = 0; i < accessPatterns; i++) {
       const index = Math.floor(Math.random() * itemCount * 1.2); // Some will miss
       const key = `item-${index}`;
       const result = cache.get(key);
-      if (result) hits++;
-      else misses++;
+      if (result) _hits++;
+      else _misses++;
     }
 
     const accessDuration = performance.now() - accessStart;
@@ -195,7 +195,7 @@ export class PerformanceBenchmark {
       frames = db
         .prepare('SELECT id FROM frames ORDER BY updated_at DESC LIMIT ?')
         .all(frameCount) as Array<{ id: string }>;
-    } catch (error: unknown) {
+    } catch {
       // Create mock frame IDs if table doesn't exist
       logger.warn('Frames table not found, using mock data for benchmark');
       frames = Array.from({ length: Math.min(frameCount, 10) }, (_, i) => ({
@@ -297,9 +297,9 @@ export class PerformanceBenchmark {
     // Run benchmarks
     const tasksFile = join(projectRoot, '.stackmemory', 'tasks.jsonl');
 
-    const jsonlResult = await this.benchmarkJSONLParsing(tasksFile);
-    const cacheResult = await this.benchmarkContextCache();
-    const lazyResult = await this.benchmarkLazyLoading(db, projectId);
+    const _jsonlResult = await this.benchmarkJSONLParsing(tasksFile);
+    const _cacheResult = await this.benchmarkContextCache();
+    const _lazyResult = await this.benchmarkLazyLoading(db, projectId);
 
     const totalDuration = performance.now() - suiteStart;
     const averageImprovement =

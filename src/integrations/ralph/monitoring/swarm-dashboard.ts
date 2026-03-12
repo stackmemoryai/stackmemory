@@ -6,7 +6,7 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../../core/monitoring/logger.js';
 import { SwarmCoordinator } from '../swarm/swarm-coordinator.js';
-import { Agent, SwarmState } from '../types.js';
+import { Agent, _SwarmState } from '../types.js';
 
 export interface SwarmMetrics {
   swarmId: string;

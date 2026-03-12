@@ -205,7 +205,7 @@ export class LinearHandlers {
   /**
    * Get Linear integration status
    */
-  async handleLinearStatus(args: any): Promise<any> {
+  async handleLinearStatus(_args: any): Promise<any> {
     try {
       let authStatus = false;
       try {

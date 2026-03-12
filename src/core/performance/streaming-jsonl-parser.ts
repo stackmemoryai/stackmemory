@@ -9,7 +9,7 @@ import { Transform, pipeline } from 'stream';
 import { promisify } from 'util';
 import { logger } from '../monitoring/logger.js';
 
-const pipelineAsync = promisify(pipeline);
+const _pipelineAsync = promisify(pipeline);
 
 export interface ParseOptions {
   maxLineLength?: number;
@@ -152,7 +152,7 @@ export class StreamingJSONLParser {
   /**
    * Create a transform stream for JSONL parsing
    */
-  createTransformStream<T = any>(options: ParseOptions = {}): Transform {
+  createTransformStream<_T = any>(options: ParseOptions = {}): Transform {
     const {
       filter,
       transform,

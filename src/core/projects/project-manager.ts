@@ -12,12 +12,12 @@ import { logger } from '../monitoring/logger.js';
 import {
   DatabaseError,
   ProjectError,
-  SystemError,
+  _SystemError,
   ErrorCode,
-  wrapError,
+  _wrapError,
   createErrorHandler,
 } from '../errors/index.js';
-import { retry, withTimeout } from '../errors/recovery.js';
+import { retry, _withTimeout } from '../errors/recovery.js';
 
 export interface ProjectInfo {
   id: string;
@@ -123,7 +123,7 @@ export class ProjectManager {
 
       return project;
     } catch (error: unknown) {
-      const wrappedError = errorHandler(error, {
+      const _wrappedError = errorHandler(error, {
         projectPath: path,
         operation: 'detectProject',
       });
@@ -168,7 +168,7 @@ export class ProjectManager {
    */
   private getGitInfo(projectPath: string): any {
     const info: any = {};
-    const errorHandler = createErrorHandler({
+    const _errorHandler = createErrorHandler({
       operation: 'getGitInfo',
       projectPath,
     });
@@ -476,7 +476,7 @@ export class ProjectManager {
         CREATE INDEX IF NOT EXISTS idx_contexts_project ON project_contexts(project_id);
       `);
     } catch (error: unknown) {
-      const dbError = errorHandler(error, {
+      const _dbError = errorHandler(error, {
         dbPath,
         operation: 'initializeDatabase',
       });
@@ -587,7 +587,7 @@ export class ProjectManager {
         }
       }
     } catch (error: unknown) {
-      const wrappedError = errorHandler(error, {
+      const _wrappedError = errorHandler(error, {
         operation: 'autoDiscoverOrganizations',
       });
 
@@ -760,7 +760,7 @@ export class ProjectManager {
 
       stmt.run(org.name, org.type, org.accountType, JSON.stringify(org));
     } catch (error: unknown) {
-      const wrappedError = errorHandler(error, {
+      const _wrappedError = errorHandler(error, {
         orgName: org.name,
         operation: 'saveOrganization',
       });

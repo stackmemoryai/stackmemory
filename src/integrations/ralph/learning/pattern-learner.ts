@@ -551,17 +551,17 @@ export class PatternLearner {
     }));
   }
 
-  private extractSuccessFactors(loops: LoopAnalysis[]): LearnedPattern[] {
+  private extractSuccessFactors(_loops: LoopAnalysis[]): LearnedPattern[] {
     // Placeholder for success factor analysis
     return [];
   }
 
-  private analyzeFailurePoints(loops: LoopAnalysis[]): FailureAnalysis[] {
+  private analyzeFailurePoints(_loops: LoopAnalysis[]): FailureAnalysis[] {
     // Placeholder for failure analysis
     return [];
   }
 
-  private analyzeIterationSequences(loops: LoopAnalysis[]): any[] {
+  private analyzeIterationSequences(_loops: LoopAnalysis[]): any[] {
     // Placeholder for iteration sequence analysis
     return [];
   }

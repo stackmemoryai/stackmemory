@@ -4,7 +4,7 @@
  */
 
 import { TraceDetector } from '../../../core/trace/trace-detector.js';
-import { ToolCall } from '../../../core/trace/types.js';
+import { _ToolCall } from '../../../core/trace/types.js';
 import { BrowserMCPIntegration } from '../../../features/browser/browser-mcp.js';
 import { logger } from '../../../core/monitoring/logger.js';
 
@@ -295,7 +295,7 @@ export class TraceHandlers {
    */
   async handleExecuteScript(args: any): Promise<any> {
     try {
-      const { session_id, script, args: scriptArgs = [] } = args;
+      const { session_id, script, args: _scriptArgs = [] } = args;
 
       if (!session_id) {
         throw new Error('Session ID is required');

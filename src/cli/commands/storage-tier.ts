@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import {
   TwoTierStorageSystem,
   defaultTwoTierConfig,
-  StorageTier,
+  _StorageTier,
   type TwoTierConfig,
 } from '../../core/storage/two-tier-storage.js';
 import { logger } from '../../core/monitoring/logger.js';

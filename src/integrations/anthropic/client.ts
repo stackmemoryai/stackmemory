@@ -180,7 +180,7 @@ export class AnthropicClient {
    * Mock response generators
    */
 
-  private mockPlanningResponse(prompt: string): string {
+  private mockPlanningResponse(_prompt: string): string {
     return JSON.stringify(
       {
         plan: {
@@ -225,7 +225,7 @@ export class AnthropicClient {
     );
   }
 
-  private mockCodeResponse(prompt: string): string {
+  private mockCodeResponse(_prompt: string): string {
     return `
 // Mock implementation
 export function processTask(input: string): string {
@@ -240,7 +240,7 @@ export function validateInput(input: unknown): boolean {
     `.trim();
   }
 
-  private mockTestingResponse(prompt: string): string {
+  private mockTestingResponse(_prompt: string): string {
     return `
 import { describe, test, expect } from 'vitest';
 import { processTask, validateInput } from './implementation';
@@ -268,7 +268,7 @@ describe('validateInput', () => {
     `.trim();
   }
 
-  private mockReviewResponse(prompt: string): string {
+  private mockReviewResponse(_prompt: string): string {
     return JSON.stringify(
       {
         quality: 0.75,

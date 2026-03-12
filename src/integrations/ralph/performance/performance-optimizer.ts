@@ -357,7 +357,7 @@ export class PerformanceOptimizer {
   /**
    * Internal frame load
    */
-  private async loadFramesInternal(query: FrameQuery): Promise<Frame[]> {
+  private async loadFramesInternal(_query: FrameQuery): Promise<Frame[]> {
     // This would load frames from StackMemory
     // Placeholder implementation
     return [];

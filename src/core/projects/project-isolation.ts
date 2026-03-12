@@ -131,7 +131,7 @@ export class ProjectIsolationManager {
 
       // Get the folder name of the git root
       return gitRoot.split('/').pop() || 'unknown';
-    } catch (error) {
+    } catch {
       // Fallback to current directory name
       return projectRoot.split('/').pop() || 'unknown';
     }

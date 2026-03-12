@@ -150,7 +150,7 @@ export class Logger {
       if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
       }
-    } catch (err: unknown) {
+    } catch {
       // Disable file logging if we cannot create the directory (e.g., ENOSPC)
       this.logFile = undefined;
       if (!this.fileLoggingDisabledNotified) {
@@ -180,7 +180,7 @@ export class Logger {
     if (this.logFile) {
       try {
         fs.appendFileSync(this.logFile, logLine);
-      } catch (err: unknown) {
+      } catch {
         // Disable file logging on error (e.g., ENOSPC) to avoid repeated failures
         this.logFile = undefined;
         if (!this.fileLoggingDisabledNotified) {

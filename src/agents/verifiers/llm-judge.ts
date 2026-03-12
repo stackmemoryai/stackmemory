@@ -49,7 +49,7 @@ export class LLMJudge extends BaseVerifier {
     });
   }
 
-  shouldActivate(context: VerifierContext): boolean {
+  shouldActivate(_context: VerifierContext): boolean {
     // Always activate for semantic validation (Spotify always includes this)
     return true;
   }
@@ -301,7 +301,7 @@ export class LLMJudge extends BaseVerifier {
   private generateJudgementFeedback(
     criteria: JudgementCriteria,
     overallScore: number,
-    context: LLMJudgeContext
+    _context: LLMJudgeContext
   ): string {
     if (overallScore >= this.VETO_THRESHOLD) {
       return (

@@ -10,10 +10,10 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../monitoring/logger.js';
 import { FrameManager } from './index.js';
-import type { Anchor, Event } from './index.js';
+import type { _Anchor, Event } from './index.js';
 import {
   getModelTokenLimit,
-  DEFAULT_MODEL_TOKEN_LIMIT,
+  _DEFAULT_MODEL_TOKEN_LIMIT,
 } from '../models/model-router.js';
 
 // ============================================================================
@@ -901,7 +901,7 @@ export class EnhancedRehydrationManager {
       const files = await this.getDirectoryFiles(workingDir);
 
       for (const file of files) {
-        const ext = path.extname(file);
+        const _ext = path.extname(file);
         const basename = path.basename(file);
 
         // Identify configuration files
@@ -1165,12 +1165,12 @@ export class EnhancedRehydrationManager {
   }
 
   // Helper methods
-  private async getDirectoryFiles(dir: string): Promise<string[]> {
+  private async getDirectoryFiles(_dir: string): Promise<string[]> {
     // Implementation to recursively get files
     return []; // Simplified for now
   }
 
-  private async getRecentlyModifiedFiles(dir: string): Promise<string[]> {
+  private async getRecentlyModifiedFiles(_dir: string): Promise<string[]> {
     // Implementation to get recently modified files
     return []; // Simplified for now
   }
@@ -1288,7 +1288,7 @@ export class EnhancedRehydrationManager {
         resolution_attempted: data.resolutionAttempts || [],
         resolution_status: data.resolved ? 'resolved' : 'pending',
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -1328,7 +1328,7 @@ export class EnhancedRehydrationManager {
 
   private inferCurrentFocus(
     snapshots: FileSnapshot[],
-    context: ConversationContext
+    _context: ConversationContext
   ): string {
     // Analyze recent file activity and conversation to infer focus
     if (snapshots.some((s) => s.contextTags.includes('migration'))) {
@@ -1342,7 +1342,7 @@ export class EnhancedRehydrationManager {
 
   private createRecoveryAnchors(
     snapshots: FileSnapshot[],
-    context: ConversationContext
+    _context: ConversationContext
   ): string[] {
     const anchors: string[] = [];
 

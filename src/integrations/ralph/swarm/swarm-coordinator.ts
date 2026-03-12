@@ -164,7 +164,7 @@ export class SwarmCoordinator {
   async launchSwarm(
     projectDescription: string,
     agents: AgentSpecialization[],
-    coordination?: SwarmConfiguration
+    _coordination?: SwarmConfiguration
   ): Promise<string> {
     logger.info('Launching swarm', {
       project: projectDescription.substring(0, 100),
@@ -318,7 +318,7 @@ export class SwarmCoordinator {
    */
   private async initializeSpecializedAgents(
     specifications: AgentSpecialization[],
-    tasks: SwarmTask[]
+    _tasks: SwarmTask[]
   ): Promise<Agent[]> {
     const agents: Agent[] = [];
 
@@ -936,7 +936,7 @@ You are a PROJECT COORDINATOR. Your role is to:
     };
   }
 
-  private extractCoreFeatures(description: string): any[] {
+  private extractCoreFeatures(_description: string): any[] {
     // Extract core features from project description
     // This would use NLP in a real implementation
     return [
@@ -1008,7 +1008,7 @@ You are a PROJECT COORDINATOR. Your role is to:
     return agent.role === role || agent.capabilities.includes(role);
   }
 
-  private selectOptimalAgent(agents: Agent[], task: SwarmTask): Agent {
+  private selectOptimalAgent(agents: Agent[], _task: SwarmTask): Agent {
     // Select agent with lowest workload
     return agents.reduce((best, current) => {
       const bestLoad = best.currentTask ? 1 : 0;
@@ -1060,7 +1060,7 @@ You are a PROJECT COORDINATOR. Your role is to:
     return iterations[task.estimatedEffort] || 10;
   }
 
-  private async getSwarmContext(task: SwarmTask): Promise<string> {
+  private async getSwarmContext(_task: SwarmTask): Promise<string> {
     // Get relevant context from other swarm members
     const relatedTasks = Array.from(this.activeAgents.values())
       .filter((a) => a.currentTask)
@@ -1070,7 +1070,7 @@ You are a PROJECT COORDINATOR. Your role is to:
     return relatedTasks || 'No other agents currently active';
   }
 
-  private getCoordinationInstructions(agent: Agent): string {
+  private getCoordinationInstructions(_agent: Agent): string {
     return `
 - Save progress to shared context regularly
 - Check for updates from collaborators
@@ -1080,8 +1080,8 @@ You are a PROJECT COORDINATOR. Your role is to:
 
   private setupAgentCoordination(
     agent: Agent,
-    ralph: any,
-    assignment: any
+    _ralph: any,
+    _assignment: any
   ): void {
     // Setup coordination hooks
     logger.debug(`Setting up coordination for agent ${agent.id}`);
@@ -1137,7 +1137,7 @@ You are a PROJECT COORDINATOR. Your role is to:
     }
   }
 
-  private async detectTunnelVision(agent: Agent): Promise<boolean> {
+  private async detectTunnelVision(_agent: Agent): Promise<boolean> {
     // Check if agent is stuck in same approach
     // Simplified implementation
     return false;

@@ -3,7 +3,7 @@
  * Handles the call stack of active frames
  */
 
-import { Frame, FrameContext, FrameType } from './frame-types.js';
+import { Frame, FrameContext, _FrameType } from './frame-types.js';
 import { FrameDatabase } from './frame-database.js';
 import { logger } from '../monitoring/logger.js';
 import { FrameError, ErrorCode } from '../errors/index.js';

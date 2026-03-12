@@ -11,15 +11,15 @@ import {
   FrameError,
   SystemError,
   ErrorCode,
-  wrapError,
-  createErrorHandler,
+  _wrapError,
+  _createErrorHandler,
 } from '../errors/index.js';
-import { retry, withTimeout } from '../errors/recovery.js';
-import { sessionManager, FrameQueryMode } from '../session/index.js';
+import { _retry, _withTimeout } from '../errors/recovery.js';
+import { _sessionManager, FrameQueryMode } from '../session/index.js';
 import { frameLifecycleHooks } from './frame-lifecycle-hooks.js';
 
 // Constants for frame validation
-const MAX_FRAME_DEPTH = 100; // Maximum allowed frame depth
+const _MAX_FRAME_DEPTH = 100; // Maximum allowed frame depth
 const DEFAULT_MAX_DEPTH = 100; // Default if not configured
 
 // Import refactored modules
@@ -29,7 +29,7 @@ import {
   Anchor,
   Event,
   FrameType,
-  FrameState,
+  _FrameState,
   FrameCreationOptions,
   FrameManagerConfig,
   DigestResult,
@@ -248,7 +248,7 @@ export class FrameManager {
     };
 
     // Insert into database
-    const createdFrame = this.frameDb.insertFrame(frame);
+    const _createdFrame = this.frameDb.insertFrame(frame);
 
     // Add to stack
     this.frameStack.pushFrame(frameId);
@@ -392,7 +392,7 @@ export class FrameManager {
       payload,
     };
 
-    const createdEvent = this.frameDb.insertEvent(event);
+    const _createdEvent = this.frameDb.insertEvent(event);
 
     logger.debug('Added event', {
       eventId,
@@ -451,7 +451,7 @@ export class FrameManager {
       metadata,
     };
 
-    const createdAnchor = this.frameDb.insertAnchor(anchor);
+    const _createdAnchor = this.frameDb.insertAnchor(anchor);
 
     logger.debug('Added anchor', {
       anchorId,

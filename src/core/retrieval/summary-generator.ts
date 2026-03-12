@@ -4,7 +4,7 @@
  */
 
 import Database from 'better-sqlite3';
-import { FrameManager, Frame, Anchor, Event } from '../context/index.js';
+import { FrameManager, Frame, _Anchor, _Event } from '../context/index.js';
 import { TraceDetector } from '../trace/trace-detector.js';
 import {
   CompressedSummary,

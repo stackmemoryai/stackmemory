@@ -232,7 +232,7 @@ export class ExtendedCoherenceManager {
    * Monitor active sessions for coherence degradation
    */
   private async monitorActiveSessionsHealth(): Promise<void> {
-    for (const [sessionId, session] of this.activeSessions) {
+    for (const [_sessionId, session] of this.activeSessions) {
       if (session.state.status === 'active') {
         await this.assessSessionCoherence(session);
       }
@@ -397,7 +397,7 @@ export class ExtendedCoherenceManager {
     session.state.interventionCount++;
 
     // Mark session as temporarily degraded
-    const previousStatus = session.state.status;
+    const _previousStatus = session.state.status;
     session.state.status = 'degraded';
 
     // Schedule restoration check
@@ -598,60 +598,60 @@ Begin your extended coherence work session now.
 
   // Placeholder implementations for helper methods
   private async getRecentAgentOutputs(
-    session: CoherenceSession
+    _session: CoherenceSession
   ): Promise<any[]> {
     // Implementation to retrieve recent agent outputs
     return [];
   }
 
-  private assessOutputQuality(outputs: any[]): number {
+  private assessOutputQuality(_outputs: any[]): number {
     // Analyze output quality metrics
     return 0.8; // placeholder
   }
 
-  private assessContextRetention(outputs: any[], task: any): number {
+  private assessContextRetention(_outputs: any[], _task: any): number {
     // Measure how well agent retains context
     return 0.7; // placeholder
   }
 
-  private assessTaskRelevance(outputs: any[], task: any): number {
+  private assessTaskRelevance(_outputs: any[], _task: any): number {
     // Measure relevance to original task
     return 0.9; // placeholder
   }
 
-  private calculateRepetitionRate(outputs: any[]): number {
+  private calculateRepetitionRate(_outputs: any[]): number {
     // Calculate how often agent repeats itself
     return 0.1; // placeholder
   }
 
-  private calculateDivergenceRate(outputs: any[], task: any): number {
+  private calculateDivergenceRate(_outputs: any[], _task: any): number {
     // Calculate how often agent goes off-topic
     return 0.05; // placeholder
   }
 
-  private calculateErrorRate(outputs: any[]): number {
+  private calculateErrorRate(_outputs: any[]): number {
     // Calculate errors per iteration
     return 0.02; // placeholder
   }
 
-  private calculateProgressRate(session: CoherenceSession): number {
+  private calculateProgressRate(_session: CoherenceSession): number {
     // Calculate tasks completed per hour
     return 2.5; // placeholder
   }
 
-  private async getMemoryUsage(session: CoherenceSession): Promise<number> {
+  private async getMemoryUsage(_session: CoherenceSession): Promise<number> {
     // Get current memory usage
     return 150; // MB placeholder
   }
 
   private async getContextWindowUsage(
-    session: CoherenceSession
+    _session: CoherenceSession
   ): Promise<number> {
     // Get context window usage percentage
     return 65; // placeholder
   }
 
-  private generateBreakpoints(taskConfig: any): string[] {
+  private generateBreakpoints(_taskConfig: any): string[] {
     // Generate natural stopping points based on task
     return [
       'Initial analysis complete',
@@ -668,39 +668,39 @@ Begin your extended coherence work session now.
   }
 
   private async generateContextRefreshPrompt(
-    session: CoherenceSession
+    _session: CoherenceSession
   ): Promise<string> {
     return 'Context refresh prompt';
   }
 
   private async applyContextRefresh(
-    session: CoherenceSession,
-    prompt: string
+    _session: CoherenceSession,
+    _prompt: string
   ): Promise<void> {
     // Apply context refresh to running agent
   }
 
-  private async loadLatestCheckpoint(session: CoherenceSession): Promise<any> {
+  private async loadLatestCheckpoint(_session: CoherenceSession): Promise<any> {
     // Load most recent checkpoint
     return null;
   }
 
   private async restartAgentFromCheckpoint(
-    session: CoherenceSession,
-    checkpoint: any
+    _session: CoherenceSession,
+    _checkpoint: any
   ): Promise<void> {
     // Restart agent with checkpoint state
   }
 
   private async restartAgentFromBeginning(
-    session: CoherenceSession
+    _session: CoherenceSession
   ): Promise<void> {
     // Restart agent from the beginning
   }
 
   private async provideGuidance(
-    session: CoherenceSession,
-    reason: string
+    _session: CoherenceSession,
+    _reason: string
   ): Promise<void> {
     // Provide guidance to help agent refocus
   }

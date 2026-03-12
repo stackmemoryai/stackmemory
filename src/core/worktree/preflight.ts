@@ -6,7 +6,7 @@
 
 import { execFileSync } from 'child_process';
 import { extname } from 'path';
-import { logger } from '../monitoring/logger.js';
+import { _logger } from '../monitoring/logger.js';
 import { extractKeywords as extractKeywordsShared } from '../utils/text.js';
 
 export interface TaskDefinition {

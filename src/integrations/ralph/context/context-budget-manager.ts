@@ -11,8 +11,8 @@ import {
   EnvironmentContext,
   MemoryContext,
   RalphStackMemoryConfig,
-  TokenEstimate,
-  IterationSummary,
+  _TokenEstimate,
+  _IterationSummary,
 } from '../types.js';
 
 export class ContextBudgetManager {

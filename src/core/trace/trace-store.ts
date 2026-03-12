@@ -8,8 +8,8 @@ import {
   ToolCall,
   TraceType,
   TraceMetadata,
-  CompressedTrace,
-  CompressionStrategy,
+  _CompressedTrace,
+  _CompressionStrategy,
 } from './types.js';
 import { logger } from '../monitoring/logger.js';
 

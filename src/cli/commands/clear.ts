@@ -13,9 +13,9 @@ import Database from 'better-sqlite3';
 import { existsSync } from 'fs';
 import { ClearSurvival } from '../../core/session/clear-survival.js';
 import { FrameManager } from '../../core/context/index.js';
-import { HandoffGenerator } from '../../core/session/handoff-generator.js';
+import { _HandoffGenerator } from '../../core/session/handoff-generator.js';
 import { sessionManager } from '../../core/session/session-manager.js';
-import { getEnv, getOptionalEnv } from '../../utils/env.js';
+import { _getEnv, _getOptionalEnv } from '../../utils/env.js';
 
 const clearCommand = new Command('clear')
   .description('Manage context clearing with ledger preservation')

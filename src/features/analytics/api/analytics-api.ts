@@ -310,7 +310,7 @@ export class AnalyticsAPI {
               })
             );
           }
-        } catch (error: unknown) {
+        } catch {
           ws.send(
             JSON.stringify({
               type: 'error',

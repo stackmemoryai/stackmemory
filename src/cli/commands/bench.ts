@@ -16,7 +16,7 @@ import {
 import type { HarnessRunMetrics } from '../../orchestrators/multimodal/baselines.js';
 import {
   feedbackLoops,
-  DEFAULT_CONFIG,
+  _DEFAULT_CONFIG,
 } from '../../core/monitoring/feedback-loops.js';
 
 function loadRunMetrics(projectRoot: string): HarnessRunMetrics[] {

@@ -560,7 +560,7 @@ export class ClaudeCodeSubagentClient {
   private async getMockResponse(
     request: SubagentRequest,
     startTime: number,
-    subagentId: string
+    _subagentId: string
   ): Promise<SubagentResponse> {
     // Simulate some processing time
     await new Promise((resolve) =>
@@ -688,7 +688,7 @@ function greetUser(name: string): string {
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
-        } catch (e) {
+        } catch {
           // Ignore cleanup errors
         }
       }

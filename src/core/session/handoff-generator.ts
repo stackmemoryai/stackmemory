@@ -6,7 +6,7 @@
  * and loads them when new sessions begin
  */
 
-import { Frame, Trace, Context } from '../types';
+import { Frame, Trace, _Context } from '../types';
 import { FrameManager } from '../frame/frame-manager';
 import { DatabaseManager } from '../storage/database-manager';
 import * as fs from 'fs/promises';
@@ -491,7 +491,7 @@ export class HandoffGenerator {
   private async suggestNextActions(
     tasks: TaskSummary[],
     blockers: Blocker[],
-    framePath: string[]
+    _framePath: string[]
   ): Promise<string[]> {
     const suggestions: string[] = [];
 

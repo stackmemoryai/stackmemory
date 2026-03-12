@@ -374,7 +374,7 @@ export class LazyContextLoader {
         ...row,
         metadata: JSON.parse(row.metadata || '{}'),
       } as unknown as Frame;
-    } catch (error: unknown) {
+    } catch {
       // Return mock frame if table doesn't exist (for benchmarking)
       if (frameId.startsWith('frame-')) {
         return {

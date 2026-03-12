@@ -3,11 +3,11 @@
  * Handles frame transfers between individual and team stacks with approval workflows
  */
 
-import type { Frame, Event, Anchor } from './frame-types.js';
+import type { _Frame, _Event, _Anchor } from './frame-types.js';
 import {
   DualStackManager,
-  type StackContext,
-  type HandoffRequest,
+  type _StackContext,
+  type _HandoffRequest,
 } from './dual-stack-manager.js';
 import { logger } from '../monitoring/logger.js';
 import { ValidationError, DatabaseError, ErrorCode } from '../errors/index.js';
@@ -15,8 +15,8 @@ import {
   validateInput,
   InitiateHandoffSchema,
   HandoffApprovalSchema,
-  type InitiateHandoffInput,
-  type HandoffApprovalInput,
+  type _InitiateHandoffInput,
+  type _HandoffApprovalInput,
 } from './validation.js';
 
 export interface HandoffMetadata {
@@ -720,7 +720,7 @@ export class FrameHandoffManager {
 
     // Filter by time range if specified
     const filteredHandoffs = timeRange
-      ? handoffs.filter((h) => {
+      ? handoffs.filter((_h) => {
           // Would need to add timestamps to track creation time
           return true; // Placeholder
         })

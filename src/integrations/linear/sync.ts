@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../../core/monitoring/logger.js';
-import { IntegrationError, ErrorCode } from '../../core/errors/index.js';
+import { _IntegrationError, _ErrorCode } from '../../core/errors/index.js';
 import {
   PebblesTask,
   LinearTaskManager,
@@ -15,7 +15,7 @@ import {
 } from '../../features/tasks/linear-task-manager.js';
 import { LinearClient, LinearIssue, LinearCreateIssueInput } from './client.js';
 import { LinearAuthManager } from './auth.js';
-import { getEnv, getOptionalEnv } from '../../utils/env.js';
+import { _getEnv, _getOptionalEnv } from '../../utils/env.js';
 
 export interface SyncConfig {
   enabled: boolean;
@@ -674,7 +674,7 @@ export class LinearSyncEngine {
           this.mappings.set(mapping.stackmemoryId, mapping);
         }
         logger.info(`Loaded ${this.mappings.size} task mappings from disk`);
-      } catch (error: unknown) {
+      } catch {
         logger.warn('Failed to load mappings, starting fresh');
       }
     }

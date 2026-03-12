@@ -181,7 +181,7 @@ export class CompoundingEngineeringManager {
     featureName: string,
     sessionData: any,
     agentOutputs: any[],
-    userFeedback?: string
+    _userFeedback?: string
   ): Promise<FeatureLearning> {
     // Analyze what worked well
     const successes = this.identifySuccesses(sessionData, agentOutputs);
@@ -493,7 +493,7 @@ export async function ${hookName.replace(/-/g, '')}Hook() {
     try {
       const content = await fs.readFile(knowledgePath, 'utf-8');
       this.knowledgeBase = JSON.parse(content);
-    } catch (error) {
+    } catch {
       // No existing knowledge, start fresh
       logger.info('Starting fresh knowledge base');
     }

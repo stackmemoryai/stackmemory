@@ -6,11 +6,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as crypto from 'crypto';
+import * as _crypto from 'crypto';
 import { logger } from '../monitoring/logger.js';
 import { SystemError, ErrorCode } from '../errors/index.js';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -19,7 +19,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
@@ -187,7 +187,7 @@ export class SessionManager {
       const sessionPath = path.join(this.sessionsDir, `${sessionId}.json`);
       const data = await fs.readFile(sessionPath, 'utf-8');
       return JSON.parse(data) as Session;
-    } catch (error: unknown) {
+    } catch {
       // Check history
       try {
         const historyPath = path.join(
@@ -359,7 +359,7 @@ export class SessionManager {
   private async getProjectHash(projectPath?: string): Promise<string | null> {
     try {
       const cwd = projectPath || process.cwd();
-      const pathModule = await import('path');
+      const _pathModule = await import('path');
 
       // Try to get git remote first (consistent with project-manager)
       let identifier: string;

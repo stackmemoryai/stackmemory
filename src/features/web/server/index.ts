@@ -14,7 +14,7 @@ import Database from 'better-sqlite3';
 import { existsSync } from 'fs';
 import { join } from 'path';
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -23,7 +23,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
@@ -82,7 +82,7 @@ app.get('/api/tasks', (req, res) => {
   try {
     const tasks = taskReader.getTasks();
     res.json({ tasks, total: tasks.length });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
@@ -91,7 +91,7 @@ app.get('/api/tasks/active', (req, res) => {
   try {
     const tasks = taskReader.getActiveTasks();
     res.json({ tasks, total: tasks.length });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch active tasks' });
   }
 });
@@ -100,7 +100,7 @@ app.get('/api/tasks/by-state/:state', (req, res) => {
   try {
     const tasks = taskReader.getTasksByState(req.params.state);
     res.json({ tasks, total: tasks.length });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch tasks by state' });
   }
 });
@@ -111,7 +111,7 @@ app.get('/api/sessions', (req, res) => {
       ? sessionManager.getActiveSessions()
       : [];
     res.json({ sessions, total: sessions.length });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
@@ -124,7 +124,7 @@ app.get('/api/frames', (req, res) => {
     }
     const frames = frameManager.getAllFrames();
     res.json({ frames, total: frames.length });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch frames' });
   }
 });
@@ -176,7 +176,7 @@ app.get('/api/analytics', (req, res) => {
     };
 
     res.json(analytics);
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });

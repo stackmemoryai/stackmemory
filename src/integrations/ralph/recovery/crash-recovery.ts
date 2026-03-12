@@ -383,7 +383,7 @@ export class CrashRecoverySystem {
         errorType: 'git_conflict',
         condition: (error) =>
           error.message.includes('git') || error.message.includes('branch'),
-        action: async (report, recovery) => {
+        action: async (_report, _recovery) => {
           logger.info('Attempting git conflict resolution');
 
           try {

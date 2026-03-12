@@ -353,7 +353,7 @@ export class PostTaskHooks extends EventEmitter {
   /**
    * Run linter on changed files
    */
-  private async runLinter(files: string[]): Promise<QualityGateResult> {
+  private async runLinter(_files: string[]): Promise<QualityGateResult> {
     const start = Date.now();
 
     try {
@@ -392,7 +392,7 @@ export class PostTaskHooks extends EventEmitter {
   /**
    * Run tests
    */
-  private async runTests(files: string[]): Promise<QualityGateResult> {
+  private async runTests(_files: string[]): Promise<QualityGateResult> {
     const start = Date.now();
 
     try {
@@ -431,7 +431,9 @@ export class PostTaskHooks extends EventEmitter {
   /**
    * Check test coverage
    */
-  private async checkTestCoverage(files: string[]): Promise<QualityGateResult> {
+  private async checkTestCoverage(
+    _files: string[]
+  ): Promise<QualityGateResult> {
     const start = Date.now();
 
     try {

@@ -193,7 +193,7 @@ export class LinearClient {
           body: JSON.stringify({ query, variables }),
         });
         this.updateRateLimitState(response);
-      } catch (e: unknown) {
+      } catch {
         // Fall through to standard error handling
       }
     }

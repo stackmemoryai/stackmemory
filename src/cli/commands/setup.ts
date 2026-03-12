@@ -955,7 +955,7 @@ export function createSetupRemoteCommand(): Command {
           ? join(serviceDir, `${serviceName}.plist`)
           : join(serviceDir, `${serviceName}.service`);
       const logDir = join(home, '.stackmemory', 'logs');
-      const pidFile = join(home, '.stackmemory', 'remote-mcp.pid');
+      const _pidFile = join(home, '.stackmemory', 'remote-mcp.pid');
 
       // Handle status check
       if (options.status) {

@@ -7,7 +7,7 @@ import { createHmac } from 'crypto';
 import { LinearTaskManager } from '../../features/tasks/linear-task-manager.js';
 import { LinearSyncEngine } from './sync.js';
 import { LinearAuthManager } from './auth.js';
-import { LinearClient } from './client.js';
+import { _LinearClient } from './client.js';
 import { IntegrationError, ErrorCode } from '../../core/errors/index.js';
 import { logger } from '../../core/monitoring/logger.js';
 import { ClaudeCodeSubagentClient } from '../claude-code/subagent-client.js';
@@ -16,7 +16,7 @@ import type { Request, Response } from 'express';
 /** Labels that trigger automated Claude Code subagent */
 const AUTOMATION_LABELS = ['automated', 'claude-code', 'stackmemory'];
 // Type-safe environment variable access
-function getEnv(key: string, defaultValue?: string): string {
+function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
   if (value === undefined) {
     if (defaultValue !== undefined) return defaultValue;
@@ -28,7 +28,7 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getOptionalEnv(key: string): string | undefined {
+function _getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 

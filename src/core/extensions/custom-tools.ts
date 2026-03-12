@@ -21,10 +21,10 @@ import {
   SystemError,
 } from '../errors/index.js';
 import type {
-  ToolDefinition as BaseToolDefinition,
+  ToolDefinition as _BaseToolDefinition,
   ToolResult as BaseToolResult,
   JSONSchema as BaseJSONSchema,
-  ExtensionContext as BaseExtensionContext,
+  ExtensionContext as _BaseExtensionContext,
 } from './types.js';
 
 // ============================================

@@ -61,7 +61,7 @@ class MonitorService {
       // Simulate work
       console.log('Running monitor check...');
       this.lastRunTime = Date.now();
-    } catch (err) {
+    } catch {
       this.errorCount++;
     }
   }

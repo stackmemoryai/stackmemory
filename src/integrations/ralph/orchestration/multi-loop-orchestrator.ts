@@ -10,7 +10,7 @@ import { sessionManager } from '../../../core/session/index.js';
 import { RalphStackMemoryBridge } from '../bridge/ralph-stackmemory-bridge.js';
 import {
   OrchestratedTask,
-  TaskDependency,
+  _TaskDependency,
   LoopCoordination,
   ParallelExecution,
   TaskBreakdown,
@@ -343,7 +343,7 @@ export class MultiLoopOrchestrator {
           // Parallel execution
           const parallelResult = await this.executeParallelLoops(phase.tasks);
 
-          for (const [taskId, taskResult] of parallelResult.results) {
+          for (const [_taskId, taskResult] of parallelResult.results) {
             if (taskResult.success) {
               result.completedLoops.push(taskResult.loopId);
             } else {

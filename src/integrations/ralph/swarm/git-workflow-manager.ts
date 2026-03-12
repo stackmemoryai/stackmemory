@@ -47,7 +47,7 @@ export class GitWorkflowManager {
     try {
       this.baselineBranch = this.getCurrentBranch();
       this.mainBranch = this.getMainBranch();
-    } catch (error) {
+    } catch {
       logger.warn('Git not initialized, workflow features disabled');
       this.config.enableGitWorkflow = false;
     }
@@ -254,7 +254,7 @@ export class GitWorkflowManager {
           execSync(`git checkout --theirs ${file}`, { encoding: 'utf8' });
           execSync(`git add ${file}`, { encoding: 'utf8' });
         }
-      } catch (error) {
+      } catch {
         logger.error(`Could not auto-resolve conflict in ${file}`);
       }
     }
@@ -400,7 +400,7 @@ export class GitWorkflowManager {
   private deleteBranch(branchName: string): void {
     try {
       execSync(`git branch -d ${branchName}`, { encoding: 'utf8' });
-    } catch (error) {
+    } catch {
       // Force delete if needed
       execSync(`git branch -D ${branchName}`, { encoding: 'utf8' });
     }
@@ -488,7 +488,7 @@ export class GitWorkflowManager {
   private async createPullRequest(
     agent: Agent,
     task: SwarmTask,
-    branchName: string
+    _branchName: string
   ): Promise<void> {
     try {
       const title = `[Swarm ${agent.role}] ${task.title}`;

@@ -122,7 +122,7 @@ export class FormatterVerifier extends BaseVerifier {
     const command = `${formatter.checkCommand} "${context.filePath}"`;
 
     try {
-      const { stdout, stderr } = await execAsync(command, {
+      const { _stdout, _stderr } = await execAsync(command, {
         cwd: process.cwd(),
         timeout: this.config.timeout,
       });

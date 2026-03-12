@@ -210,7 +210,7 @@ export class FrameDigestIntegration {
   /**
    * Get frame anchors (wrapper for proper typing)
    */
-  private getFrameAnchors(frameId: string): Anchor[] {
+  private getFrameAnchors(_frameId: string): Anchor[] {
     // This would typically use frameManager's method, but it's private
     // For now, return empty array - in production would need to expose this
     return [];
