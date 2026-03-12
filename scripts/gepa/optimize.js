@@ -38,6 +38,37 @@ if (fs.existsSync(envPath)) {
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 
+// Profile support: --profile <name> overrides config sections
+const profileIdx = process.argv.indexOf('--profile');
+const profileName = profileIdx !== -1 ? process.argv[profileIdx + 1] : null;
+if (profileName) {
+  // Remove --profile <name> from argv so it doesn't interfere with command parsing
+  process.argv.splice(profileIdx, 2);
+
+  const profiles = config.profiles || {};
+  if (!profiles[profileName]) {
+    console.error(
+      `Error: Unknown profile "${profileName}". Available: ${Object.keys(profiles).join(', ')}`
+    );
+    process.exit(1);
+  }
+
+  const profile = profiles[profileName];
+
+  // Merge profile overrides into config
+  if (profile.target) {
+    Object.assign(config.target, profile.target);
+  }
+  if (profile.evolution?.mutationStrategies) {
+    config.evolution.mutationStrategies = profile.evolution.mutationStrategies;
+  }
+  if (profile.evals?.files) {
+    config.evals.files = profile.evals.files;
+  }
+
+  console.log(`Using profile: ${profileName}`);
+}
+
 const GEPA_DIR = process.env.GEPA_DIR || __dirname;
 const GENERATIONS_DIR = path.join(GEPA_DIR, 'generations');
 const RESULTS_DIR = path.join(GEPA_DIR, 'results');
@@ -87,7 +118,10 @@ function getGenPath(gen, variant = null) {
  * Initialize GEPA with current CLAUDE.md
  */
 async function init(targetPath) {
-  const claudeMdPath = targetPath || path.join(process.cwd(), 'CLAUDE.md');
+  const resolvedTarget = targetPath || config.target.file || 'CLAUDE.md';
+  const claudeMdPath = resolvedTarget.startsWith('~')
+    ? path.join(process.env.HOME, resolvedTarget.slice(1))
+    : path.resolve(resolvedTarget);
 
   if (!fs.existsSync(claudeMdPath)) {
     console.error(`Error: ${claudeMdPath} not found`);
@@ -183,6 +217,10 @@ async function generateMutation(content, strategy, state) {
     add_constraints: `Add specific constraints and guardrails based on common failure modes. Be precise about what NOT to do.`,
 
     simplify: `Simplify complex instructions. Break down multi-step rules. Use bullet points over paragraphs.`,
+
+    add_guardrails: `Add guardrails for common agent failure modes: forgetting to run tests, wrong commit format, not reading prior context on retries, not handling empty fields. Add explicit "DO NOT" rules where agents commonly go wrong.`,
+
+    improve_error_handling: `Improve how the prompt handles edge cases and errors: empty descriptions, missing labels, retry attempts, urgent priorities. Add conditional sections and fallback instructions for when data is incomplete.`,
   };
 
   const prompt = `You are optimizing a CLAUDE.md system prompt for an AI coding agent.
@@ -386,10 +424,10 @@ async function runEval(variantName) {
 
   console.log(`Running evals on ${variantName}...`);
 
-  // Load eval tasks
-  const evalFiles = fs
-    .readdirSync(EVALS_DIR)
-    .filter((f) => f.endsWith('.jsonl'));
+  // Load eval tasks (use profile-specific files if set, otherwise all .jsonl)
+  const evalFiles = config.evals.files
+    ? config.evals.files.filter((f) => fs.existsSync(path.join(EVALS_DIR, f)))
+    : fs.readdirSync(EVALS_DIR).filter((f) => f.endsWith('.jsonl'));
   const tasks = evalFiles.flatMap((f) =>
     fs
       .readFileSync(path.join(EVALS_DIR, f), 'utf8')
@@ -849,5 +887,9 @@ Usage:
   node optimize.js run [generations]     Full optimization loop
   node optimize.js status                Show current status
   node optimize.js diff [a] [b]          Compare two variants
+
+Options:
+  --profile <name>                       Use a named profile (default: claude-md)
+                                         Available: claude-md, conductor
 `);
 }

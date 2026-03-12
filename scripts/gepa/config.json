@@ -55,5 +55,46 @@
     "trackTokenUsage": true,
     "trackErrors": true,
     "trackUserFeedback": true
+  },
+
+  "profiles": {
+    "claude-md": {
+      "target": {
+        "file": "CLAUDE.md",
+        "scope": "project",
+        "backup": true
+      },
+      "evolution": {
+        "mutationStrategies": [
+          "rephrase",
+          "add_examples",
+          "remove_redundancy",
+          "restructure",
+          "add_constraints",
+          "simplify"
+        ]
+      },
+      "evals": {
+        "files": ["stackmemory-tasks.jsonl", "coding-tasks.jsonl"]
+      }
+    },
+    "conductor": {
+      "target": {
+        "file": "~/.stackmemory/conductor/prompt-template.md",
+        "scope": "user",
+        "backup": true
+      },
+      "evolution": {
+        "mutationStrategies": [
+          "add_guardrails",
+          "improve_error_handling",
+          "add_examples",
+          "simplify"
+        ]
+      },
+      "evals": {
+        "files": ["conductor-tasks.jsonl"]
+      }
+    }
   }
 }

@@ -97,6 +97,8 @@ export interface RunningIssue {
   tokensUsed: number;
   /** Observability: log file write stream */
   logStream?: WriteStream;
+  /** Retry intelligence: adjustments from outcome history */
+  retryAdjustments?: string[];
 }
 
 export interface ConductorStats {
@@ -190,6 +192,133 @@ function logAgentOutcome(entry: AgentOutcomeEntry): void {
   const dir = join(homedir(), '.stackmemory', 'conductor');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   appendFileSync(getOutcomesLogPath(), JSON.stringify(entry) + '\n');
+}
+
+// ── Retry Intelligence ──
+
+export interface RetryStrategy {
+  shouldRetry: boolean;
+  reason?: string;
+  adjustments: string[];
+}
+
+/**
+ * Consult outcome history to decide whether retrying a failed agent is worthwhile
+ * and what adjustments to make. Reads outcomes.jsonl directly.
+ */
+export function getRetryStrategy(
+  issue: string,
+  outcomes?: AgentOutcomeEntry[]
+): RetryStrategy {
+  // Load outcomes from disk if not provided
+  if (!outcomes) {
+    const logPath = getOutcomesLogPath();
+    if (!existsSync(logPath)) {
+      return { shouldRetry: true, adjustments: [] };
+    }
+    try {
+      const lines = readFileSync(logPath, 'utf-8')
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+      outcomes = lines.map((l) => JSON.parse(l) as AgentOutcomeEntry);
+    } catch {
+      return { shouldRetry: true, adjustments: [] };
+    }
+  }
+
+  // Filter to recent outcomes for this issue
+  const issueOutcomes = outcomes.filter((o) => o.issue === issue);
+  // Use all outcomes if none for this specific issue
+  const relevant = issueOutcomes.length > 0 ? issueOutcomes : outcomes;
+  const failures = relevant.filter(
+    (o) => o.outcome === 'failure' || o.outcome === 'partial'
+  );
+
+  if (failures.length === 0) {
+    return { shouldRetry: true, adjustments: [] };
+  }
+
+  const lastFailure = failures[failures.length - 1];
+
+  // Don't retry if last failure was a rate limit (429)
+  if (
+    lastFailure.errorTail &&
+    /429|rate.?limit|too many requests|usage.?limit|overloaded/i.test(
+      lastFailure.errorTail
+    )
+  ) {
+    return {
+      shouldRetry: false,
+      reason:
+        'Last failure was a rate limit (429) — retrying immediately will not help',
+      adjustments: [],
+    };
+  }
+
+  // Don't retry if the issue has failed 2+ times on the same phase (structural problem)
+  if (issueOutcomes.length > 0) {
+    const issueFailures = issueOutcomes.filter(
+      (o) => o.outcome === 'failure' || o.outcome === 'partial'
+    );
+    const phaseFailCounts = new Map<string, number>();
+    for (const f of issueFailures) {
+      phaseFailCounts.set(f.phase, (phaseFailCounts.get(f.phase) || 0) + 1);
+    }
+    for (const [phase, count] of phaseFailCounts) {
+      if (count >= 2) {
+        return {
+          shouldRetry: false,
+          reason: `Issue has failed ${count} times in '${phase}' phase — likely a structural problem`,
+          adjustments: [],
+        };
+      }
+    }
+  }
+
+  // Build adjustments based on failure patterns
+  const adjustments: string[] = [];
+
+  if (lastFailure.errorTail) {
+    const tail = lastFailure.errorTail;
+
+    // Timeout patterns
+    if (/timeout|timed?.?out|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(tail)) {
+      adjustments.push(
+        'Previous attempt timed out. Work in smaller increments and commit partial progress early.'
+      );
+    }
+
+    // Lint patterns
+    if (/lint|eslint|prettier|formatting|style.?error/i.test(tail)) {
+      adjustments.push(
+        'Previous attempt failed on linting. Run `npm run lint:fix` after each file change and fix all lint errors before committing.'
+      );
+    }
+
+    // Test patterns
+    if (/test.?fail|assertion|expect|vitest|jest|FAIL/i.test(tail)) {
+      adjustments.push(
+        'Previous attempt failed tests. Run tests incrementally after each change. Check existing test expectations before modifying code.'
+      );
+    }
+
+    // Build/compile patterns
+    if (/build.?fail|tsc|type.?error|TS\d{4}|compile/i.test(tail)) {
+      adjustments.push(
+        'Previous attempt had build/type errors. Run `npm run build` after changes and fix type errors before committing.'
+      );
+    }
+
+    // Import/module patterns
+    if (/cannot find module|ERR_MODULE_NOT_FOUND|import/i.test(tail)) {
+      adjustments.push(
+        'Previous attempt had module resolution errors. Ensure all imports use .js extensions for relative paths (ESM).'
+      );
+    }
+  }
+
+  return { shouldRetry: true, adjustments };
 }
 
 // ── Helpers ──
@@ -1027,6 +1156,21 @@ export class Conductor {
           attempt: run.attempt,
         });
 
+        // Log failure outcome for retry intelligence
+        logAgentOutcome({
+          timestamp: new Date().toISOString(),
+          issue: issue.identifier,
+          attempt: run.attempt,
+          outcome: 'failure',
+          phase: run.phase,
+          toolCalls: run.toolCalls,
+          filesModified: run.filesModified,
+          tokensUsed: run.tokensUsed,
+          durationMs: Date.now() - run.startedAt,
+          hasCommits: false,
+          errorTail: run.error?.slice(-500),
+        });
+
         // Check for rate limit — if so, don't retry, let global backoff handle it
         if (this.handleRateLimitError(run.error, issue.identifier)) {
           throw err;
@@ -1042,8 +1186,28 @@ export class Conductor {
           ).catch(() => {});
         }
 
-        // If more attempts remain, retry with backoff
+        // If more attempts remain, consult retry intelligence before retrying
         if (run.attempt < maxAttempts && !this.stopping) {
+          const strategy = getRetryStrategy(issue.identifier);
+
+          if (!strategy.shouldRetry) {
+            console.log(
+              `[${issue.identifier}] Skipping retry: ${strategy.reason}`
+            );
+            logger.info('Retry skipped by intelligence', {
+              identifier: issue.identifier,
+              reason: strategy.reason,
+            });
+            throw err;
+          }
+
+          if (strategy.adjustments.length > 0) {
+            run.retryAdjustments = strategy.adjustments;
+            console.log(
+              `[${issue.identifier}] Retry with adjustments: ${strategy.adjustments.length} hint(s)`
+            );
+          }
+
           console.log(
             `[${issue.identifier}] Failed (attempt ${run.attempt}), retrying...`
           );
@@ -1491,7 +1655,7 @@ export class Conductor {
    */
   private runAgentCLI(issue: LinearIssue, run: RunningIssue): Promise<void> {
     return new Promise((resolve, reject) => {
-      const prompt = this.buildPrompt(issue, run.attempt);
+      const prompt = this.buildPrompt(issue, run.attempt, run.retryAdjustments);
 
       // Use the real claude binary, not cmux wrapper that injects hooks
       const claudeBin = this.findClaudeBinary();
@@ -1661,7 +1825,7 @@ export class Conductor {
     run: RunningIssue
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const prompt = this.buildPrompt(issue, run.attempt);
+      const prompt = this.buildPrompt(issue, run.attempt, run.retryAdjustments);
 
       // Spawn claude-app-server via JSON-RPC protocol
       const proc = spawn('node', [this.config.appServerPath], {
@@ -1875,7 +2039,11 @@ export class Conductor {
    * Template variables: {{ISSUE_ID}}, {{TITLE}}, {{DESCRIPTION}},
    * {{LABELS}}, {{PRIORITY}}, {{ATTEMPT}}, {{PRIOR_CONTEXT}}
    */
-  private buildPrompt(issue: LinearIssue, attempt: number): string {
+  private buildPrompt(
+    issue: LinearIssue,
+    attempt: number,
+    retryAdjustments?: string[]
+  ): string {
     const templatePath = join(
       homedir(),
       '.stackmemory',
@@ -1887,10 +2055,22 @@ export class Conductor {
       ['None', 'Urgent', 'High', 'Medium', 'Low'][issue.priority] || 'None';
     const labels =
       issue.labels.length > 0 ? issue.labels.map((l) => l.name).join(', ') : '';
-    const priorContext =
-      attempt > 1
-        ? `This is attempt ${attempt}. Check .stackmemory/conductor-context.md for context from prior attempts.`
-        : '';
+
+    // Build prior context with retry adjustments
+    const contextParts: string[] = [];
+    if (attempt > 1) {
+      contextParts.push(
+        `This is attempt ${attempt}. Check .stackmemory/conductor-context.md for context from prior attempts.`
+      );
+    }
+    if (retryAdjustments && retryAdjustments.length > 0) {
+      contextParts.push(
+        '## Retry Adjustments (from prior failure analysis)',
+        '',
+        ...retryAdjustments.map((a) => `- ${a}`)
+      );
+    }
+    const priorContext = contextParts.join('\n');
 
     // Try custom template first
     if (existsSync(templatePath)) {
