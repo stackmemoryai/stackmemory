@@ -14,6 +14,7 @@ import {
 import { join, extname, relative } from 'path';
 import { spawn } from 'child_process';
 import { loadConfig, HooksConfig } from './config.js';
+import { isProcessAlive } from '../utils/process-cleanup.js';
 import {
   hookEmitter,
   HookEventData,
@@ -77,13 +78,11 @@ export async function startDaemon(
 
   if (existsSync(pidFile)) {
     const pid = parseInt(readFileSync(pidFile, 'utf-8').trim(), 10);
-    try {
-      process.kill(pid, 0);
+    if (isProcessAlive(pid)) {
       log('warn', 'Daemon already running', { pid });
       return;
-    } catch {
-      unlinkSync(pidFile);
     }
+    unlinkSync(pidFile);
   }
 
   if (!options.foreground) {
@@ -166,17 +165,15 @@ export function getDaemonStatus(): {
 
   const pid = parseInt(readFileSync(pidFile, 'utf-8').trim(), 10);
 
-  try {
-    process.kill(pid, 0);
+  if (isProcessAlive(pid)) {
     return {
       running: true,
       pid,
       uptime: state.running ? Date.now() - state.startTime : undefined,
       eventsProcessed: state.eventsProcessed,
     };
-  } catch {
-    return { running: false };
   }
+  return { running: false };
 }
 
 function setupLogStream(): void {

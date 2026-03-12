@@ -14,6 +14,7 @@ import {
 } from './types.js';
 import { createPredictionClient } from './prediction-client.js';
 import { logger } from '../../core/monitoring/logger.js';
+import { isProcessAlive } from '../../utils/process-cleanup.js';
 
 const HOME = process.env['HOME'] || '/tmp';
 const PID_FILE = join(HOME, '.stackmemory', 'sweep', 'server.pid');
@@ -193,9 +194,7 @@ export class SweepServerManager {
       // Wait for process to exit
       await new Promise<void>((resolve) => {
         const checkInterval = setInterval(() => {
-          try {
-            process.kill(status.pid!, 0); // Check if still running
-          } catch {
+          if (!isProcessAlive(status.pid!)) {
             clearInterval(checkInterval);
             resolve();
           }
@@ -242,10 +241,7 @@ export class SweepServerManager {
       const { pid, port, host, modelPath, startedAt } = data;
 
       // Check if process is still running
-      try {
-        process.kill(pid, 0);
-      } catch {
-        // Process not running
+      if (!isProcessAlive(pid)) {
         return { running: false };
       }
 

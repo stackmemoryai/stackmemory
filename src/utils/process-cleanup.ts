@@ -25,6 +25,18 @@ export interface CleanupResult {
   errors: Array<{ pid: number; error: string }>;
 }
 
+/**
+ * Check if a process is still alive by sending signal 0
+ */
+export function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const STACKMEMORY_PROCESS_PATTERNS = [
   'stackmemory',
   'ralph orchestrate',

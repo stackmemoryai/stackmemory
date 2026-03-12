@@ -16,6 +16,7 @@ import {
   appendFileSync,
   readFileSync,
 } from 'fs';
+import { isProcessAlive } from '../utils/process-cleanup.js';
 import {
   loadDaemonConfig,
   getDaemonPaths,
@@ -112,15 +113,13 @@ export class UnifiedDaemon {
         const pid = parseInt(existingPid, 10);
 
         // Check if process is running
-        try {
-          process.kill(pid, 0);
+        if (isProcessAlive(pid)) {
           this.log('WARN', 'daemon', 'Daemon already running', { pid });
           return false;
-        } catch {
-          // Process not running, stale PID
-          this.log('INFO', 'daemon', 'Cleaning stale PID file', { pid });
-          unlinkSync(this.paths.pidFile);
         }
+        // Process not running, stale PID
+        this.log('INFO', 'daemon', 'Cleaning stale PID file', { pid });
+        unlinkSync(this.paths.pidFile);
       } catch {
         try {
           unlinkSync(this.paths.pidFile);

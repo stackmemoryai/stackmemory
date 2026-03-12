@@ -27,7 +27,8 @@ docs/            # Documentation
 - Database: src/core/database/sqlite-adapter.ts
 - Snapshot: src/core/worktree/capture.ts
 - Preflight: src/core/worktree/preflight.ts
-- Conductor: src/cli/commands/orchestrator.ts
+- Conductor: src/cli/commands/orchestrator.ts (core) + orchestrate.ts (CLI)
+- Process Utils: src/utils/process-cleanup.ts
 - Shared Utils: src/core/utils/{git,text,fs}.ts
 
 ## Detailed Guides
@@ -62,7 +63,12 @@ stackmemory restore    # Restore from captured state
 stackmemory snapshot save  # Post-run context snapshot (alias: snap)
 stackmemory snapshot list  # List recent snapshots
 stackmemory preflight      # File overlap check for parallel tasks (alias: pf)
-stackmemory conductor start  # Autonomous Linear→worktree→agent orchestrator
+stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrator
+stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
+stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
+stackmemory conductor status   # Live agent status dashboard
+stackmemory conductor monitor  # Real-time TUI with phase tracking
+stackmemory conductor finalize # Clean up dead/stale agents
 stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias: watch)
 ```
 
@@ -144,6 +150,25 @@ railway up
 
 # Pre-publish checks require clean git status — stash GEPA files first
 ```
+
+## Conductor (Autonomous Agent Orchestration)
+
+The conductor manages autonomous coding agents via Linear issues:
+
+**Data files** (all under `~/.stackmemory/conductor/`):
+- `prompt-template.md` — Agent prompt template with `{{VARIABLE}}` substitution (auto-created on first `conductor start`)
+- `outcomes.jsonl` — JSONL log of agent outcomes (success/failure, phase, tokens, errors)
+- `evolution-log.jsonl` — History of `--evolve` mutations applied to the prompt template
+- `agents/<issue-id>/status.json` — Per-agent status files
+- `agents/<issue-id>/output.log` — Agent stdout/stderr
+
+**Learning loop**:
+1. Agents run → outcomes logged to `outcomes.jsonl`
+2. `conductor learn` analyzes patterns (success rate, failure phases, error types)
+3. `conductor learn --evolve` calls Claude to mutate `prompt-template.md` based on failure data
+4. Next agent run uses the improved template → repeat
+
+**Template variables**: `{{ISSUE_ID}}`, `{{TITLE}}`, `{{DESCRIPTION}}`, `{{LABELS}}`, `{{PRIORITY}}`, `{{ATTEMPT}}`, `{{PRIOR_CONTEXT}}`
 
 ## Task Delegation Model
 

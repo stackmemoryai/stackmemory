@@ -17,11 +17,13 @@ import {
   writeFileSync,
   readFileSync,
   readdirSync,
+  copyFileSync,
 } from 'fs';
 import { join } from 'path';
 import { homedir, tmpdir } from 'os';
 import Database from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
+import { isProcessAlive } from '../../utils/process-cleanup.js';
 import { Conductor } from './orchestrator.js';
 import {
   getAgentStatusDir,
@@ -147,16 +149,6 @@ const phaseColor: Record<AgentPhase, string> = {
   committing: c.green,
 };
 
-/** Check if a process is still alive */
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Phase-to-progress mapping with color and estimated completion */
 function phaseProgress(
   phase: AgentPhase,
@@ -281,6 +273,271 @@ function printUsageSummary(u: Record<string, unknown>): void {
   console.log(
     `  20x (900 msgs)  ${budgetBar(budgetPct20x)}  ${c.d}~${fmtMinutes(mins20x)} left${c.r}`
   );
+}
+
+/** Default prompt template written on first `conductor start` */
+const DEFAULT_PROMPT_TEMPLATE = `# Agent Prompt — {{ISSUE_ID}}
+
+You are working on Linear issue **{{ISSUE_ID}}**: {{TITLE}}
+
+## Description
+
+{{DESCRIPTION}}
+
+## Context
+
+- Priority: {{PRIORITY}}
+- Labels: {{LABELS}}
+{{PRIOR_CONTEXT}}
+
+## Instructions
+
+1. Read the issue description and related code carefully
+2. Plan your approach before writing code
+3. Implement the requested changes
+4. Run \`npm run lint\` and fix any errors
+5. Run \`npm run test:run\` and fix any failures
+6. Commit your changes with format: \`type(scope): message\`
+
+## Rules
+
+- Follow existing code conventions (ESM imports with .js extension, TypeScript strict)
+- Keep changes focused — only modify what the issue requires
+- Write or update tests for any new functionality
+- Do not skip pre-commit hooks
+- If stuck, leave a comment in the code explaining the blocker
+
+Work in the current directory. All changes will be on a dedicated branch.
+`;
+
+/**
+ * Ensure a default prompt-template.md exists.
+ * Called on `conductor start` so agents always have a template to work from.
+ */
+function ensureDefaultPromptTemplate(): string {
+  const templatePath = join(
+    homedir(),
+    '.stackmemory',
+    'conductor',
+    'prompt-template.md'
+  );
+  if (!existsSync(templatePath)) {
+    const dir = join(homedir(), '.stackmemory', 'conductor');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(templatePath, DEFAULT_PROMPT_TEMPLATE);
+    console.log(
+      `  ${c.d}Created default prompt template: ${templatePath}${c.r}`
+    );
+  }
+  return templatePath;
+}
+
+/**
+ * Spawn `claude --print` with stdin prompt, return stdout.
+ * Used by `conductor learn --evolve` to generate prompt mutations.
+ */
+function spawnClaudePrint(prompt: string, timeoutMs = 120000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = cpSpawn('claude', ['--print'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env },
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let killed = false;
+
+    const timer = setTimeout(() => {
+      killed = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+
+    child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
+    child.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (killed)
+        return reject(new Error(`claude timed out after ${timeoutMs}ms`));
+      if (code !== 0 && !stdout)
+        return reject(new Error(stderr || `claude exited ${code}`));
+      resolve(stdout);
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
+interface EvolveInput {
+  templatePath: string;
+  successRate: number;
+  failures: number;
+  failPhases: Record<string, number>;
+  errorPatterns: Record<string, number>;
+  recs: string[];
+  outcomes: AgentOutcomeEntry[];
+}
+
+/**
+ * GEPA-style prompt evolution: analyze failure patterns, mutate
+ * the current prompt template, back up the old one, write the new one.
+ */
+async function evolvePromptTemplate(input: EvolveInput): Promise<void> {
+  const {
+    templatePath,
+    successRate,
+    failures,
+    failPhases,
+    errorPatterns,
+    recs,
+    outcomes,
+  } = input;
+
+  // Read current template (or use default)
+  let currentTemplate: string;
+  if (existsSync(templatePath)) {
+    currentTemplate = readFileSync(templatePath, 'utf-8');
+  } else {
+    currentTemplate = DEFAULT_PROMPT_TEMPLATE;
+    const dir = join(homedir(), '.stackmemory', 'conductor');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(templatePath, currentTemplate);
+  }
+
+  // Build failure context for the mutation prompt
+  const failPhaseSummary = Object.entries(failPhases)
+    .sort((a, b) => b[1] - a[1])
+    .map(([phase, count]) => `  - ${phase}: ${count} failures`)
+    .join('\n');
+
+  const errorSummary = Object.entries(errorPatterns)
+    .sort((a, b) => b[1] - a[1])
+    .map(([pattern, count]) => `  - ${pattern}: ${count} occurrences`)
+    .join('\n');
+
+  // Sample error tails from recent failures
+  const failedOutcomes = outcomes
+    .filter((o) => o.outcome === 'failure' && o.errorTail)
+    .slice(-5);
+  const errorTails = failedOutcomes
+    .map(
+      (o) =>
+        `  [${o.issue} attempt ${o.attempt}, phase: ${o.phase}]\n  ${o.errorTail}`
+    )
+    .join('\n\n');
+
+  const mutationPrompt = `You are optimizing a prompt template for autonomous AI coding agents managed by a conductor system.
+
+CURRENT PROMPT TEMPLATE:
+\`\`\`markdown
+${currentTemplate}
+\`\`\`
+
+PERFORMANCE DATA:
+- Success rate: ${successRate}%
+- Total failures: ${failures}
+
+FAILURE PHASE BREAKDOWN:
+${failPhaseSummary || '  (none)'}
+
+ERROR PATTERNS:
+${errorSummary || '  (none)'}
+
+SAMPLE ERROR TAILS FROM RECENT FAILURES:
+${errorTails || '  (none)'}
+
+RECOMMENDATIONS FROM ANALYSIS:
+${recs.map((r) => `- ${r}`).join('\n')}
+
+YOUR TASK:
+Improve the prompt template to reduce failures. Focus on:
+1. Adding specific instructions that address the most common failure modes
+2. Making implicit requirements explicit (lint rules, test commands, commit format)
+3. Adding guardrails for the error patterns seen (e.g., if lint failures are common, add lint-specific instructions)
+4. Keeping the template concise — agents work better with clear, structured prompts
+5. Preserving all {{VARIABLE}} placeholders exactly as-is
+
+REQUIREMENTS:
+- Output ONLY the improved markdown template
+- Keep all {{VARIABLE}} placeholders: {{ISSUE_ID}}, {{TITLE}}, {{DESCRIPTION}}, {{LABELS}}, {{PRIORITY}}, {{ATTEMPT}}, {{PRIOR_CONTEXT}}
+- Do not add commentary, explanations, or markdown fences around the output
+- Target similar length to the current template (no bloat)
+
+OUTPUT THE IMPROVED TEMPLATE:`;
+
+  try {
+    console.log(
+      `    ${c.d}Calling Claude to generate improved template...${c.r}`
+    );
+    const evolved = await spawnClaudePrint(mutationPrompt);
+
+    if (!evolved.trim()) {
+      console.log(`    ${c.red}Empty response from Claude — skipping.${c.r}`);
+      return;
+    }
+
+    // Validate: must contain at least the core variables
+    const requiredVars = ['{{ISSUE_ID}}', '{{TITLE}}', '{{DESCRIPTION}}'];
+    const missing = requiredVars.filter((v) => !evolved.includes(v));
+    if (missing.length > 0) {
+      console.log(
+        `    ${c.red}Evolved template missing variables: ${missing.join(', ')} — skipping.${c.r}`
+      );
+      return;
+    }
+
+    // Backup current template
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .slice(0, 19);
+    const backupPath = templatePath.replace('.md', `.backup-${timestamp}.md`);
+    copyFileSync(templatePath, backupPath);
+    console.log(`    ${c.d}Backed up to ${backupPath}${c.r}`);
+
+    // Write evolved template
+    writeFileSync(templatePath, evolved.trim() + '\n');
+    console.log(
+      `    ${c.green}Evolved template written to ${templatePath}${c.r}`
+    );
+
+    // Log the evolution event
+    const evolutionLog = join(
+      homedir(),
+      '.stackmemory',
+      'conductor',
+      'evolution-log.jsonl'
+    );
+    const entry = {
+      timestamp: new Date().toISOString(),
+      successRate,
+      failures,
+      failPhases,
+      errorPatterns,
+      backupPath,
+    };
+    const dir = join(homedir(), '.stackmemory', 'conductor');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      evolutionLog,
+      (existsSync(evolutionLog) ? readFileSync(evolutionLog, 'utf-8') : '') +
+        JSON.stringify(entry) +
+        '\n'
+    );
+    console.log(`    ${c.d}Evolution logged to ${evolutionLog}${c.r}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`    ${c.red}Evolution failed: ${msg}${c.r}`);
+    console.log(
+      `    ${c.d}Tip: Ensure 'claude' CLI is available and authenticated.${c.r}`
+    );
+  }
 }
 
 export function createConductorCommands(): Command {
@@ -722,12 +979,26 @@ export function createConductorCommands(): Command {
         // Check for commits in worktree
         let hasCommits = false;
         if (s.workspacePath && existsSync(s.workspacePath)) {
+          let baseBranch = 'main';
           try {
-            const log = execSync('git log origin/main..HEAD --oneline', {
+            const ref = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
               cwd: s.workspacePath,
               encoding: 'utf-8',
-              timeout: 10000,
-            });
+              timeout: 5000,
+            }).trim();
+            baseBranch = ref.replace('refs/remotes/origin/', '');
+          } catch {
+            // fall back to 'main'
+          }
+          try {
+            const log = execSync(
+              `git log origin/${baseBranch}..HEAD --oneline`,
+              {
+                cwd: s.workspacePath,
+                encoding: 'utf-8',
+                timeout: 10000,
+              }
+            );
             hasCommits = log.trim().length > 0;
           } catch {
             // can't check
@@ -812,17 +1083,19 @@ export function createConductorCommands(): Command {
 
       const tail = cpSpawn('tail', args, { stdio: 'inherit' });
 
+      // Forward signals to tail
+      const forward = () => {
+        tail.kill('SIGTERM');
+      };
+      process.on('SIGINT', forward);
+      process.on('SIGTERM', forward);
+
       await new Promise<void>((resolve) => {
         tail.on('close', () => {
+          process.removeListener('SIGINT', forward);
+          process.removeListener('SIGTERM', forward);
           resolve();
         });
-
-        // Forward signals to tail
-        const forward = () => {
-          tail.kill('SIGTERM');
-        };
-        process.on('SIGINT', forward);
-        process.on('SIGTERM', forward);
       });
     });
 
@@ -835,6 +1108,11 @@ export function createConductorCommands(): Command {
     .option('--last <n>', 'Analyze last N outcomes (default: all)', '0')
     .option('--failures-only', 'Only analyze failures', false)
     .option('--export', 'Export analysis as JSON', false)
+    .option(
+      '--evolve',
+      'Auto-mutate prompt template using GEPA-style evolution from failure data',
+      false
+    )
     .action(async (options) => {
       const logPath = getOutcomesLogPath();
       if (!existsSync(logPath)) {
@@ -1051,6 +1329,21 @@ export function createConductorCommands(): Command {
         console.log(`\n  ${c.d}Using custom template: ${templatePath}${c.r}`);
       }
 
+      // --- evolve: GEPA-style mutation of prompt template ---
+      if (options.evolve) {
+        console.log(`\n  ${c.b}${c.cyan}Evolving prompt template...${c.r}\n`);
+
+        await evolvePromptTemplate({
+          templatePath,
+          successRate,
+          failures,
+          failPhases,
+          errorPatterns,
+          recs,
+          outcomes,
+        });
+      }
+
       console.log('');
     });
 
@@ -1153,6 +1446,9 @@ export function createConductorCommands(): Command {
       'cli'
     )
     .action(async (options) => {
+      // Ensure default prompt template exists on first start
+      ensureDefaultPromptTemplate();
+
       const conductor = new Conductor({
         teamId: options.team,
         activeStates: options.states.split(',').map((s: string) => s.trim()),
@@ -1347,14 +1643,14 @@ export function createConductorCommands(): Command {
           if (!paused) await render();
         }, refreshInterval);
         await new Promise<void>((resolve) => {
-          process.on('SIGINT', () => {
+          const cleanup = () => {
             clearInterval(timer);
+            process.removeListener('SIGINT', cleanup);
+            process.removeListener('SIGTERM', cleanup);
             resolve();
-          });
-          process.on('SIGTERM', () => {
-            clearInterval(timer);
-            resolve();
-          });
+          };
+          process.on('SIGINT', cleanup);
+          process.on('SIGTERM', cleanup);
         });
         return;
       }
@@ -1477,16 +1773,15 @@ export function createConductorCommands(): Command {
 
       // Keep alive
       await new Promise<void>((resolve) => {
-        process.on('SIGINT', () => {
+        const cleanup = () => {
           if (refreshTimer) clearTimeout(refreshTimer);
           if (process.stdin.isTTY) process.stdin.setRawMode(false);
+          process.removeListener('SIGINT', cleanup);
+          process.removeListener('SIGTERM', cleanup);
           resolve();
-        });
-        process.on('SIGTERM', () => {
-          if (refreshTimer) clearTimeout(refreshTimer);
-          if (process.stdin.isTTY) process.stdin.setRawMode(false);
-          resolve();
-        });
+        };
+        process.on('SIGINT', cleanup);
+        process.on('SIGTERM', cleanup);
       });
     });
 

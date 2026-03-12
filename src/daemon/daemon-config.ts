@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { isProcessAlive } from '../utils/process-cleanup.js';
 
 export interface DaemonServiceConfig {
   enabled: boolean;
@@ -257,10 +258,7 @@ export function readDaemonStatus(): DaemonStatus {
     const pid = parseInt(pidContent, 10);
 
     // Check if process is running
-    try {
-      process.kill(pid, 0);
-    } catch {
-      // Process not running
+    if (!isProcessAlive(pid)) {
       return defaultStatus;
     }
 

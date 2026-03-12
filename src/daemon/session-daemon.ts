@@ -13,6 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
+import { isProcessAlive } from '../utils/process-cleanup.js';
 
 interface DaemonConfig {
   sessionId: string;
@@ -117,18 +118,15 @@ class SessionDaemon {
         const pid = parseInt(existingPid, 10);
 
         // Check if process is still running
-        try {
-          process.kill(pid, 0);
-          // Process exists, daemon already running
+        if (isProcessAlive(pid)) {
           this.log('WARN', 'Daemon already running for this session', {
             existingPid: pid,
           });
           return false;
-        } catch {
-          // Process not running, stale PID file
-          this.log('INFO', 'Cleaning up stale PID file', { stalePid: pid });
-          fs.unlinkSync(this.pidFile);
         }
+        // Process not running, stale PID file
+        this.log('INFO', 'Cleaning up stale PID file', { stalePid: pid });
+        fs.unlinkSync(this.pidFile);
       } catch {
         try {
           fs.unlinkSync(this.pidFile);

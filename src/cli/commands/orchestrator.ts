@@ -27,6 +27,7 @@ import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { Transform, type TransformCallback } from 'stream';
 import { logger } from '../../core/monitoring/logger.js';
+import { isProcessAlive } from '../../utils/process-cleanup.js';
 import {
   LinearClient,
   type LinearIssue,
@@ -2100,15 +2101,7 @@ export class Conductor {
 
       const elapsedMin = Math.round(elapsed / 60000);
       const pid = run.process?.pid;
-      let alive = false;
-      if (pid) {
-        try {
-          process.kill(pid, 0);
-          alive = true;
-        } catch {
-          // process is dead
-        }
-      }
+      const alive = pid ? isProcessAlive(pid) : false;
 
       if (!alive) {
         // Process died without cleanup — finalize it
