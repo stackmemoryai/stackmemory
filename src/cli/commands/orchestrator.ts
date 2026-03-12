@@ -77,6 +77,8 @@ export interface ConductorConfig {
   hookTimeoutMs: number;
   /** Agent execution mode: 'adapter' (JSON-RPC via app-server) or 'cli' (direct claude -p) */
   agentMode: AgentMode;
+  /** Model routing: 'auto' = complexity-based, or a specific model ID */
+  model?: string;
 }
 
 export interface RunningIssue {
@@ -178,6 +180,7 @@ export interface AgentOutcomeEntry {
   tokensUsed: number;
   durationMs: number;
   hasCommits: boolean;
+  labels?: string[]; // issue labels for difficulty prediction
   errorTail?: string; // last 5 lines of output.log on failure
   promptHash?: string; // hash of the prompt template used
 }
@@ -474,6 +477,90 @@ function inferPhase(msg: Record<string, unknown>): AgentPhase | null {
   }
 
   return null;
+}
+
+// ── Model Routing ──
+
+export type IssueComplexity = 'simple' | 'moderate' | 'complex';
+
+const SIMPLE_LABELS = ['bug', 'fix', 'typo', 'chore', 'docs', 'hotfix'];
+const COMPLEX_LABELS = [
+  'feature',
+  'refactor',
+  'architecture',
+  'migration',
+  'security',
+  'performance',
+];
+
+/**
+ * Estimate issue complexity from Linear metadata.
+ * Used to route issues to appropriate models.
+ */
+export function estimateIssueComplexity(
+  issue: LinearIssue,
+  attempt?: number
+): IssueComplexity {
+  let score = 0; // higher = more complex
+
+  // Description length: short (<200) = simple, long (>800) = complex
+  const descLen = (issue.description || '').length;
+  if (descLen > 800) score += 2;
+  else if (descLen > 400) score += 1;
+  else if (descLen < 200) score -= 1;
+
+  // Label hints
+  const labelNames = (issue.labels || []).map((l) => l.name.toLowerCase());
+  for (const label of labelNames) {
+    if (SIMPLE_LABELS.some((s) => label.includes(s))) score -= 1;
+    if (COMPLEX_LABELS.some((c) => label.includes(c))) score += 2;
+  }
+
+  // Title hints
+  const titleLower = issue.title.toLowerCase();
+  if (SIMPLE_LABELS.some((s) => titleLower.includes(s))) score -= 1;
+  if (COMPLEX_LABELS.some((c) => titleLower.includes(c))) score += 1;
+
+  // Priority: urgent (1) or high (2) → needs care → complex
+  if (issue.priority === 1) score += 2;
+  else if (issue.priority === 2) score += 1;
+
+  // Story point estimate if available
+  if (issue.estimate) {
+    if (issue.estimate >= 5) score += 2;
+    else if (issue.estimate >= 3) score += 1;
+    else if (issue.estimate <= 1) score -= 1;
+  }
+
+  // Prior failed attempts → bump complexity
+  if (attempt && attempt > 1) score += 2;
+
+  if (score >= 3) return 'complex';
+  if (score >= 1) return 'moderate';
+  return 'simple';
+}
+
+/**
+ * Select a Claude model based on issue complexity.
+ * Returns the model ID to pass to `claude --model`.
+ */
+export function selectModelForIssue(
+  complexity: IssueComplexity,
+  config: ConductorConfig
+): string | undefined {
+  const modelSetting = config.model || 'auto';
+
+  // Explicit model override — use it for everything
+  if (modelSetting !== 'auto') return modelSetting;
+
+  // Auto routing by complexity
+  switch (complexity) {
+    case 'simple':
+    case 'moderate':
+      return 'claude-sonnet-4-20250514';
+    case 'complex':
+      return 'claude-opus-4-20250514';
+  }
 }
 
 // ── Default Config ──
@@ -1131,6 +1218,7 @@ export class Conductor {
           tokensUsed: run.tokensUsed,
           durationMs: Date.now() - run.startedAt,
           hasCommits: true,
+          labels: issue.labels.map((l) => l.name),
         });
         await this.runHook(
           'after-run',
@@ -1168,6 +1256,7 @@ export class Conductor {
           tokensUsed: run.tokensUsed,
           durationMs: Date.now() - run.startedAt,
           hasCommits: false,
+          labels: issue.labels.map((l) => l.name),
           errorTail: run.error?.slice(-500),
         });
 
@@ -1657,25 +1746,39 @@ export class Conductor {
     return new Promise((resolve, reject) => {
       const prompt = this.buildPrompt(issue, run.attempt, run.retryAdjustments);
 
+      // Model routing: select model based on issue complexity
+      const complexity = estimateIssueComplexity(issue, run.attempt);
+      const selectedModel = selectModelForIssue(complexity, this.config);
+
+      logger.info('Agent model selected', {
+        identifier: issue.identifier,
+        complexity,
+        model: selectedModel || '(default)',
+        reason:
+          this.config.model && this.config.model !== 'auto'
+            ? 'config override'
+            : `auto: ${complexity} issue`,
+      });
+
       // Use the real claude binary, not cmux wrapper that injects hooks
       const claudeBin = this.findClaudeBinary();
-      const proc = spawn(
-        claudeBin,
-        [
-          '-p',
-          '--output-format',
-          'stream-json',
-          '--dangerously-skip-permissions',
-          '--settings',
-          '{"hooks":{}}',
-          prompt,
-        ],
-        {
-          cwd: run.workspacePath,
-          env: this.buildAgentEnv(issue, run),
-          stdio: ['pipe', 'pipe', 'pipe'],
-        }
-      );
+      const args = [
+        '-p',
+        '--output-format',
+        'stream-json',
+        '--dangerously-skip-permissions',
+        '--settings',
+        '{"hooks":{}}',
+      ];
+      if (selectedModel) {
+        args.push('--model', selectedModel);
+      }
+      args.push(prompt);
+      const proc = spawn(claudeBin, args, {
+        cwd: run.workspacePath,
+        env: this.buildAgentEnv(issue, run),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
 
       run.process = proc;
       proc.stdin.end(); // Close stdin — claude -p takes prompt as arg, not stdin
@@ -2375,6 +2478,7 @@ export class Conductor {
       tokensUsed: run.tokensUsed,
       durationMs,
       hasCommits,
+      labels: run.issue.labels.map((l) => l.name),
       errorTail,
     });
 

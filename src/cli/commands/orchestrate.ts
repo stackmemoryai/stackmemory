@@ -332,6 +332,148 @@ function ensureDefaultPromptTemplate(): string {
   return templatePath;
 }
 
+// ── Difficulty Prediction ──
+
+export type DifficultyLevel = 'easy' | 'medium' | 'hard';
+
+export interface DifficultyPrediction {
+  difficulty: DifficultyLevel;
+  confidence: number;
+  reasons: string[];
+}
+
+/**
+ * Predict issue difficulty from labels, description, priority, and historical outcomes.
+ * Used for model selection and retry budget allocation.
+ */
+export function predictDifficulty(
+  labels: string[],
+  description: string,
+  priority: number,
+  outcomes: AgentOutcomeEntry[]
+): DifficultyPrediction {
+  let difficulty: DifficultyLevel = 'medium';
+  let confidence = 0.5;
+  const reasons: string[] = [];
+  const lowerLabels = labels.map((l) => l.toLowerCase());
+
+  // Signal 1: Historical failure rate for matching labels
+  if (outcomes.length > 0 && labels.length > 0) {
+    const matching = outcomes.filter(
+      (o) =>
+        o.labels &&
+        o.labels.some((ol) => lowerLabels.includes(ol.toLowerCase()))
+    );
+    if (matching.length >= 3) {
+      const failRate =
+        matching.filter((o) => o.outcome === 'failure').length /
+        matching.length;
+      if (failRate > 0.6) {
+        difficulty = 'hard';
+        confidence = Math.min(confidence + 0.1, 0.9);
+        reasons.push(
+          `Historical failure rate ${Math.round(failRate * 100)}% for similar labels`
+        );
+      } else if (failRate < 0.2) {
+        difficulty = 'easy';
+        confidence = Math.min(confidence + 0.1, 0.9);
+        reasons.push(
+          `Historical failure rate ${Math.round(failRate * 100)}% for similar labels`
+        );
+      }
+    }
+  }
+
+  // Signal 2: Short description + bug/fix label → likely easy
+  const hasBugOrFix = lowerLabels.some(
+    (l) => l === 'bug' || l === 'fix' || l.includes('bugfix')
+  );
+  if (description.length < 100 && hasBugOrFix) {
+    if (difficulty !== 'easy') difficulty = 'easy';
+    confidence = Math.min(confidence + 0.1, 0.9);
+    reasons.push('Short description with bug/fix label suggests simple fix');
+  }
+
+  // Signal 3: Long description or feature/refactor label → likely hard
+  const hasComplexLabel = lowerLabels.some(
+    (l) =>
+      l === 'feature' ||
+      l === 'refactor' ||
+      l === 'refactoring' ||
+      l === 'architecture'
+  );
+  if (description.length > 500 || hasComplexLabel) {
+    if (difficulty !== 'hard') {
+      difficulty =
+        description.length > 500 && hasComplexLabel
+          ? 'hard'
+          : difficulty === 'easy'
+            ? 'medium'
+            : 'hard';
+    }
+    confidence = Math.min(confidence + 0.1, 0.9);
+    if (description.length > 500) {
+      reasons.push(
+        `Long description (${description.length} chars) suggests complexity`
+      );
+    }
+    if (hasComplexLabel) {
+      reasons.push('Feature/refactor label suggests higher complexity');
+    }
+  }
+
+  // Signal 4: High priority → bump difficulty
+  if (priority === 1 || priority === 2) {
+    if (difficulty === 'easy') difficulty = 'medium';
+    else if (difficulty === 'medium') difficulty = 'hard';
+    confidence = Math.min(confidence + 0.1, 0.9);
+    reasons.push(
+      `Priority ${priority} (${priority === 1 ? 'urgent' : 'high'}) — higher difficulty expected`
+    );
+  }
+
+  // Signal 5: Historical avg toolCalls for similar labels > 80 → hard
+  if (outcomes.length > 0 && labels.length > 0) {
+    const matching = outcomes.filter(
+      (o) =>
+        o.labels &&
+        o.labels.some((ol) => lowerLabels.includes(ol.toLowerCase()))
+    );
+    if (matching.length >= 3) {
+      const avgToolCalls =
+        matching.reduce((s, o) => s + o.toolCalls, 0) / matching.length;
+      if (avgToolCalls > 80) {
+        difficulty = 'hard';
+        confidence = Math.min(confidence + 0.1, 0.9);
+        reasons.push(
+          `Historical avg tool calls ${Math.round(avgToolCalls)} for similar labels (>80)`
+        );
+      }
+    }
+  }
+
+  if (reasons.length === 0) {
+    reasons.push('No strong signals — defaulting to medium');
+  }
+
+  return { difficulty, confidence, reasons };
+}
+
+/** Load outcomes from disk */
+function loadOutcomes(): AgentOutcomeEntry[] {
+  const logPath = getOutcomesLogPath();
+  if (!existsSync(logPath)) return [];
+  try {
+    return readFileSync(logPath, 'utf-8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as AgentOutcomeEntry);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Spawn `claude --print` with stdin prompt, return stdout.
  * Used by `conductor learn --evolve` to generate prompt mutations.
@@ -1113,6 +1255,11 @@ export function createConductorCommands(): Command {
       'Auto-mutate prompt template using GEPA-style evolution from failure data',
       false
     )
+    .option(
+      '--predict',
+      'Show difficulty predictions alongside actual outcomes',
+      false
+    )
     .action(async (options) => {
       const logPath = getOutcomesLogPath();
       if (!existsSync(logPath)) {
@@ -1344,7 +1491,193 @@ export function createConductorCommands(): Command {
         });
       }
 
+      // --- predict: show predicted vs actual difficulty ---
+      if (options.predict) {
+        console.log(
+          `\n  ${c.b}${c.purple}Difficulty Predictions vs Actual${c.r}\n`
+        );
+
+        // Deduplicate by issue (use last outcome per issue)
+        const byIssue = new Map<string, AgentOutcomeEntry>();
+        for (const o of outcomes) {
+          byIssue.set(o.issue, o);
+        }
+
+        const difficultyColor = {
+          easy: c.green,
+          medium: c.yellow,
+          hard: c.red,
+        };
+
+        for (const [issue, outcome] of byIssue) {
+          const issueLabels = outcome.labels || [];
+          // Use all outcomes except this issue for prediction (leave-one-out)
+          const otherOutcomes = outcomes.filter((o) => o.issue !== issue);
+          const pred = predictDifficulty(
+            issueLabels,
+            '', // no description in outcome data
+            0, // no priority in outcome data
+            otherOutcomes
+          );
+
+          // Infer actual difficulty from outcome
+          const actualDifficulty: DifficultyLevel =
+            outcome.outcome === 'success' && outcome.toolCalls < 40
+              ? 'easy'
+              : outcome.outcome === 'failure' || outcome.toolCalls > 80
+                ? 'hard'
+                : 'medium';
+
+          const match = pred.difficulty === actualDifficulty;
+          const matchIcon = match ? `${c.green}✓${c.r}` : `${c.red}✗${c.r}`;
+
+          console.log(
+            `    ${matchIcon} ${c.white}${issue.padEnd(12)}${c.r}  predicted: ${difficultyColor[pred.difficulty]}${pred.difficulty.padEnd(6)}${c.r}  actual: ${difficultyColor[actualDifficulty]}${actualDifficulty.padEnd(6)}${c.r}  ${c.gray}(${Math.round(pred.confidence * 100)}% conf)${c.r}`
+          );
+        }
+
+        const issueList = [...byIssue.values()];
+        const correct = issueList.filter((o) => {
+          const otherOutcomes = outcomes.filter((oo) => oo.issue !== o.issue);
+          const pred = predictDifficulty(o.labels || [], '', 0, otherOutcomes);
+          const actual: DifficultyLevel =
+            o.outcome === 'success' && o.toolCalls < 40
+              ? 'easy'
+              : o.outcome === 'failure' || o.toolCalls > 80
+                ? 'hard'
+                : 'medium';
+          return pred.difficulty === actual;
+        }).length;
+        const accuracy = Math.round((correct / issueList.length) * 100);
+        console.log(
+          `\n    ${c.b}Accuracy${c.r}: ${accuracy}% (${correct}/${issueList.length})`
+        );
+      }
+
       console.log('');
+    });
+
+  // --- predict ---
+  cmd
+    .command('predict [issue-id]')
+    .description('Predict difficulty for an issue based on historical outcomes')
+    .option('--title <title>', 'Issue title (for testing without Linear)')
+    .option(
+      '--labels <labels>',
+      'Comma-separated labels (for testing without Linear)'
+    )
+    .option('--priority <n>', 'Priority 0-4 (for testing without Linear)', '0')
+    .option('--json', 'Output as JSON', false)
+    .action(async (issueId: string | undefined, options) => {
+      let title = options.title || '';
+      let labels: string[] = options.labels
+        ? options.labels.split(',').map((l: string) => l.trim())
+        : [];
+      let description = '';
+      let priority = parseInt(options.priority, 10) || 0;
+
+      // If issue-id provided and no inline overrides, fetch from Linear
+      if (issueId && !options.title && !options.labels) {
+        try {
+          const { LinearClient } =
+            await import('../../integrations/linear/client.js');
+          const { LinearAuthManager } =
+            await import('../../integrations/linear/auth.js');
+
+          let client: InstanceType<typeof LinearClient>;
+          try {
+            const authManager = new LinearAuthManager(process.cwd());
+            const token = await authManager.getValidToken();
+            client = new LinearClient({ apiKey: token, useBearer: true });
+          } catch {
+            const apiKey = process.env.LINEAR_API_KEY;
+            if (!apiKey) {
+              console.log(
+                `${c.red}No Linear auth found.${c.r} Use --title/--labels/--priority for testing.`
+              );
+              return;
+            }
+            client = new LinearClient({ apiKey });
+          }
+
+          const issue = await client.getIssue(issueId);
+          if (!issue) {
+            console.log(`${c.red}Issue ${issueId} not found.${c.r}`);
+            return;
+          }
+
+          title = issue.title;
+          description = issue.description || '';
+          labels = issue.labels.map((l) => l.name);
+          priority = issue.priority;
+        } catch (err) {
+          console.log(
+            `${c.red}Failed to fetch issue:${c.r} ${(err as Error).message}`
+          );
+          return;
+        }
+      }
+
+      if (!issueId && !options.title) {
+        console.log(
+          `${c.yellow}Provide an issue ID or --title/--labels for testing.${c.r}`
+        );
+        return;
+      }
+
+      const outcomes = loadOutcomes();
+      const pred = predictDifficulty(labels, description, priority, outcomes);
+
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            {
+              issueId: issueId || 'inline',
+              title,
+              labels,
+              priority,
+              ...pred,
+            },
+            null,
+            2
+          )
+        );
+        return;
+      }
+
+      const difficultyColor = {
+        easy: c.green,
+        medium: c.yellow,
+        hard: c.red,
+      };
+
+      console.log(`\n  ${c.b}${c.purple}Difficulty Prediction${c.r}\n`);
+      if (title) {
+        console.log(`  ${c.b}Issue${c.r}       ${issueId || 'inline'}`);
+        console.log(`  ${c.b}Title${c.r}       ${title}`);
+      }
+      if (labels.length > 0) {
+        console.log(`  ${c.b}Labels${c.r}      ${labels.join(', ')}`);
+      }
+      if (priority > 0) {
+        console.log(`  ${c.b}Priority${c.r}    ${priority}`);
+      }
+
+      console.log(
+        `\n  ${c.b}Difficulty${c.r}  ${difficultyColor[pred.difficulty]}${pred.difficulty.toUpperCase()}${c.r}`
+      );
+      console.log(
+        `  ${c.b}Confidence${c.r}  ${Math.round(pred.confidence * 100)}%`
+      );
+
+      console.log(`\n  ${c.b}Signals${c.r}`);
+      for (const reason of pred.reasons) {
+        console.log(`    ${c.cyan}→${c.r} ${reason}`);
+      }
+
+      console.log(
+        `\n  ${c.d}Based on ${outcomes.length} historical outcomes${c.r}\n`
+      );
     });
 
   // --- usage ---
@@ -1445,6 +1778,11 @@ export function createConductorCommands(): Command {
       'Agent mode: "cli" (claude -p, session auth) or "adapter" (JSON-RPC, API key)',
       'cli'
     )
+    .option(
+      '--model <model>',
+      'Model routing: "auto" (complexity-based) or a specific model ID',
+      'auto'
+    )
     .action(async (options) => {
       // Ensure default prompt template exists on first start
       ensureDefaultPromptTemplate();
@@ -1463,6 +1801,7 @@ export function createConductorCommands(): Command {
         maxRetries: parseInt(options.retries, 10),
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
         agentMode: options.mode === 'adapter' ? 'adapter' : 'cli',
+        model: options.model,
       });
 
       await conductor.start();
