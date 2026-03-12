@@ -524,6 +524,93 @@ interface EvolveInput {
   errorPatterns: Record<string, number>;
   recs: string[];
   outcomes: AgentOutcomeEntry[];
+  dryRun?: boolean;
+}
+
+/**
+ * Simple line-by-line diff for dry-run output.
+ * Shows removed/added lines with context (2 lines around changes).
+ */
+function printSimpleDiff(oldText: string, newText: string): void {
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+  const oldSet = new Set(oldLines);
+  const newSet = new Set(newLines);
+
+  // Build change markers: which lines are only in old / only in new
+  const removed = oldLines.filter((l) => !newSet.has(l));
+  const added = newLines.filter((l) => !oldSet.has(l));
+  const removedSet = new Set(removed);
+  const addedSet = new Set(added);
+
+  // Walk old lines, mark changed indices
+  const CONTEXT = 2;
+  const changedOld = new Set<number>();
+  for (let i = 0; i < oldLines.length; i++) {
+    if (removedSet.has(oldLines[i])) changedOld.add(i);
+  }
+  const changedNew = new Set<number>();
+  for (let i = 0; i < newLines.length; i++) {
+    if (addedSet.has(newLines[i])) changedNew.add(i);
+  }
+
+  // Print old lines with context around removals
+  let lastPrinted = -1;
+  for (let i = 0; i < oldLines.length; i++) {
+    // Check if within context of a changed line
+    let nearChange = false;
+    for (
+      let j = Math.max(0, i - CONTEXT);
+      j <= Math.min(oldLines.length - 1, i + CONTEXT);
+      j++
+    ) {
+      if (changedOld.has(j)) {
+        nearChange = true;
+        break;
+      }
+    }
+    if (!nearChange) continue;
+    if (lastPrinted >= 0 && i > lastPrinted + 1) {
+      console.log(`    ${c.d}...${c.r}`);
+    }
+    if (removedSet.has(oldLines[i])) {
+      console.log(`    ${c.red}- ${oldLines[i]}${c.r}`);
+    } else {
+      console.log(`      ${oldLines[i]}`);
+    }
+    lastPrinted = i;
+  }
+
+  // Separator between removed and added
+  if (removed.length > 0 && added.length > 0) {
+    console.log(`    ${c.d}---${c.r}`);
+  }
+
+  // Print new lines with context around additions
+  lastPrinted = -1;
+  for (let i = 0; i < newLines.length; i++) {
+    let nearChange = false;
+    for (
+      let j = Math.max(0, i - CONTEXT);
+      j <= Math.min(newLines.length - 1, i + CONTEXT);
+      j++
+    ) {
+      if (changedNew.has(j)) {
+        nearChange = true;
+        break;
+      }
+    }
+    if (!nearChange) continue;
+    if (lastPrinted >= 0 && i > lastPrinted + 1) {
+      console.log(`    ${c.d}...${c.r}`);
+    }
+    if (addedSet.has(newLines[i])) {
+      console.log(`    ${c.green}+ ${newLines[i]}${c.r}`);
+    } else {
+      console.log(`      ${newLines[i]}`);
+    }
+    lastPrinted = i;
+  }
 }
 
 /**
@@ -539,6 +626,7 @@ async function evolvePromptTemplate(input: EvolveInput): Promise<void> {
     errorPatterns,
     recs,
     outcomes,
+    dryRun,
   } = input;
 
   // Read current template (or use default)
@@ -630,6 +718,16 @@ OUTPUT THE IMPROVED TEMPLATE:`;
     if (missing.length > 0) {
       console.log(
         `    ${c.red}Evolved template missing variables: ${missing.join(', ')} — skipping.${c.r}`
+      );
+      return;
+    }
+
+    // Dry run: show diff and exit without writing
+    if (dryRun) {
+      console.log(`\n    ${c.b}${c.cyan}Dry-run diff:${c.r}\n`);
+      printSimpleDiff(currentTemplate, evolved.trim());
+      console.log(
+        `\n    ${c.d}Dry run — no files modified. Run without --dry-run to apply.${c.r}`
       );
       return;
     }
@@ -1256,6 +1354,11 @@ export function createConductorCommands(): Command {
       false
     )
     .option(
+      '--dry-run',
+      'Show evolved template without writing (use with --evolve)',
+      false
+    )
+    .option(
       '--predict',
       'Show difficulty predictions alongside actual outcomes',
       false
@@ -1488,6 +1591,7 @@ export function createConductorCommands(): Command {
           errorPatterns,
           recs,
           outcomes,
+          dryRun: options.dryRun,
         });
       }
 
@@ -1783,6 +1887,10 @@ export function createConductorCommands(): Command {
       'Model routing: "auto" (complexity-based) or a specific model ID',
       'auto'
     )
+    .option(
+      '--no-pr',
+      'Disable automatic GitHub PR creation after agent success'
+    )
     .action(async (options) => {
       // Ensure default prompt template exists on first start
       ensureDefaultPromptTemplate();
@@ -1802,6 +1910,7 @@ export function createConductorCommands(): Command {
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
         agentMode: options.mode === 'adapter' ? 'adapter' : 'cli',
         model: options.model,
+        autoPR: options.pr,
       });
 
       await conductor.start();

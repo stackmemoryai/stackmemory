@@ -79,6 +79,8 @@ export interface ConductorConfig {
   agentMode: AgentMode;
   /** Model routing: 'auto' = complexity-based, or a specific model ID */
   model?: string;
+  /** Auto-create GitHub PRs after successful agent runs (default: true) */
+  autoPR?: boolean;
 }
 
 export interface RunningIssue {
@@ -183,6 +185,7 @@ export interface AgentOutcomeEntry {
   labels?: string[]; // issue labels for difficulty prediction
   errorTail?: string; // last 5 lines of output.log on failure
   promptHash?: string; // hash of the prompt template used
+  prUrl?: string; // GitHub PR URL if auto-created
 }
 
 /** Get the conductor failures/outcomes log path */
@@ -195,6 +198,58 @@ function logAgentOutcome(entry: AgentOutcomeEntry): void {
   const dir = join(homedir(), '.stackmemory', 'conductor');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   appendFileSync(getOutcomesLogPath(), JSON.stringify(entry) + '\n');
+}
+
+/** Best-effort PR creation via GitHub CLI after successful agent run */
+function createPullRequest(opts: {
+  branch: string;
+  baseBranch: string;
+  issueId: string;
+  title: string;
+  filesModified: number;
+  toolCalls: number;
+  workspacePath: string;
+}): string | null {
+  try {
+    // Push the branch first
+    execSync(`git push -u origin "${opts.branch}"`, {
+      cwd: opts.workspacePath,
+      stdio: 'pipe',
+      timeout: 60000,
+    });
+
+    const prTitle = `feat(conductor): ${opts.issueId} — ${opts.title}`;
+    const prBody = [
+      '## Summary',
+      '',
+      `Automated PR from conductor agent for **${opts.issueId}**.`,
+      '',
+      `- **Files modified:** ${opts.filesModified}`,
+      `- **Tool calls:** ${opts.toolCalls}`,
+      '',
+      '_This PR was auto-created by StackMemory Conductor._',
+    ].join('\n');
+
+    const result = execSync(
+      `gh pr create --base "${opts.baseBranch}" --head "${opts.branch}" --title "${prTitle.replace(/"/g, '\\"')}" --body "${prBody.replace(/"/g, '\\"')}"`,
+      {
+        cwd: opts.workspacePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+      }
+    );
+
+    const prUrl = result.trim();
+    logger.info('Created PR', { issueId: opts.issueId, prUrl });
+    return prUrl;
+  } catch (err) {
+    logger.warn('Failed to create PR (best-effort)', {
+      issueId: opts.issueId,
+      error: (err as Error).message,
+    });
+    return null;
+  }
 }
 
 // ── Retry Intelligence ──
@@ -1207,6 +1262,27 @@ export class Conductor {
         // Success
         run.status = 'completed';
         this.completeCount++;
+
+        // Auto-create PR if enabled
+        let prUrl: string | undefined;
+        if (this.config.autoPR !== false) {
+          const wsKey = this.sanitizeIdentifier(issue.identifier);
+          const branchName = `conductor/${wsKey}`;
+          const url = createPullRequest({
+            branch: branchName,
+            baseBranch: this.config.baseBranch,
+            issueId: issue.identifier,
+            title: issue.title,
+            filesModified: run.filesModified,
+            toolCalls: run.toolCalls,
+            workspacePath: run.workspacePath,
+          });
+          if (url) {
+            prUrl = url;
+            console.log(`[${issue.identifier}] PR created: ${url}`);
+          }
+        }
+
         logAgentOutcome({
           timestamp: new Date().toISOString(),
           issue: issue.identifier,
@@ -1219,6 +1295,7 @@ export class Conductor {
           durationMs: Date.now() - run.startedAt,
           hasCommits: true,
           labels: issue.labels.map((l) => l.name),
+          prUrl,
         });
         await this.runHook(
           'after-run',
@@ -2465,6 +2542,26 @@ export class Conductor {
       }
     }
 
+    // Auto-create PR for stale agents with commits
+    let prUrl: string | undefined;
+    if (hasCommits && this.config.autoPR !== false) {
+      const wsKey = this.sanitizeIdentifier(run.issue.identifier);
+      const branchName = `conductor/${wsKey}`;
+      const url = createPullRequest({
+        branch: branchName,
+        baseBranch: this.config.baseBranch,
+        issueId: run.issue.identifier,
+        title: run.issue.title,
+        filesModified: run.filesModified,
+        toolCalls: run.toolCalls,
+        workspacePath: wsPath,
+      });
+      if (url) {
+        prUrl = url;
+        console.log(`[${run.issue.identifier}] PR created: ${url}`);
+      }
+    }
+
     // Log structured outcome for learning
     const durationMs = Date.now() - run.startedAt;
     logAgentOutcome({
@@ -2480,6 +2577,7 @@ export class Conductor {
       hasCommits,
       labels: run.issue.labels.map((l) => l.name),
       errorTail,
+      prUrl,
     });
 
     if (hasCommits) {
