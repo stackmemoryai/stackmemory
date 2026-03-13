@@ -20,6 +20,16 @@
             "command": "entire hooks claude-code session-end"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rudel hooks claude session-end",
+            "async": true
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
