@@ -4,19 +4,35 @@
 
 ```
 src/
-  cli/           # CLI commands and entry point
-  core/          # Core business logic
-    context/     # Frame and context management
-    database/    # Database adapters (SQLite, ParadeDB)
-    digest/      # Digest generation
-    query/       # Query parsing and routing
-  integrations/  # External integrations (Linear, MCP)
-  services/      # Business services
-  skills/        # Claude Code skills
-  utils/         # Shared utilities
-scripts/         # Build and utility scripts
-config/          # Configuration files
-docs/            # Documentation
+  cli/             # CLI commands and entry point
+  core/            # Core business logic
+    config/        # Config types and manager
+    context/       # Frame management, enrichment, rehydration
+    database/      # SQLite adapter, migrations, query cache
+    digest/        # Digest generation (hybrid, chronological)
+    errors/        # Error types and recovery
+    merge/         # Stack merge and conflict resolution
+    models/        # Model routing, complexity scoring
+    monitoring/    # Logging, metrics, session monitor
+    performance/   # Caching, profiling, benchmarks
+    query/         # Query parsing and routing
+    retrieval/     # Context retrieval, LLM provider
+    session/       # Handoff, session management
+    skills/        # Skill storage and types
+    storage/       # Tiered storage, remote sync
+    trace/         # Debug tracing, trace detection
+  integrations/    # External integrations
+    claude-code/   # Agent bridge, post-task hooks
+    linear/        # Linear sync, webhooks, OAuth
+    mcp/           # MCP server, 56 tool handlers
+    ralph/         # Multi-agent swarm orchestration
+  daemon/          # Unified daemon, session daemon
+  features/        # Analytics, browser, sweep, TUI
+  hooks/           # Claude Code hook handlers
+  skills/          # Built-in skill implementations
+  utils/           # Shared utilities
+scripts/           # Build and utility scripts
+docs/              # Documentation
 ```
 
 ## Key Files
@@ -28,6 +44,8 @@ docs/            # Documentation
 - Snapshot: src/core/worktree/capture.ts
 - Preflight: src/core/worktree/preflight.ts
 - Conductor: src/cli/commands/orchestrator.ts (core) + orchestrate.ts (CLI)
+- Conductor Traces: src/cli/commands/conductor-traces.ts
+- Frame Enrichment: src/core/context/frame-enrichment.ts
 - Process Utils: src/utils/process-cleanup.ts
 - Shared Utils: src/core/utils/{git,text,fs}.ts
 
@@ -53,6 +71,8 @@ Full documentation (docs/):
 npm run build          # Compile TypeScript (esbuild)
 npm run lint           # ESLint check
 npm run lint:fix       # Auto-fix lint issues
+npm run lint:fast      # Fast lint via oxlint
+npm run typecheck      # tsc --noEmit (8GB heap, avoids OOM)
 npm test               # Run Vitest (watch)
 npm run test:run       # Run tests once
 npm run linear:sync    # Sync with Linear
@@ -166,8 +186,14 @@ The conductor manages autonomous coding agents via Linear issues:
 - `agents/<issue-id>/output.log` — Agent stdout/stderr
 - `traces.db` — SQLite database with per-turn conversation traces (tool calls, tokens, phases, content previews)
 
+**Intelligence features**:
+- Multi-model routing with difficulty prediction (routes simple tasks to cheaper models)
+- Smart retry with exponential backoff and prior context injection
+- Auto-PR creation on successful agent completion
+- Trace-based evidence: per-turn conversation logging (tools, tokens, phases) to traces.db
+
 **Learning loop**:
-1. Agents run → outcomes logged to `outcomes.jsonl`
+1. Agents run → outcomes logged to `outcomes.jsonl`, traces to `traces.db`
 2. `conductor learn` analyzes patterns (success rate, failure phases, error types)
 3. `conductor learn --evolve` calls Claude to mutate `prompt-template.md` based on failure data
 4. Next agent run uses the improved template → repeat
