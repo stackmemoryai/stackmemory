@@ -213,6 +213,24 @@ Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't unde
 - Plan-execute sessions (low interaction, high edits) are most efficient
 - Avoid exploratory marathons with topic-switching — burns 30-40% extra tokens
 
+## Context Maintenance
+
+**`/update-docs`** — Run weekly or when context feels stale:
+- Audits CLAUDE.md, MEMORY.md, agent_docs/ against git history and codebase
+- Detects stale entries, missing patterns, outdated paths
+- Trigger: start of week, after major refactors, or when sessions feel slow/confused
+
+**`/recover`** — Run when a session goes off the rails:
+- Analyzes traces to find where context drifted from intent
+- Maps drift to specific doc fixes (missing guidance, stale memory, ambiguous instruction)
+- Trigger: user says "this is wrong", "not what I wanted", "off the rails", repeated corrections
+
+**When to use which:**
+- Session producing wrong results → `/recover` (diagnose + fix now)
+- Routine maintenance, nothing broken → `/update-docs` (proactive gardening)
+- After publishing a new version → `/update-docs` (catch version/path drift)
+- After conductor failures → `/recover last` (learn from agent traces)
+
 ## Workflow
 
 - Check .env for API keys before asking
