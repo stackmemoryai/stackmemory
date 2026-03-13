@@ -227,6 +227,54 @@ export class FrameDatabase {
         INSERT OR IGNORE INTO schema_version (version) VALUES (1);
       `);
 
+      // Migration: add access_count column if missing
+      try {
+        this.db.exec(
+          'ALTER TABLE frames ADD COLUMN access_count INTEGER DEFAULT 0'
+        );
+      } catch {
+        // Column already exists
+      }
+
+      // Migration: add last_accessed column if missing
+      try {
+        this.db.exec('ALTER TABLE frames ADD COLUMN last_accessed INTEGER');
+      } catch {
+        // Column already exists
+      }
+
+      // Frame access log for retention decay scoring
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS frame_access_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          frame_id TEXT NOT NULL,
+          accessed_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (frame_id) REFERENCES frames(frame_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_frame_access_log_frame
+          ON frame_access_log(frame_id);
+      `);
+
+      // Temporal entity state table (append-only knowledge graph)
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS entity_states (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id TEXT NOT NULL,
+          entity_name TEXT NOT NULL,
+          relation TEXT NOT NULL,
+          value TEXT NOT NULL,
+          context TEXT,
+          source_frame_id TEXT,
+          valid_from INTEGER NOT NULL DEFAULT (unixepoch()),
+          superseded_at INTEGER,
+          FOREIGN KEY (source_frame_id) REFERENCES frames(frame_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_entity_name
+          ON entity_states(project_id, entity_name, relation);
+        CREATE INDEX IF NOT EXISTS idx_entity_temporal
+          ON entity_states(entity_name, valid_from DESC);
+      `);
+
       // Cord task orchestration table (dependency DAG for multi-agent coordination)
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS cord_tasks (

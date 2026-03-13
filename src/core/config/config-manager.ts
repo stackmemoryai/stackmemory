@@ -12,6 +12,7 @@ import {
   DEFAULT_CONFIG,
   PRESET_PROFILES,
   ScoringWeights,
+  DEFAULT_ENRICHMENT,
 } from './types.js';
 
 export interface ValidationResult {
@@ -95,6 +96,7 @@ export class ConfigManager {
         },
       },
       performance: { ...DEFAULT_CONFIG.performance, ...loaded.performance },
+      enrichment: { ...DEFAULT_ENRICHMENT, ...loaded.enrichment },
       profiles: { ...PRESET_PROFILES, ...loaded.profiles },
     };
 

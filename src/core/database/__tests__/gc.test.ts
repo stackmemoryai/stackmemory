@@ -413,8 +413,9 @@ describe('Garbage Collection', () => {
       });
 
       const score = adapter.computeImportanceScore('empty-frame');
-      // Base score: 0.3 (no anchors, no events > 3, no digest, no children, not recent)
-      expect(score).toBe(0.3);
+      // Ebbinghaus decay: salience(0.3) * exp(-0.05 * 10) ≈ 0.18
+      expect(score).toBeGreaterThanOrEqual(0.05);
+      expect(score).toBeLessThan(0.3);
     });
 
     it('should increase score for frames with DECISION anchors', async () => {
@@ -424,9 +425,15 @@ describe('Garbage Collection', () => {
       });
       insertAnchor('decision-frame', 'anc-decision', 'DECISION');
 
+      const baseScore = adapter.computeImportanceScore('empty-frame-baseline');
+      insertFrame({ frameId: 'empty-frame-baseline', createdAt: daysAgo(10) });
+      const baselineScore = adapter.computeImportanceScore(
+        'empty-frame-baseline'
+      );
+
       const score = adapter.computeImportanceScore('decision-frame');
-      // Base 0.3 + 0.15 (DECISION) = 0.45
-      expect(score).toBe(0.45);
+      // DECISION anchor increases salience, so score should be higher than baseline
+      expect(score).toBeGreaterThan(baselineScore);
     });
 
     it('should increase score for frames with digest_text', async () => {
@@ -435,10 +442,12 @@ describe('Garbage Collection', () => {
         createdAt: daysAgo(10),
         digestText: 'This frame has a digest',
       });
+      insertFrame({ frameId: 'no-digest-frame', createdAt: daysAgo(10) });
 
-      const score = adapter.computeImportanceScore('digest-frame');
-      // Base 0.3 + 0.15 (digest) = 0.45
-      expect(score).toBe(0.45);
+      const digestScore = adapter.computeImportanceScore('digest-frame');
+      const baseScore = adapter.computeImportanceScore('no-digest-frame');
+      // digest_text increases salience
+      expect(digestScore).toBeGreaterThan(baseScore);
     });
 
     it('should increase score for frames with many events', async () => {
@@ -449,10 +458,12 @@ describe('Garbage Collection', () => {
       for (let i = 0; i < 5; i++) {
         insertEvent('eventful-frame', `evt-${i}`);
       }
+      insertFrame({ frameId: 'quiet-frame', createdAt: daysAgo(10) });
 
-      const score = adapter.computeImportanceScore('eventful-frame');
-      // Base 0.3 + 0.1 (events > 3) = 0.4
-      expect(score).toBe(0.4);
+      const eventScore = adapter.computeImportanceScore('eventful-frame');
+      const baseScore = adapter.computeImportanceScore('quiet-frame');
+      // >3 events increases salience
+      expect(eventScore).toBeGreaterThan(baseScore);
     });
 
     it('should increase score for recent frames', async () => {
@@ -461,10 +472,15 @@ describe('Garbage Collection', () => {
         frameId: 'recent-frame',
         createdAt: nowSec - 3600, // 1 hour ago
       });
+      insertFrame({
+        frameId: 'old-frame-compare',
+        createdAt: daysAgo(30),
+      });
 
-      const score = adapter.computeImportanceScore('recent-frame');
-      // Base 0.3 + 0.1 (recency) = 0.4
-      expect(score).toBe(0.4);
+      const recentScore = adapter.computeImportanceScore('recent-frame');
+      const oldScore = adapter.computeImportanceScore('old-frame-compare');
+      // Recent frames decay less, so score should be higher
+      expect(recentScore).toBeGreaterThan(oldScore);
     });
 
     it('should cap score at 1.0', async () => {
@@ -486,8 +502,8 @@ describe('Garbage Collection', () => {
       ).run(nowSec);
 
       const score = adapter.computeImportanceScore('max-frame');
-      // 0.3 + 0.15 (DECISION) + 0.1 (events) + 0.15 (digest) + 0.1 (children) + 0.1 (recency) = 0.9
-      expect(score).toBe(0.9);
+      // All factors + recent → high score, still capped at 1.0
+      expect(score).toBeGreaterThan(0.5);
       expect(score).toBeLessThanOrEqual(1.0);
     });
 
@@ -833,15 +849,15 @@ describe('Garbage Collection', () => {
 
       const updated = adapter.recomputeImportanceScores(100);
 
-      // score-1 should get recomputed (0.3 + 0.15 digest = 0.45, != 0.5 so updated)
-      // score-2 should get recomputed (0.3, != 0.5 so updated)
+      // Both should get recomputed (decay formula produces values != 0.5)
       expect(updated).toBe(2);
 
       const score1 = getImportanceScore('score-1');
-      expect(score1).toBe(0.45);
-
       const score2 = getImportanceScore('score-2');
-      expect(score2).toBe(0.3);
+      // score-1 has digest → higher salience → higher score than score-2
+      expect(score1).toBeGreaterThan(score2);
+      expect(score1).not.toBe(0.5);
+      expect(score2).not.toBe(0.5);
     });
   });
 });

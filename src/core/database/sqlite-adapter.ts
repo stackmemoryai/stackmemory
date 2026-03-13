@@ -668,8 +668,50 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
   }
 
   /**
-   * Compute importance score for a single frame.
-   * Score range: [0.0, 1.0] — higher means more important, less likely to be GC'd.
+   * Compute structural salience for a frame (range 0.3-1.0).
+   * Based on anchors, events, digest, and children.
+   */
+  private computeSalience(frameId: string, digestText: string | null): number {
+    if (!this.db) return 0.3;
+
+    let score = 0.3;
+
+    const decisionCount = (
+      this.db
+        .prepare(
+          "SELECT COUNT(*) as count FROM anchors WHERE frame_id = ? AND type = 'DECISION'"
+        )
+        .get(frameId) as CountResult
+    ).count;
+    if (decisionCount > 0) score += 0.15;
+
+    const eventCount = (
+      this.db
+        .prepare('SELECT COUNT(*) as count FROM events WHERE frame_id = ?')
+        .get(frameId) as CountResult
+    ).count;
+    if (eventCount > 3) score += 0.1;
+
+    if (digestText) score += 0.15;
+
+    const childCount = (
+      this.db
+        .prepare(
+          'SELECT COUNT(*) as count FROM frames WHERE parent_frame_id = ?'
+        )
+        .get(frameId) as CountResult
+    ).count;
+    if (childCount > 0) score += 0.1;
+
+    return Math.min(score, 1.0);
+  }
+
+  /**
+   * Compute importance score using Ebbinghaus retention decay + reinforcement.
+   *
+   * R(frame, t) = I_salience * e^(-lambda * dt) + sigma * sum(1 / (t - t_access_i))
+   *
+   * Score range: [0.05, 1.0] — never fully zero.
    */
   computeImportanceScore(frameId: string): number {
     if (!this.db)
@@ -688,44 +730,51 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
 
     if (!frame) return 0.3;
 
-    let score = 0.3; // base
+    const salience = this.computeSalience(frameId, frame.digest_text);
 
-    // +0.15 for DECISION anchors
-    const decisionCount = (
-      this.db
-        .prepare(
-          "SELECT COUNT(*) as count FROM anchors WHERE frame_id = ? AND type = 'DECISION'"
-        )
-        .get(frameId) as CountResult
-    ).count;
-    if (decisionCount > 0) score += 0.15;
-
-    // +0.1 for event count > 3
-    const eventCount = (
-      this.db
-        .prepare('SELECT COUNT(*) as count FROM events WHERE frame_id = ?')
-        .get(frameId) as CountResult
-    ).count;
-    if (eventCount > 3) score += 0.1;
-
-    // +0.15 for having digest_text
-    if (frame.digest_text) score += 0.15;
-
-    // +0.1 for having children
-    const childCount = (
-      this.db
-        .prepare(
-          'SELECT COUNT(*) as count FROM frames WHERE parent_frame_id = ?'
-        )
-        .get(frameId) as CountResult
-    ).count;
-    if (childCount > 0) score += 0.1;
-
-    // +0.1 for recency (< 1 day old)
     const nowSec = Math.floor(Date.now() / 1000);
-    if (nowSec - frame.created_at < 86400) score += 0.1;
+    const dtDays = Math.max(0, (nowSec - frame.created_at) / 86400);
+    const lambda = 0.05;
+    const decayTerm = salience * Math.exp(-lambda * dtDays);
 
-    return Math.round(Math.min(score, 1.0) * 100) / 100;
+    // Reinforcement from access history
+    const sigma = 0.1;
+    const accesses = this.db
+      .prepare('SELECT accessed_at FROM frame_access_log WHERE frame_id = ?')
+      .all(frameId) as Array<{ accessed_at: number }>;
+
+    let reinforcement = 0;
+    for (const a of accesses) {
+      const gap = nowSec - a.accessed_at;
+      if (gap > 0) reinforcement += 1 / gap;
+    }
+
+    const raw = decayTerm + sigma * reinforcement;
+    return Math.round(Math.min(Math.max(raw, 0.05), 1.0) * 100) / 100;
+  }
+
+  /**
+   * Record a frame access for retention decay scoring.
+   * Inserts into frame_access_log and bumps access_count/last_accessed.
+   */
+  recordFrameAccess(frameId: string): void {
+    if (!this.db) return;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    try {
+      this.db
+        .prepare(
+          'INSERT INTO frame_access_log (frame_id, accessed_at) VALUES (?, ?)'
+        )
+        .run(frameId, nowSec);
+      this.db
+        .prepare(
+          'UPDATE frames SET access_count = COALESCE(access_count, 0) + 1, last_accessed = ? WHERE frame_id = ?'
+        )
+        .run(nowSec, frameId);
+    } catch {
+      // best-effort — don't block caller
+    }
   }
 
   /**
@@ -2325,5 +2374,152 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
         }
       }
     });
+  }
+
+  // --- Entity State Methods ---
+
+  recordEntityState(
+    projectId: string,
+    entityName: string,
+    relation: string,
+    value: string,
+    context?: string,
+    sourceFrameId?: string
+  ): number {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    // Supersede the previous current row for this (entity_name, relation)
+    this.db
+      .prepare(
+        `UPDATE entity_states
+         SET superseded_at = ?
+         WHERE entity_name = ? AND relation = ? AND superseded_at IS NULL`
+      )
+      .run(nowSec, entityName, relation);
+
+    const result = this.db
+      .prepare(
+        `INSERT INTO entity_states
+         (project_id, entity_name, relation, value, context, source_frame_id, valid_from)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        projectId,
+        entityName,
+        relation,
+        value,
+        context ?? null,
+        sourceFrameId ?? null,
+        nowSec
+      );
+
+    return Number(result.lastInsertRowid);
+  }
+
+  getEntityState(
+    entityName: string,
+    relation?: string,
+    asOf?: number
+  ): Array<{
+    id: number;
+    project_id: string;
+    entity_name: string;
+    relation: string;
+    value: string;
+    context: string | null;
+    source_frame_id: string | null;
+    valid_from: number;
+    superseded_at: number | null;
+  }> {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    if (asOf != null) {
+      const relFilter = relation ? ' AND relation = ?' : '';
+      const sql = `SELECT * FROM entity_states
+        WHERE entity_name = ?${relFilter}
+          AND valid_from <= ?
+          AND (superseded_at IS NULL OR superseded_at > ?)
+        ORDER BY valid_from DESC`;
+      const params: (string | number)[] = [entityName];
+      if (relation) params.push(relation);
+      params.push(asOf, asOf);
+      return this.db.prepare(sql).all(...params) as any[];
+    }
+
+    const relFilter = relation ? ' AND relation = ?' : '';
+    const sql = `SELECT * FROM entity_states
+      WHERE entity_name = ?${relFilter} AND superseded_at IS NULL
+      ORDER BY valid_from DESC, id DESC`;
+    const params: string[] = [entityName];
+    if (relation) params.push(relation);
+    return this.db.prepare(sql).all(...params) as any[];
+  }
+
+  getEntityHistory(
+    entityName: string,
+    relation?: string
+  ): Array<{
+    id: number;
+    project_id: string;
+    entity_name: string;
+    relation: string;
+    value: string;
+    context: string | null;
+    source_frame_id: string | null;
+    valid_from: number;
+    superseded_at: number | null;
+  }> {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const relFilter = relation ? ' AND relation = ?' : '';
+    const sql = `SELECT * FROM entity_states
+      WHERE entity_name = ?${relFilter}
+      ORDER BY valid_from DESC, id DESC`;
+    const params: string[] = [entityName];
+    if (relation) params.push(relation);
+    return this.db.prepare(sql).all(...params) as any[];
+  }
+
+  getEntityDiff(
+    entityName: string,
+    since?: number
+  ): Array<{
+    id: number;
+    project_id: string;
+    entity_name: string;
+    relation: string;
+    value: string;
+    context: string | null;
+    source_frame_id: string | null;
+    valid_from: number;
+    superseded_at: number | null;
+  }> {
+    if (!this.db)
+      throw new DatabaseError(
+        'Database not connected',
+        ErrorCode.DB_CONNECTION_FAILED
+      );
+
+    const sinceFilter = since != null ? ' AND valid_from > ?' : '';
+    const sql = `SELECT * FROM entity_states
+      WHERE entity_name = ?${sinceFilter}
+      ORDER BY valid_from DESC, id DESC`;
+    const params: (string | number)[] = [entityName];
+    if (since != null) params.push(since);
+    return this.db.prepare(sql).all(...params) as any[];
   }
 }

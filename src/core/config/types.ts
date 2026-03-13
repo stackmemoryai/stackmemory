@@ -42,6 +42,12 @@ export interface RetentionConfig {
   };
 }
 
+export interface EnrichmentConfig {
+  enabled: boolean;
+  lookbackDepth: number;
+  extractEntities: boolean;
+}
+
 export interface PerformanceConfig {
   max_stack_depth: number;
   max_frame_events: number;
@@ -69,6 +75,7 @@ export interface StackMemoryConfig {
   };
   retention: RetentionConfig;
   performance: PerformanceConfig;
+  enrichment: EnrichmentConfig;
   profiles?: Record<string, ProfileConfig>;
 }
 
@@ -166,6 +173,12 @@ export const PRESET_PROFILES: Record<string, ProfileConfig> = {
   },
 };
 
+export const DEFAULT_ENRICHMENT: EnrichmentConfig = {
+  enabled: false,
+  lookbackDepth: 3,
+  extractEntities: true,
+};
+
 export const DEFAULT_CONFIG: StackMemoryConfig = {
   version: '1.0',
   scoring: {
@@ -196,5 +209,6 @@ export const DEFAULT_CONFIG: StackMemoryConfig = {
     retrieval_timeout_ms: 500,
     batch_upload_size: 100,
   },
+  enrichment: DEFAULT_ENRICHMENT,
   profiles: PRESET_PROFILES,
 };
