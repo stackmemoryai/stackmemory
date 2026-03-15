@@ -101,9 +101,9 @@ stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias:
 - ALLOWED: All subdirectories
 - TEMP: /tmp for temporary operations
 
-## Validation (MUST DO)
+## Validation
 
-After code changes:
+Verify each step after code changes — pre-commit hooks catch 80% of CI failures locally:
 1. `npm run lint` - fix any errors AND warnings
 2. `npm run test:run` - verify no regressions
 3. `npm run build` - ensure compilation
@@ -114,18 +114,18 @@ Test coverage:
 - Maintain or improve coverage (no untested code paths)
 - Critical paths: context management, handoff, Linear sync
 
-Never: Assume success | Skip testing | Use mock data as fallback
-
 Testing rules:
 - Run `npm run test:run` via subagent or background task — never inline (blocks context)
 - ESLint: use `catch {}` not `catch (_err) {}` (lint rule)
 - `vi.clearAllMocks()` resets `mockReturnValue` — re-set mocks in `beforeEach`
 - Pre-commit hook runs: lint + parallel vitest + build — fix issues before commit, never skip
 
-## Git Rules (CRITICAL)
+## Git Rules
 
-- NEVER use `--no-verify` on git push or commit
-- ALWAYS fix lint/test errors before pushing
+The pre-commit hook enforces lint + test + build. Fix the underlying issue rather than bypassing it.
+
+- Do not use `--no-verify` on git push or commit — fix the hook failure instead
+- Fix lint/test errors before pushing
 - If pre-push hooks fail, fix the underlying issue
 - Run `npm run lint && npm run test:run` before pushing
 - Commit message format: `type(scope): message`
@@ -231,6 +231,8 @@ Route effort by task complexity — not all code changes deserve equal scrutiny:
 - Publishing (npm publish, Railway deploy)
 
 Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
+
+For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor surrounding code, add abstractions for one-time operations, or create helpers that are used once. Three similar lines of code is better than a premature abstraction.
 
 ## Session Budget
 
