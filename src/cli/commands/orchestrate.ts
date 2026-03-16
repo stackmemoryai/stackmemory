@@ -889,8 +889,19 @@ OUTPUT THE IMPROVED TEMPLATE:`;
 }
 
 export function createConductorCommands(): Command {
+  const CONDUCTOR_VERSION = '0.2.0';
+
   const cmd = new Command('conductor');
-  cmd.description('Conductor — autonomous agent orchestration via Linear');
+  cmd
+    .description('Conductor — autonomous agent orchestration via Linear')
+    .option('--version', 'Print conductor adapter version')
+    .action((options) => {
+      if (options.version) {
+        console.log(`symphony-adapter ${CONDUCTOR_VERSION}`);
+        return;
+      }
+      cmd.help();
+    });
 
   // --- capture ---
   cmd
