@@ -202,55 +202,248 @@ async function mutate() {
 }
 
 /**
- * Generate a mutation using AI
+ * Strategy definitions: prompt, motivation, and example for each mutation type.
+ * Motivation helps Claude generalize the intent (per Anthropic best practices).
+ * Examples give few-shot grounding so mutations are concrete, not vague.
+ */
+const STRATEGIES = {
+  rephrase: {
+    prompt: `Rephrase instructions for clarity without changing meaning. Make them more direct and actionable.`,
+    motivation: `Claude responds best to clear, explicit instructions. Vague phrasing causes the model to infer intent, leading to inconsistent behavior across sessions.`,
+    example: {
+      before: `NEVER use ellipses`,
+      after: `Your response will be read aloud by a TTS engine, so never use ellipses since TTS cannot pronounce them.`,
+      why: `Adding motivation helps Claude generalize — it now avoids other TTS-unfriendly patterns too.`,
+    },
+  },
+
+  add_examples: {
+    prompt: `Add concrete examples where instructions are abstract. Wrap examples in <example> tags so Claude distinguishes them from instructions.`,
+    motivation: `Examples are the most reliable way to steer output format, tone, and structure. 3-5 well-crafted examples dramatically improve accuracy. Abstract rules without examples leave too much room for interpretation.`,
+    example: {
+      before: `Use clean commit messages`,
+      after: `Use clean commit messages following conventional commits:\n<example>\nfeat(auth): add OAuth2 PKCE flow\nfix(api): prevent null tenant_id in query route\nchore: update dependencies\n</example>`,
+      why: `Concrete examples eliminate ambiguity about what "clean" means in this codebase.`,
+    },
+  },
+
+  remove_redundancy: {
+    prompt: `Remove redundant or repetitive instructions. Consolidate similar rules. Keep it DRY.`,
+    motivation: `Redundant instructions waste token budget and can cause conflicting interpretations when the same rule is phrased differently in two places. Consolidation also improves scannability.`,
+    example: {
+      before: `Don't create unnecessary files.\n...\nAvoid creating new files unless needed.\n...\nPrefer editing existing files over creating new ones.`,
+      after: `Prefer editing existing files. Only create new files when the task explicitly requires it.`,
+      why: `Three scattered rules consolidated into one clear directive — fewer tokens, less ambiguity.`,
+    },
+  },
+
+  restructure: {
+    prompt: `Reorganize sections for better flow. Group related instructions. Improve hierarchy. Put critical constraints early.`,
+    motivation: `Queries and critical instructions placed after long content blocks can improve response quality by up to 30%. Grouping related rules reduces misinterpretation when Claude scans for relevant instructions.`,
+    example: {
+      before: `## Commands\n...\n## Testing\n...\n## Git\n...\n## Testing Rules\n...`,
+      after: `## Commands\n...\n## Testing\n### Running Tests\n...\n### Testing Rules\n...\n## Git\n...`,
+      why: `Testing rules grouped under Testing header — Claude finds them together instead of scattered.`,
+    },
+  },
+
+  add_constraints: {
+    prompt: `Add specific constraints and guardrails based on common failure modes. Be precise about what NOT to do. Frame as "do X instead of Y" rather than just "don't do Y".`,
+    motivation: `Claude follows "do X instead of Y" better than bare prohibitions. Telling Claude what to do instead gives it a clear action path. Bare "don't" rules leave it guessing what the alternative is.`,
+    example: {
+      before: `Don't use markdown in responses`,
+      after: `Your response should be composed of smoothly flowing prose paragraphs. Reserve markdown for inline code, code blocks, and simple headings only.`,
+      why: `Positive framing ("do this") outperforms negative framing ("don't do that") — Claude has a clear target.`,
+    },
+  },
+
+  simplify: {
+    prompt: `Simplify complex instructions. Break down multi-step rules into sequential steps. Use numbered lists when order matters.`,
+    motivation: `Complex compound instructions are often partially followed. Breaking them into numbered steps ensures each step is executed. Sequential steps as numbered lists signal that order and completeness matter.`,
+    example: {
+      before: `Before committing, make sure to lint, test, check for secrets, and verify the build passes`,
+      after: `Before committing:\n1. Run lint: \`npm run lint\`\n2. Run tests: \`npm test\`\n3. Verify no secrets in staged files\n4. Verify build: \`npm run build\``,
+      why: `Each step is independently verifiable — Claude can check them off rather than interpreting a run-on sentence.`,
+    },
+  },
+
+  add_xml_structure: {
+    prompt: `Wrap distinct sections of the prompt in descriptive XML tags (e.g. <instructions>, <constraints>, <context>, <examples>). Use nested tags when content has natural hierarchy. Keep tag names consistent and descriptive.`,
+    motivation: `XML tags help Claude parse complex prompts unambiguously. When a prompt mixes instructions, context, examples, and variable inputs, tags prevent misinterpretation of which content serves which purpose.`,
+    example: {
+      before: `## Security\nNEVER commit secrets. Always validate input. Use parameterized queries.`,
+      after: `<security_constraints>\n## Security\nNEVER commit secrets. Always validate input. Use parameterized queries.\n</security_constraints>`,
+      why: `XML boundary makes it unambiguous that these are hard constraints, not suggestions. Claude weights tagged constraints more reliably.`,
+    },
+  },
+
+  add_role: {
+    prompt: `Add or refine a role definition at the top of the prompt. Even a single sentence focusing Claude's behavior and expertise makes a measurable difference. The role should match the actual use case.`,
+    motivation: `Setting a role in the system prompt focuses Claude's behavior and tone. A coding assistant role primes different behavior than a general assistant. Role + domain expertise = more targeted responses.`,
+    example: {
+      before: `# CLAUDE.md\n\n## Project Overview\nThis is a Node/Express API...`,
+      after: `# CLAUDE.md\n\nYou are a senior full-stack engineer working on this Node/Express/PostgreSQL monolith. Prioritize working code over explanations.\n\n## Project Overview\nThis is a Node/Express API...`,
+      why: `Role primes Claude to write code directly rather than explaining concepts — matches the actual use case.`,
+    },
+  },
+
+  add_motivation: {
+    prompt: `For existing rules that lack context, add a brief "why" explanation. Claude generalizes better from motivated rules — it can apply the spirit of the rule to edge cases the rule doesn't explicitly cover.`,
+    motivation: `Providing context or motivation behind instructions helps Claude understand goals and deliver more targeted responses. A rule with a reason is followed more reliably than a bare directive.`,
+    example: {
+      before: `Run npm test in a sub-agent, not inline`,
+      after: `Run npm test in a sub-agent, not inline — tests are long-running (3 parallel Jest suites) and their output pollutes the conversation context, making it harder to track the actual task.`,
+      why: `Now Claude understands it's about context pollution, so it applies the same logic to other long-running commands.`,
+    },
+  },
+
+  calibrate_tool_usage: {
+    prompt: `Review tool-triggering language in the prompt. Replace aggressive phrasing ("CRITICAL: You MUST use this tool", "ALWAYS use", "If in doubt, use") with proportionate guidance ("Use this tool when..."). Opus 4.6 overtriggers on language that was needed for previous models.`,
+    motivation: `Claude Opus 4.6 is significantly more proactive than previous models. Instructions designed to prevent undertriggering now cause overtriggering — spawning subagents for simple greps, using tools when direct action suffices. Dial back aggressive language to match current model capability.`,
+    example: {
+      before: `CRITICAL: You MUST always use the Bash tool to run tests. NEVER skip this step.`,
+      after: `Use the Bash tool to run tests when you've made code changes that could affect behavior.`,
+      why: `Removes over-prompting that causes the model to run tests even for documentation-only changes.`,
+    },
+  },
+
+  add_self_check: {
+    prompt: `Add verification/self-check instructions at key decision points. Ask Claude to verify its work against specific criteria before finalizing. This catches errors reliably for coding and math tasks.`,
+    motivation: `"Before you finish, verify your answer against [criteria]" is one of the most reliable error-reduction techniques. It works because Claude can catch its own mistakes when explicitly prompted to review.`,
+    example: {
+      before: `Write tests for new features`,
+      after: `Write tests for new features. Before marking the task complete, verify:\n- All new code paths have test coverage\n- Tests actually assert behavior (not just that functions exist)\n- Edge cases from the requirements are covered`,
+      why: `Self-check criteria turn a vague instruction into a concrete checklist Claude can verify against.`,
+    },
+  },
+
+  reduce_overengineering: {
+    prompt: `Add anti-overengineering constraints. Claude Opus 4.5/4.6 tend to create extra files, add unnecessary abstractions, and build flexibility that wasn't requested. Add specific guidance to keep solutions minimal and focused.`,
+    motivation: `Without constraints, Claude overengineers: extra config files, unnecessary abstraction layers, defensive coding for impossible scenarios, helpers for one-time operations. The right amount of complexity is the minimum needed for the current task.`,
+    example: {
+      before: `(no overengineering guidance)`,
+      after: `<avoid_overengineering>\nOnly make changes directly requested or clearly necessary. Don't add features, refactor surrounding code, or create abstractions for one-time operations. Three similar lines of code is better than a premature abstraction. Don't add error handling for scenarios that can't happen.\n</avoid_overengineering>`,
+      why: `Explicit constraint with XML tag boundary — Claude treats this as a hard rule, not a suggestion.`,
+    },
+  },
+
+  add_guardrails: {
+    prompt: `Add guardrails for common agent failure modes: forgetting to run tests, wrong commit format, not reading prior context on retries, not handling empty fields. Add explicit "DO NOT" rules where agents commonly go wrong.`,
+    motivation: `Agentic workflows fail at predictable points. Explicit guardrails at these failure points prevent the most common errors without requiring the agent to learn from experience.`,
+    example: {
+      before: `Run tests before committing`,
+      after: `<guardrails>\nBefore committing:\n1. Run the full test suite — do not skip even if "only docs changed"\n2. If tests fail, fix the issue and re-run — do not commit with failing tests\n3. If a test is flaky, note it but do not delete or skip it\n</guardrails>`,
+      why: `Numbered guardrails with XML boundary — each failure mode has an explicit prevention rule.`,
+    },
+  },
+
+  improve_error_handling: {
+    prompt: `Improve how the prompt handles edge cases and errors: empty descriptions, missing labels, retry attempts, urgent priorities. Add conditional sections and fallback instructions for when data is incomplete.`,
+    motivation: `Agent prompts often assume happy-path inputs. Real-world usage includes empty fields, missing context, retries after failures, and incomplete data. Fallback instructions prevent the agent from stalling or hallucinating.`,
+    example: {
+      before: `Use the ticket description to understand the task`,
+      after: `Use the ticket description to understand the task. If the description is empty or unclear, check the ticket comments and linked PRs for context. If still unclear, ask the user for clarification rather than guessing.`,
+      why: `Fallback chain prevents the agent from hallucinating context when the primary source is empty.`,
+    },
+  },
+};
+
+/**
+ * Generate a mutation using AI, with optional self-review refinement.
  */
 async function generateMutation(content, strategy, state) {
-  const strategyPrompts = {
-    rephrase: `Rephrase instructions for clarity without changing meaning. Make them more direct and actionable.`,
+  const strat = STRATEGIES[strategy];
+  if (!strat) {
+    console.warn(`  Unknown strategy: ${strategy}, falling back to rephrase`);
+    return generateMutation(content, 'rephrase', state);
+  }
 
-    add_examples: `Add concrete examples where instructions are abstract. Use <example> tags for code examples.`,
+  const prompt = `You are an expert prompt engineer optimizing a CLAUDE.md system prompt for an AI coding agent (Claude Opus 4.6).
 
-    remove_redundancy: `Remove redundant or repetitive instructions. Consolidate similar rules. Keep it DRY.`,
-
-    restructure: `Reorganize sections for better flow. Group related instructions. Improve hierarchy.`,
-
-    add_constraints: `Add specific constraints and guardrails based on common failure modes. Be precise about what NOT to do.`,
-
-    simplify: `Simplify complex instructions. Break down multi-step rules. Use bullet points over paragraphs.`,
-
-    add_guardrails: `Add guardrails for common agent failure modes: forgetting to run tests, wrong commit format, not reading prior context on retries, not handling empty fields. Add explicit "DO NOT" rules where agents commonly go wrong.`,
-
-    improve_error_handling: `Improve how the prompt handles edge cases and errors: empty descriptions, missing labels, retry attempts, urgent priorities. Add conditional sections and fallback instructions for when data is incomplete.`,
-  };
-
-  const prompt = `You are optimizing a CLAUDE.md system prompt for an AI coding agent.
-
-CURRENT PROMPT:
-\`\`\`markdown
+<current_prompt>
 ${content}
-\`\`\`
+</current_prompt>
 
+<strategy>
 OPTIMIZATION STRATEGY: ${strategy}
-${strategyPrompts[strategy]}
+${strat.prompt}
 
+WHY THIS MATTERS:
+${strat.motivation}
+
+EXAMPLE OF A GOOD MUTATION:
+<example>
+  Before: ${strat.example.before}
+  After: ${strat.example.after}
+  Why better: ${strat.example.why}
+</example>
+</strategy>
+
+<context>
 EVALUATION FEEDBACK FROM PREVIOUS GENERATIONS:
 ${getRecentFeedback(state)}
 
 REFLECTION INSIGHTS (from failure pattern analysis):
 ${getReflectionInsights()}
+</context>
 
-REQUIREMENTS:
-1. Output ONLY the improved markdown content
+<requirements>
+1. Output ONLY the improved markdown content — no commentary, no fences
 2. Preserve all critical instructions and constraints
-3. Keep the same overall structure unless restructuring
-4. Do not add commentary or explanations
+3. Keep the same overall structure unless using restructure strategy
+4. Apply the strategy thoughtfully — targeted changes, not wholesale rewrites
 5. Target <8000 tokens total length
+6. Ensure every rule has clear, actionable language
+</requirements>
 
 OUTPUT THE IMPROVED CLAUDE.MD:`;
 
-  // Use Claude to generate mutation
-  const result = await callClaude(prompt);
-  return result.trim();
+  const draft = await callClaude(prompt);
+
+  // Self-review step: generate → review → refine
+  if (config.evolution.selfReview !== false) {
+    return await selfReview(draft.trim(), content, strategy, strat);
+  }
+
+  return draft.trim();
+}
+
+/**
+ * Self-review: have Claude review its own mutation against criteria, then refine.
+ * This catches errors before burning eval budget (per Anthropic best practices:
+ * "generate a draft → review against criteria → refine based on review").
+ */
+async function selfReview(draft, original, strategy, strat) {
+  const reviewPrompt = `You are reviewing a CLAUDE.md mutation before it goes to evaluation.
+
+<original_prompt>
+${original.slice(0, 3000)}
+</original_prompt>
+
+<mutated_prompt>
+${draft.slice(0, 5000)}
+</mutated_prompt>
+
+<review_criteria>
+Strategy applied: ${strategy} — ${strat.prompt}
+
+Check the mutation against these criteria:
+1. PRESERVATION: Are all critical instructions from the original still present?
+2. COHERENCE: Do the changes make the prompt more internally consistent, not less?
+3. SPECIFICITY: Are new/changed instructions actionable (not vague)?
+4. TOKEN BUDGET: Is the result under ~8000 tokens? If over, what can be trimmed?
+5. NO DRIFT: Does the mutation stay within the strategy's scope (not rewriting unrelated sections)?
+6. NO CONFLICTS: Do new instructions contradict existing ones?
+7. OVERENGINEERING: Did the mutation add unnecessary complexity to the prompt itself?
+</review_criteria>
+
+If the mutation passes all criteria, output it unchanged.
+If it fails any criteria, output a refined version that fixes the issues.
+
+Output ONLY the final prompt content — no commentary, no review notes, no fences.`;
+
+  const refined = await callClaude(reviewPrompt);
+  return refined.trim();
 }
 
 /**
@@ -398,8 +591,8 @@ async function callClaude(prompt) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8000,
+        model: config.mutation?.model || 'claude-sonnet-4-6',
+        max_tokens: config.mutation?.maxOutputTokens || 8000,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -540,40 +733,48 @@ async function evaluateExpectations(output, expected, task) {
 }
 
 /**
- * LLM-as-judge — uses a fast model to evaluate output against criteria
+ * LLM-as-judge — uses a fast model to evaluate output against criteria.
+ * Uses XML structure and grounding (quote before judging) per Anthropic best practices.
  */
 async function llmJudge(output, expected, task) {
   const criteriaList = Object.entries(expected)
     .map(
       ([key, value]) =>
-        `- ${key}: ${typeof value === 'string' ? value : 'should be ' + value}`
+        `  <criterion name="${key}">${typeof value === 'string' ? value : 'should be ' + value}</criterion>`
     )
     .join('\n');
 
   const judgePrompt = `You are a strict code evaluation judge. Evaluate whether the AI output satisfies each criterion.
 
-TASK GIVEN TO AI:
+<task_given>
 ${task.prompt}
+</task_given>
 
-AI OUTPUT:
-\`\`\`
+<ai_output>
 ${output.slice(0, 6000)}
-\`\`\`
+</ai_output>
 
-CRITERIA TO EVALUATE:
+<criteria>
 ${criteriaList}
+</criteria>
 
-For each criterion, determine if the output genuinely satisfies it. Be strict:
-- "has_function" means a real, working function is defined (not just mentioned)
-- "bug_fixed" means the actual bug is corrected (not just discussed)
-- "handles_edge_cases" means edge cases are actually handled in code
-- "explains_fix" means there's a clear explanation of what was wrong and why
+<grounding_rules>
+Before judging each criterion, quote the specific line(s) from the AI output that satisfy or fail it. If you cannot find a relevant quote, the criterion fails.
+
+Strictness guide:
+- "has_function" — a real, working function definition exists (not just mentioned in prose)
+- "bug_fixed" — the actual bug is corrected in code (not just discussed)
+- "handles_edge_cases" — edge cases are handled with actual code (null checks, empty arrays, etc.)
+- "explains_fix" — a clear explanation of what was wrong and why the fix works
+- "no_overengineering" — solution is minimal; no unnecessary abstractions, extra files, or defensive code for impossible scenarios
+- "no_hallucination" — all claims about code are grounded in actual output; no references to files/functions that don't exist
+</grounding_rules>
 
 Respond with ONLY this JSON (no markdown fences):
 {
   "criteria": {
-    "criterion_name": {"passed": true, "reason": "brief explanation"},
-    "criterion_name": {"passed": false, "reason": "brief explanation"}
+    "criterion_name": {"passed": true, "quote": "relevant line from output", "reason": "brief explanation"},
+    "criterion_name": {"passed": false, "quote": "", "reason": "brief explanation"}
   }
 }`;
 
@@ -636,7 +837,7 @@ async function callJudge(prompt, model) {
 function regexJudge(output, expected) {
   const criteria = {};
 
-  for (const [key, value] of Object.entries(expected)) {
+  for (const [key] of Object.entries(expected)) {
     let passed = false;
     switch (key) {
       case 'has_function':
@@ -663,6 +864,20 @@ function regexJudge(output, expected) {
         passed =
           output.length > 200 &&
           /because|since|the issue|the problem/i.test(output);
+        break;
+      case 'no_overengineering':
+        // Heuristic: fail if output creates multiple new files or adds abstract factory patterns
+        passed = !(
+          /class\s+\w+Factory|abstract\s+class|createFactory/i.test(output) ||
+          (output.match(/\/\/ .*\.(?:ts|js|py)\b/g) || []).length > 3
+        );
+        break;
+      case 'no_hallucination':
+        // Heuristic: pass if output doesn't reference non-standard fictional APIs
+        passed =
+          !/(?:import|require)\s*\(?\s*['"](?!\.|\/).*(?:magic|autofix|superhelper)/i.test(
+            output
+          );
         break;
       default:
         passed = output.toLowerCase().includes(key.toLowerCase());

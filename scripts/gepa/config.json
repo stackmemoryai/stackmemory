@@ -1,6 +1,6 @@
 {
   "name": "GEPA - Genetic Eval-driven Prompt Algorithm",
-  "version": "1.0.0",
+  "version": "2.0.0",
 
   "target": {
     "file": "CLAUDE.md",
@@ -12,13 +12,20 @@
     "populationSize": 4,
     "generations": 10,
     "selectionRate": 0.5,
+    "selfReview": true,
     "mutationStrategies": [
       "rephrase",
       "add_examples",
       "remove_redundancy",
       "restructure",
       "add_constraints",
-      "simplify"
+      "simplify",
+      "add_xml_structure",
+      "add_role",
+      "add_motivation",
+      "calibrate_tool_usage",
+      "add_self_check",
+      "reduce_overengineering"
     ]
   },
 
@@ -30,7 +37,9 @@
       "task_completion",
       "code_quality",
       "instruction_following",
-      "efficiency"
+      "efficiency",
+      "no_overengineering",
+      "no_hallucination"
     ]
   },
 
@@ -40,12 +49,19 @@
     "timeoutMs": 30000
   },
 
+  "mutation": {
+    "model": "claude-sonnet-4-6",
+    "maxOutputTokens": 8000
+  },
+
   "scoring": {
     "weights": {
-      "task_completion": 0.4,
-      "code_quality": 0.25,
-      "instruction_following": 0.25,
-      "efficiency": 0.1
+      "task_completion": 0.3,
+      "code_quality": 0.2,
+      "instruction_following": 0.2,
+      "efficiency": 0.1,
+      "no_overengineering": 0.1,
+      "no_hallucination": 0.1
     },
     "threshold": 0.7
   },
@@ -71,7 +87,11 @@
           "remove_redundancy",
           "restructure",
           "add_constraints",
-          "simplify"
+          "simplify",
+          "add_xml_structure",
+          "add_motivation",
+          "calibrate_tool_usage",
+          "reduce_overengineering"
         ]
       },
       "evals": {
@@ -89,7 +109,9 @@
           "add_guardrails",
           "improve_error_handling",
           "add_examples",
-          "simplify"
+          "simplify",
+          "add_role",
+          "add_self_check"
         ]
       },
       "evals": {

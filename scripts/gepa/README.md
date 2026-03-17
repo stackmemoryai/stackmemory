@@ -79,14 +79,35 @@ cp scripts/gepa/generations/current ./CLAUDE.md
 
 ## Mutation Strategies
 
-GEPA uses 6 mutation strategies, cycling through them:
+GEPA uses 14 mutation strategies (v2.0), cycling through them. The first 6 are foundational; the remaining 8 are derived from Anthropic's Claude prompting best practices (2026-03).
 
+### Foundational
 1. **rephrase** - Reword for clarity without changing meaning
-2. **add_examples** - Add concrete examples where abstract
+2. **add_examples** - Add concrete examples where abstract (3-5 few-shot)
 3. **remove_redundancy** - DRY up repetitive instructions
-4. **restructure** - Reorganize for better flow
-5. **add_constraints** - Add guardrails for failure modes
-6. **simplify** - Break down complex rules
+4. **restructure** - Reorganize for better flow, critical rules early
+5. **add_constraints** - Add guardrails for failure modes ("do X instead of Y")
+6. **simplify** - Break down complex rules into numbered steps
+
+### Best-Practices-Derived
+7. **add_xml_structure** - Wrap sections in descriptive XML tags for unambiguous parsing
+8. **add_role** - Add/refine role definition to focus behavior and tone
+9. **add_motivation** - Add "why" context so Claude generalizes rules to edge cases
+10. **calibrate_tool_usage** - Dial back aggressive tool-triggering language for Opus 4.6
+11. **add_self_check** - Add verification criteria at key decision points
+12. **reduce_overengineering** - Constrain Claude from adding unnecessary abstractions
+
+### Agent-Specific
+13. **add_guardrails** - Explicit failure-mode prevention for agentic workflows
+14. **improve_error_handling** - Fallback instructions for incomplete/missing data
+
+## Self-Review (v2.0)
+
+Before evaluation, each mutation goes through a self-review step:
+```
+mutate → self-review → refine → eval → select
+```
+The review checks: preservation, coherence, specificity, token budget, no drift, no conflicts, no prompt overengineering. This catches errors before burning eval budget.
 
 ## Reflection (Key Innovation)
 
