@@ -26,6 +26,10 @@ export {
 } from './provider-handlers.js';
 export { TeamHandlers, type TeamHandlerDependencies } from './team-handlers.js';
 export { CordHandlers, type CordHandlerDependencies } from './cord-handlers.js';
+export {
+  ProvenantHandlers,
+  type ProvenantHandlerDependencies,
+} from './provenant-handlers.js';
 
 import {
   ContextHandlers,
@@ -40,6 +44,7 @@ import { TraceHandlers, TraceHandlerDependencies } from './trace-handlers.js';
 import { ProviderHandlers } from './provider-handlers.js';
 import { TeamHandlers, TeamHandlerDependencies } from './team-handlers.js';
 import { CordHandlers } from './cord-handlers.js';
+import { ProvenantHandlers } from './provenant-handlers.js';
 
 // Combined dependencies interface
 export interface MCPHandlerDependencies
@@ -49,6 +54,7 @@ export interface MCPHandlerDependencies
     LinearHandlerDependencies,
     TraceHandlerDependencies {
   dbAdapter?: TeamHandlerDependencies['dbAdapter'];
+  projectDir?: string;
 }
 
 /**
@@ -62,6 +68,7 @@ export class MCPHandlerFactory {
   private providerHandlers: ProviderHandlers;
   private teamHandlers?: TeamHandlers;
   private cordHandlers?: CordHandlers;
+  private provenantHandlers?: ProvenantHandlers;
 
   constructor(deps: MCPHandlerDependencies) {
     this.contextHandlers = new ContextHandlers({
@@ -94,6 +101,12 @@ export class MCPHandlerFactory {
       this.cordHandlers = new CordHandlers({
         frameManager: deps.frameManager,
         dbAdapter: deps.dbAdapter,
+      });
+    }
+
+    if (deps.projectDir) {
+      this.provenantHandlers = new ProvenantHandlers({
+        projectDir: deps.projectDir,
       });
     }
   }
@@ -202,6 +215,32 @@ export class MCPHandlerFactory {
         if (!this.cordHandlers) throw new Error('Cord tools require dbAdapter');
         return this.cordHandlers.handleCordTree.bind(this.cordHandlers);
 
+      // Provenant decision graph handlers
+      case 'provenant_search':
+        if (!this.provenantHandlers)
+          throw new Error('Provenant tools require projectDir');
+        return this.provenantHandlers.handleSearch.bind(this.provenantHandlers);
+      case 'provenant_log':
+        if (!this.provenantHandlers)
+          throw new Error('Provenant tools require projectDir');
+        return this.provenantHandlers.handleLog.bind(this.provenantHandlers);
+      case 'provenant_status':
+        if (!this.provenantHandlers)
+          throw new Error('Provenant tools require projectDir');
+        return this.provenantHandlers.handleStatus.bind(this.provenantHandlers);
+      case 'provenant_contradictions':
+        if (!this.provenantHandlers)
+          throw new Error('Provenant tools require projectDir');
+        return this.provenantHandlers.handleContradictions.bind(
+          this.provenantHandlers
+        );
+      case 'provenant_resolve':
+        if (!this.provenantHandlers)
+          throw new Error('Provenant tools require projectDir');
+        return this.provenantHandlers.handleResolve.bind(
+          this.provenantHandlers
+        );
+
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -255,6 +294,13 @@ export class MCPHandlerFactory {
       'cord_complete',
       'cord_ask',
       'cord_tree',
+
+      // Provenant decision graph tools
+      'provenant_search',
+      'provenant_log',
+      'provenant_status',
+      'provenant_contradictions',
+      'provenant_resolve',
     ];
   }
 

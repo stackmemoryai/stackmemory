@@ -36,6 +36,7 @@ export class MCPToolDefinitions {
       ...this.getCordTools(),
       ...this.getDigestTools(),
       ...this.getDesirePathTools(),
+      ...this.getProvenantTools(),
     ];
   }
 
@@ -1492,6 +1493,110 @@ export class MCPToolDefinitions {
   }
 
   /**
+   * Provenant decision graph tools
+   */
+  private getProvenantTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'provenant_search',
+        description:
+          'Search the decision graph for past decisions, patterns, and context by meaning',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Natural language search query',
+            },
+            actor: {
+              type: 'string',
+              description: 'Filter by decision maker',
+            },
+            since: {
+              type: 'string',
+              description: 'ISO date — only include decisions after this date',
+            },
+            limit: {
+              type: 'number',
+              description: 'Max results to return',
+              default: 10,
+            },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'provenant_log',
+        description:
+          'Log a decision to the graph. Use when a product or technical decision is made during a session.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            content: {
+              type: 'string',
+              description: 'The decision content',
+            },
+            actor: {
+              type: 'string',
+              description: 'Who made this decision',
+            },
+            reasoning: {
+              type: 'string',
+              description: 'Why this decision was made',
+            },
+          },
+          required: ['content'],
+        },
+      },
+      {
+        name: 'provenant_status',
+        description:
+          'Get decision graph overview: node count, edges, open contradictions, review queue depth',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'provenant_contradictions',
+        description:
+          'List open contradictions in the decision graph — conflicting beliefs that need human resolution',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'provenant_resolve',
+        description:
+          'Resolve a contradiction between two nodes by picking a winner or dismissing',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            node_a: {
+              type: 'string',
+              description: 'First node ID or prefix',
+            },
+            node_b: {
+              type: 'string',
+              description: 'Second node ID or prefix',
+            },
+            winner: {
+              type: 'string',
+              description: 'Winning node ID or prefix',
+            },
+            dismiss: {
+              type: 'boolean',
+              description: 'Dismiss as noise instead of resolving',
+            },
+          },
+          required: ['node_a', 'node_b'],
+        },
+      },
+    ];
+  }
+
+  /**
    * Get tool definition by name
    */
   getToolDefinition(name: string): MCPToolDefinition | undefined {
@@ -1519,6 +1624,7 @@ export class MCPToolDefinitions {
       | 'team'
       | 'cord'
       | 'digest'
+      | 'provenant'
   ): MCPToolDefinition[] {
     switch (category) {
       case 'context':
@@ -1555,6 +1661,8 @@ export class MCPToolDefinitions {
         return this.getDigestTools();
       case 'desire_paths':
         return this.getDesirePathTools();
+      case 'provenant':
+        return this.getProvenantTools();
       default:
         return [];
     }
