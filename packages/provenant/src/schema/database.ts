@@ -711,15 +711,19 @@ export class Database {
     const params: unknown[] = [];
     const scoreParts: string[] = [];
 
+    const escapeLike = (s: string) => s.replace(/[%_\\]/g, '\\$&');
+
     for (const kw of keywords) {
-      scoreParts.push('(CASE WHEN LOWER(content) LIKE ? THEN 1 ELSE 0 END)');
-      params.push(`%${kw}%`);
+      scoreParts.push(
+        "(CASE WHEN LOWER(content) LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END)"
+      );
+      params.push(`%${escapeLike(kw)}%`);
     }
 
     let sql = `SELECT *, (${scoreParts.join(' + ')}) as match_score FROM nodes WHERE (${scoreParts.join(' + ')}) > 0`;
     // Duplicate params for the WHERE clause
     for (const kw of keywords) {
-      params.push(`%${kw}%`);
+      params.push(`%${escapeLike(kw)}%`);
     }
 
     if (actorFilter) {
@@ -762,16 +766,22 @@ export class Database {
     unresolvedStaleFlags: number;
     unresolvedRejections: number;
   } {
-    const count = (table: string) =>
+    const countNodes = () =>
       (
-        this.db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as {
+        this.db.prepare('SELECT COUNT(*) as c FROM nodes').get() as {
+          c: number;
+        }
+      ).c;
+    const countEdges = () =>
+      (
+        this.db.prepare('SELECT COUNT(*) as c FROM edges').get() as {
           c: number;
         }
       ).c;
 
     return {
-      nodeCount: count('nodes'),
-      edgeCount: count('edges'),
+      nodeCount: countNodes(),
+      edgeCount: countEdges(),
       pendingQueue: (
         this.db
           .prepare(

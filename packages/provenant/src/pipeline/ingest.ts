@@ -110,19 +110,26 @@ export async function ingest(
 
     // auto_accept — check for dedup before writing node
     if (embedder) {
-      let dedupResult: DedupOutcome;
+      let dedupResult: DedupResult;
       try {
         dedupResult = await checkDedup(db, embedder, record, cfg);
       } catch {
         // Embedding failed — skip dedup, treat as independent
-        dedupResult = 'independent';
+        dedupResult = { outcome: 'independent' };
       }
-      if (dedupResult === 'merged') {
+      if (dedupResult.outcome === 'merged') {
+        if (!cfg.dryRun) {
+          db.linkNodeToSource(
+            dedupResult.nodeId,
+            source.id,
+            adapter.system,
+            record.external_id
+          );
+        }
         result.deduped++;
-        // Link source to existing node (handled inside checkDedup)
         continue;
       }
-      if (dedupResult === 'queued') {
+      if (dedupResult.outcome === 'queued') {
         if (!cfg.dryRun) {
           db.enqueue({
             source_id: source.id,
@@ -179,14 +186,17 @@ export async function ingest(
 
 // --- Dedup ---
 
-type DedupOutcome = 'independent' | 'merged' | 'queued';
+type DedupResult =
+  | { outcome: 'independent' }
+  | { outcome: 'merged'; nodeId: string }
+  | { outcome: 'queued' };
 
 async function checkDedup(
   db: Database,
   embedder: EmbeddingProvider,
   record: RawRecord,
   cfg: typeof DEFAULTS
-): Promise<DedupOutcome> {
+): Promise<DedupResult> {
   const { embedding } = await embedder.embed(record.content);
   const windowStart = Date.now() - cfg.dedupWindowMs;
 
@@ -194,7 +204,7 @@ async function checkDedup(
   const candidates = db.getRecentNodesWithEmbeddings(windowStart);
 
   let bestSimilarity = 0;
-  let _bestNodeId: string | undefined;
+  let bestNodeId: string | undefined;
 
   for (const candidate of candidates) {
     if (!candidate.embedding) continue;
@@ -202,17 +212,17 @@ async function checkDedup(
     const similarity = cosineSimilarity(embedding, candidateEmbedding);
     if (similarity > bestSimilarity) {
       bestSimilarity = similarity;
-      _bestNodeId = candidate.id;
+      bestNodeId = candidate.id;
     }
   }
 
-  if (bestSimilarity >= cfg.dedupMergeThreshold) {
-    return 'merged';
+  if (bestSimilarity >= cfg.dedupMergeThreshold && bestNodeId) {
+    return { outcome: 'merged', nodeId: bestNodeId };
   }
   if (bestSimilarity >= cfg.dedupReviewThreshold) {
-    return 'queued';
+    return { outcome: 'queued' };
   }
-  return 'independent';
+  return { outcome: 'independent' };
 }
 
 // --- Staleness propagation ---
