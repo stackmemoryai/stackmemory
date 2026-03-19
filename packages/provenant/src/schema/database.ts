@@ -352,7 +352,7 @@ export class Database {
       suggestion_node: params.suggestion_node,
       override_node: params.override_node ?? null,
       reasoning: params.reasoning ?? null,
-      reasoning_resolved: params.reasoning != null,
+      reasoning_resolved: params.reasoning != null ? 1 : 0,
       actor: params.actor ?? null,
       created_at: Date.now(),
     };

@@ -92,8 +92,12 @@ export async function query(
     answer = await askClaude(question, context, config);
   } catch (err) {
     // LLM unavailable — return raw context as the answer
-    const msg = err instanceof Error ? err.message : String(err);
-    answer = `[Claude unavailable: ${msg}]\n\nRaw context:\n${context}`;
+    const msg = err instanceof Error ? err.message : 'unknown error';
+    // Sanitize error message to avoid leaking API keys in auth errors
+    const safeMsg = msg
+      .replace(/sk-[a-zA-Z0-9-_]+/g, '[REDACTED]')
+      .replace(/key[_-]?[a-zA-Z0-9]{16,}/gi, '[REDACTED]');
+    answer = `[Claude unavailable: ${safeMsg}]\n\nRaw context:\n${context}`;
   }
 
   return {
@@ -118,8 +122,11 @@ async function findRelevantNodes(
   if (embedder) {
     try {
       return await semanticSearch(db, embedder, question, maxNodes, config);
-    } catch {
-      // Embedding failed (bad key, network, etc.) — fall back to keywords
+    } catch (err) {
+      console.warn(
+        '[provenant] semantic search failed, falling back to keywords:',
+        err
+      );
     }
   }
   return keywordSearch(db, question, maxNodes, config);
@@ -152,7 +159,7 @@ function keywordSearch(
   question: string,
   maxNodes: number,
   config: QueryConfig
-): Promise<Citation[]> {
+): Citation[] {
   // Extract keywords (strip common words)
   const stopwords = new Set([
     'the',
@@ -197,14 +204,12 @@ function keywordSearch(
     config.since
   );
 
-  return Promise.resolve(
-    nodes.map((node) => ({
-      node,
-      sources: [],
-      edges: [],
-      relevance: 0.5, // unknown relevance without embeddings
-    }))
-  );
+  return nodes.map((node) => ({
+    node,
+    sources: [],
+    edges: [],
+    relevance: 0.5, // unknown relevance without embeddings
+  }));
 }
 
 // --- Context building ---

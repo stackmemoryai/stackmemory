@@ -67,7 +67,7 @@ export interface RejectionLogEntry {
   suggestion_node: string;
   override_node: string | null;
   reasoning: string | null;
-  reasoning_resolved: boolean;
+  reasoning_resolved: 0 | 1;
   actor: string | null;
   created_at: number;
 }

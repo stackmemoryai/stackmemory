@@ -113,8 +113,11 @@ export async function ingest(
       let dedupResult: DedupResult;
       try {
         dedupResult = await checkDedup(db, embedder, record, cfg);
-      } catch {
-        // Embedding failed — skip dedup, treat as independent
+      } catch (err) {
+        console.warn(
+          '[provenant] dedup check failed, treating as independent:',
+          err
+        );
         dedupResult = { outcome: 'independent' };
       }
       if (dedupResult.outcome === 'merged') {
@@ -152,8 +155,11 @@ export async function ingest(
           embedding = embeddingToBuffer(
             (await embedder.embed(record.content)).embedding
           );
-        } catch {
-          // Embedding failed — write node without embedding
+        } catch (err) {
+          console.warn(
+            '[provenant] embedding failed, writing node without embedding:',
+            err
+          );
         }
       }
 
