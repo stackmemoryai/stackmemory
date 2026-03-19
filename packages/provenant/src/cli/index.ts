@@ -16,6 +16,7 @@ import {
   logOverrideResolve,
 } from './commands/log-override.js';
 import { serve } from './commands/serve.js';
+import { calibrate } from './commands/calibrate.js';
 
 const program = new Command();
 
@@ -131,5 +132,22 @@ program
   .option('-p, --port <port>', 'Port to listen on', '3847')
   .option('--db <path>', 'Database path', '.provenant/graph.db')
   .action(serve);
+
+// Shadow mode calibration
+program
+  .command('calibrate')
+  .description(
+    'Re-score existing nodes to calibrate confidence thresholds (shadow mode)'
+  )
+  .option('--db <path>', 'Database path', '.provenant/graph.db')
+  .option('--since <date>', 'Only calibrate nodes after this date')
+  .option('--auto-accept <threshold>', 'Auto-accept threshold to test', '0.7')
+  .option('--review <threshold>', 'Review threshold to test', '0.4')
+  .option(
+    '--sweep',
+    'Sweep all threshold combinations and show FP rates',
+    false
+  )
+  .action(calibrate);
 
 program.parse();

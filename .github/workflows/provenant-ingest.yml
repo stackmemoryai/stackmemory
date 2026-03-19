@@ -1,0 +1,87 @@
+name: Provenant Daily Ingest
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC (10pm PST)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: 'Comma-separated adapters to ingest (e.g. linear,slack)'
+        required: false
+        default: 'linear,slack'
+        type: string
+      dry_run:
+        description: 'Dry run (score without writing)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: provenant-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build provenant
+        working-directory: packages/provenant
+        run: npx tsc
+
+      - name: Download graph database
+        uses: actions/cache@v4
+        with:
+          path: .provenant/graph.db
+          key: provenant-db-${{ github.run_number }}
+          restore-keys: provenant-db-
+
+      - name: Run ingest
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          SOURCES="${{ inputs.sources || 'linear,slack' }}"
+          DRY_RUN="${{ inputs.dry_run || 'false' }}"
+          DRY_FLAG=""
+          if [ "$DRY_RUN" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          fi
+
+          IFS=',' read -ra ADAPTER_LIST <<< "$SOURCES"
+          for adapter in "${ADAPTER_LIST[@]}"; do
+            adapter=$(echo "$adapter" | xargs)  # trim whitespace
+            echo "═══ Ingesting: $adapter ═══"
+            npx tsx packages/provenant/src/cli/index.ts ingest -s "$adapter" $DRY_FLAG || {
+              echo "⚠ Adapter $adapter failed (may not be configured), continuing..."
+            }
+            echo ""
+          done
+
+      - name: Run calibration check
+        run: |
+          npx tsx packages/provenant/src/cli/index.ts calibrate --since "$(date -d '30 days ago' +%Y-%m-%d 2>/dev/null || date -v-30d +%Y-%m-%d)" || true
+
+      - name: Show status
+        run: npx tsx packages/provenant/src/cli/index.ts status
+
+      - name: Upload graph database
+        uses: actions/upload-artifact@v4
+        with:
+          name: provenant-graph-${{ github.run_number }}
+          path: .provenant/graph.db
+          retention-days: 90
