@@ -315,18 +315,29 @@ export class SlackAdapter implements SourceAdapter {
     threadTs: string,
     oldestTs: string
   ): Promise<SlackMessage[]> {
-    const params = new URLSearchParams({
-      channel: channelId,
-      ts: threadTs,
-      oldest: oldestTs,
-      limit: '200',
-    });
+    const messages: SlackMessage[] = [];
+    let cursor: string | undefined;
 
-    const data = await this.api<{
-      messages: SlackMessage[];
-    }>('conversations.replies', params);
+    do {
+      const params = new URLSearchParams({
+        channel: channelId,
+        ts: threadTs,
+        oldest: oldestTs,
+        limit: '200',
+      });
+      if (cursor) params.set('cursor', cursor);
 
-    return data.messages;
+      const data = await this.api<{
+        messages: SlackMessage[];
+        has_more?: boolean;
+        response_metadata?: { next_cursor?: string };
+      }>('conversations.replies', params);
+
+      messages.push(...data.messages);
+      cursor = data.response_metadata?.next_cursor || undefined;
+    } while (cursor);
+
+    return messages;
   }
 
   private async resolveUser(userId: string): Promise<string> {
@@ -347,26 +358,68 @@ export class SlackAdapter implements SourceAdapter {
   }
 
   private async api<T>(method: string, params: URLSearchParams): Promise<T> {
-    const url = `${this.baseUrl}/${method}?${params.toString()}`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${this.token}` },
-    });
+    const maxRetries = 3;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const url = `${this.baseUrl}/${method}?${params.toString()}`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${this.token}` },
+      });
 
-    if (!response.ok) {
-      throw new Error(
-        `Slack API error ${response.status}: ${await response.text()}`
-      );
+      if (response.status === 429) {
+        if (attempt >= maxRetries) {
+          throw new Error(
+            `Slack API rate limited (${method}) after max retries`
+          );
+        }
+        const retryAfter = response.headers.get('retry-after');
+        const waitMs = retryAfter
+          ? parseInt(retryAfter, 10) * 1000
+          : (attempt + 1) * 3000;
+        console.warn(
+          `[provenant] Slack rate limited (${method}), waiting ${waitMs}ms...`
+        );
+        await sleep(waitMs);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          `Slack API error ${response.status}: ${await response.text()}`
+        );
+      }
+
+      const json = (await response.json()) as {
+        ok: boolean;
+        error?: string;
+      } & T;
+      if (!json.ok) {
+        // Slack returns 200 with ok:false and retry_after for rate limits
+        if (json.error === 'ratelimited') {
+          if (attempt >= maxRetries) {
+            throw new Error(
+              `Slack API rate limited (${method}) after max retries`
+            );
+          }
+          const waitMs = (attempt + 1) * 3000;
+          console.warn(
+            `[provenant] Slack rate limited (${method}), waiting ${waitMs}ms...`
+          );
+          await sleep(waitMs);
+          continue;
+        }
+        throw new Error(`Slack API error: ${json.error}`);
+      }
+
+      return json as T;
     }
-
-    const json = (await response.json()) as { ok: boolean; error?: string } & T;
-    if (!json.ok) {
-      throw new Error(`Slack API error: ${json.error}`);
-    }
-
-    return json as T;
+    throw new Error(`Slack API request failed (${method}) after retries`);
   }
 }
 
 function parseSlackTs(ts: string): number {
   return Math.floor(parseFloat(ts) * 1000);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

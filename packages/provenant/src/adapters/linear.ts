@@ -167,7 +167,7 @@ const ISSUES_QUERY = `
         createdAt
         updatedAt
         url
-        comments {
+        comments(first: 250) {
           nodes {
             id
             body
@@ -204,7 +204,7 @@ const ISSUES_QUERY_ALL = `
         createdAt
         updatedAt
         url
-        comments {
+        comments(first: 250) {
           nodes {
             id
             body
@@ -372,20 +372,41 @@ export class LinearAdapter implements SourceAdapter {
     query: string,
     variables: Record<string, unknown>
   ): Promise<T> {
-    const response = await fetch(this.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: this.apiKey,
-      },
-      body: JSON.stringify({ query, variables }),
-    });
+    const maxRetries = 3;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: this.apiKey,
+        },
+        body: JSON.stringify({ query, variables }),
+      });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Linear API error ${response.status}: ${body}`);
+      if (response.status === 429) {
+        if (attempt >= maxRetries) {
+          throw new Error('Linear API rate limited after max retries');
+        }
+        const retryAfter = response.headers.get('retry-after');
+        const waitMs = retryAfter
+          ? parseInt(retryAfter, 10) * 1000
+          : (attempt + 1) * 2000;
+        console.warn(`[provenant] Linear rate limited, waiting ${waitMs}ms...`);
+        await sleep(waitMs);
+        continue;
+      }
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Linear API error ${response.status}: ${body}`);
+      }
+
+      return response.json() as Promise<T>;
     }
-
-    return response.json() as Promise<T>;
+    throw new Error('Linear API request failed after retries');
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
