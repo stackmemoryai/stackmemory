@@ -379,6 +379,14 @@ export class Database {
       .all() as RejectionLogEntry[];
   }
 
+  findRejection(idPrefix: string): RejectionLogEntry | undefined {
+    return this.db
+      .prepare(
+        'SELECT * FROM rejection_log WHERE reasoning_resolved = 0 AND id LIKE ? LIMIT 1'
+      )
+      .get(`${idPrefix}%`) as RejectionLogEntry | undefined;
+  }
+
   resolveRejectionReasoning(id: string, reasoning: string): void {
     this.db
       .prepare(
@@ -589,7 +597,7 @@ export class Database {
         ];
         let qi = 0;
         while (qi < queue.length) {
-          const current = queue[qi++];
+          const current = queue[qi++]!;
           const neighbors = adj.get(current.node);
           if (!neighbors) continue;
           for (const neighbor of neighbors) {

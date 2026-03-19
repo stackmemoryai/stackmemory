@@ -11,6 +11,11 @@ import {
   reviewDismiss,
   reviewExpire,
 } from './commands/review.js';
+import {
+  logOverrideList,
+  logOverrideResolve,
+} from './commands/log-override.js';
+import { serve } from './commands/serve.js';
 
 const program = new Command();
 
@@ -25,6 +30,8 @@ program
   .requiredOption('-c, --content <text>', 'Decision content')
   .option('-a, --actor <name>', 'Who made this decision')
   .option('-r, --reasoning <text>', 'Why this decision was made')
+  .option('--source-url <url>', 'URL evidence for this decision')
+  .option('--source-file <path>', 'File path evidence for this decision')
   .option('--db <path>', 'Database path', '.provenant/graph.db')
   .action(logDecision);
 
@@ -96,5 +103,33 @@ review
   )
   .option('--db <path>', 'Database path', '.provenant/graph.db')
   .action(reviewExpire);
+
+// Log-override subcommands
+const logOverride = program
+  .command('log-override')
+  .description('Manage the rejection log');
+
+logOverride
+  .command('list')
+  .description('List unresolved rejection log entries')
+  .option('-l, --limit <n>', 'Max items to show', '20')
+  .option('--db <path>', 'Database path', '.provenant/graph.db')
+  .action(logOverrideList);
+
+logOverride
+  .command('resolve')
+  .description('Resolve a rejection by adding reasoning')
+  .argument('<id>', 'Rejection ID (or prefix)')
+  .requiredOption('-r, --reasoning <text>', 'Resolution reasoning')
+  .option('--db <path>', 'Database path', '.provenant/graph.db')
+  .action(logOverrideResolve);
+
+// REST API server
+program
+  .command('serve')
+  .description('Start the REST API server')
+  .option('-p, --port <port>', 'Port to listen on', '3847')
+  .option('--db <path>', 'Database path', '.provenant/graph.db')
+  .action(serve);
 
 program.parse();

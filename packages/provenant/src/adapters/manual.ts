@@ -40,6 +40,8 @@ export class ManualAdapter implements SourceAdapter {
     content: string;
     actor?: string;
     reasoning?: string;
+    sourceUrl?: string;
+    sourceFile?: string;
   }): RawRecord {
     return {
       external_id: `manual-${Date.now()}`,
@@ -47,7 +49,11 @@ export class ManualAdapter implements SourceAdapter {
       raw_payload: JSON.stringify(params),
       actor: params.actor,
       created_at: Date.now(),
-      metadata: { reasoning: params.reasoning },
+      metadata: {
+        reasoning: params.reasoning,
+        sourceUrl: params.sourceUrl,
+        sourceFile: params.sourceFile,
+      },
     };
   }
 }

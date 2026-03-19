@@ -8,6 +8,8 @@ interface LogDecisionOpts {
   content: string;
   actor?: string;
   reasoning?: string;
+  sourceUrl?: string;
+  sourceFile?: string;
   db: string;
 }
 
@@ -21,6 +23,8 @@ export function logDecision(opts: LogDecisionOpts): void {
       content: opts.content,
       actor: opts.actor,
       reasoning: opts.reasoning,
+      sourceUrl: opts.sourceUrl,
+      sourceFile: opts.sourceFile,
     });
 
     const result = scoreRecord(record, adapter.signalModel);
@@ -49,6 +53,12 @@ export function logDecision(opts: LogDecisionOpts): void {
     console.log(`  type:       decision`);
     console.log(`  confidence: ${result.score.toFixed(2)} (${result.action})`);
     console.log(`  actor:      ${node.actor ?? '—'}`);
+    if (opts.sourceUrl) {
+      console.log(`  source-url: ${opts.sourceUrl}`);
+    }
+    if (opts.sourceFile) {
+      console.log(`  source-file: ${opts.sourceFile}`);
+    }
     console.log(`  signals:`);
     for (const s of result.signals) {
       const icon = s.matched ? (s.weight >= 0 ? '+' : '−') : ' ';

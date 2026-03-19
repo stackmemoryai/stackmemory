@@ -94,6 +94,86 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+// --- Voyage AI provider ---
+
+export interface VoyageEmbedConfig {
+  apiKey: string;
+  model?: string; // default: voyage-3-lite
+  baseUrl?: string;
+  batchSize?: number; // default 128
+}
+
+const VOYAGE_DEFAULTS = {
+  model: 'voyage-3-lite',
+  baseUrl: 'https://api.voyageai.com/v1',
+  batchSize: 128,
+};
+
+export class VoyageEmbeddingProvider implements EmbeddingProvider {
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly baseUrl: string;
+  private readonly batchSize: number;
+
+  constructor(config: VoyageEmbedConfig) {
+    this.apiKey = config.apiKey;
+    this.model = config.model ?? VOYAGE_DEFAULTS.model;
+    this.baseUrl = config.baseUrl ?? VOYAGE_DEFAULTS.baseUrl;
+    this.batchSize = config.batchSize ?? VOYAGE_DEFAULTS.batchSize;
+  }
+
+  static fromEnv(model?: string): VoyageEmbeddingProvider | undefined {
+    const key = process.env['VOYAGE_API_KEY'];
+    if (!key) return undefined;
+    return new VoyageEmbeddingProvider({ apiKey: key, model });
+  }
+
+  async embed(text: string): Promise<EmbedResult> {
+    const results = await this.embedBatch([text]);
+    return results[0]!;
+  }
+
+  async embedBatch(texts: string[]): Promise<EmbedResult[]> {
+    const results: EmbedResult[] = [];
+
+    for (let i = 0; i < texts.length; i += this.batchSize) {
+      const batch = texts.slice(i, i + this.batchSize);
+      const response = await fetch(`${this.baseUrl}/embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          input: batch,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Voyage embeddings error ${response.status}: ${body}`);
+      }
+
+      const json = (await response.json()) as {
+        data: Array<{ embedding: number[] }>;
+        usage: { total_tokens: number };
+      };
+
+      const tokensPerItem = Math.ceil(json.usage.total_tokens / batch.length);
+
+      for (const item of json.data) {
+        results.push({
+          embedding: new Float64Array(item.embedding),
+          tokens: tokensPerItem,
+        });
+      }
+    }
+
+    return results;
+  }
+}
+
 // --- Factory ---
 
 export function createEmbeddingProvider(): EmbeddingProvider | undefined {
@@ -101,7 +181,10 @@ export function createEmbeddingProvider(): EmbeddingProvider | undefined {
   const openai = OpenAIEmbeddingProvider.fromEnv();
   if (openai) return openai;
 
-  // TODO: Try Voyage AI (VOYAGE_API_KEY)
+  // Try Voyage AI
+  const voyage = VoyageEmbeddingProvider.fromEnv();
+  if (voyage) return voyage;
+
   return undefined;
 }
 
