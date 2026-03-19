@@ -489,21 +489,28 @@ export class Database {
     nodeAPrefix: string,
     nodeBPrefix: string
   ): Contradiction | undefined {
-    // Match by prefix (short IDs)
-    const all = this.getPendingContradictions();
-    return all.find(
-      (c) =>
-        (c.node_a.startsWith(nodeAPrefix) &&
-          c.node_b.startsWith(nodeBPrefix)) ||
-        (c.node_a.startsWith(nodeBPrefix) && c.node_b.startsWith(nodeAPrefix))
-    );
+    return this.db
+      .prepare(
+        `SELECT * FROM contradictions WHERE status = 'pending'
+         AND ((node_a LIKE ? AND node_b LIKE ?) OR (node_a LIKE ? AND node_b LIKE ?))
+         LIMIT 1`
+      )
+      .get(
+        `${nodeAPrefix}%`,
+        `${nodeBPrefix}%`,
+        `${nodeBPrefix}%`,
+        `${nodeAPrefix}%`
+      ) as Contradiction | undefined;
   }
 
   // --- Review Queue helpers ---
 
   findQueueItem(idPrefix: string): ReviewQueueItem | undefined {
-    const pending = this.getPendingQueue();
-    return pending.find((i) => i.id.startsWith(idPrefix));
+    return this.db
+      .prepare(
+        'SELECT * FROM review_queue WHERE resolved_at IS NULL AND id LIKE ? LIMIT 1'
+      )
+      .get(`${idPrefix}%`) as ReviewQueueItem | undefined;
   }
 
   resolveQueueItem(id: string): void {
@@ -580,8 +587,9 @@ export class Database {
         const queue: Array<{ node: string; depth: number }> = [
           { node: startNode, depth: 0 },
         ];
-        while (queue.length > 0) {
-          const current = queue.shift()!;
+        let qi = 0;
+        while (qi < queue.length) {
+          const current = queue[qi++];
           const neighbors = adj.get(current.node);
           if (!neighbors) continue;
           for (const neighbor of neighbors) {
