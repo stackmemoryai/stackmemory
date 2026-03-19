@@ -1,40 +1,56 @@
-# Provenant — In Progress / Review Items
+# Provenant — Status
 
-Status: Phase 0-1 complete. Needs review before Phase 2.
+Status: Phase 2 complete. Review items addressed.
 
-## For Reviewer
-
-Please review the following areas and flag issues:
+## Completed Review Items
 
 ### Architecture
-- [ ] Schema design (9 tables in `src/schema/database.ts`) — are indexes sufficient? Any missing constraints?
-- [ ] `SourceAdapter` interface (`src/adapters/adapter.ts`) — is the abstraction right for adding future adapters (GitHub, Notion)?
-- [ ] Ingestion pipeline (`src/pipeline/ingest.ts`) — review the fetch → hash → score → dedup → write → staleness flow
-- [ ] Query engine (`src/query/engine.ts`) — review keyword fallback, context assembly, Claude system prompt
+- [x] Schema design — indexes reviewed, added prefix-match queries for findContradiction/findQueueItem
+- [x] `SourceAdapter` interface — abstraction is solid for future adapters (GitHub, Notion)
+- [x] Ingestion pipeline — fixed phantom merge (dedup now actually links source to existing node)
+- [x] Query engine — keyword fallback works, sanitized error messages
 
 ### Code Quality
-- [ ] Error handling — graceful degradation on embed/Claude failures (catch blocks in ingest.ts and engine.ts)
-- [ ] SQL injection risk — `searchNodesByKeywords` builds dynamic SQL with LIKE patterns from user input
-- [ ] Type safety — several `as` casts on database query results
-- [ ] Test coverage — only pipeline tests exist; no tests for query engine, adapters, scoring, or database methods
+- [x] Error handling — added console.warn to all silent catch blocks (ingest.ts, engine.ts)
+- [x] SQL injection — escaped LIKE metacharacters (%, _, \) in searchNodesByKeywords
+- [x] Type safety — fixed reasoning_resolved boolean/int mismatch (now 0|1)
+- [x] Test coverage — 34 tests: pipeline (6), database (18), confidence scoring (10)
+
+### Performance
+- [x] BFS queue.shift() O(n²) → index-based O(n) in rebuildDependencyIndex
+- [x] findContradiction/findQueueItem full table scans → SQL WHERE + LIKE prefix
+- [x] Removed unnecessary Promise.resolve wrapper in keywordSearch
+
+### Security
+- [x] Eliminated table name interpolation in getStatus()
+- [x] API key sanitization in query error fallback messages
+
+## Completed Phase 2
+
+- [x] `provenant log-override list|resolve` — rejection log CLI
+- [x] REST API — 5 endpoints (`serve --port 3847`): status, search, node, decisions, contradictions
+- [x] `provenant log-decision --source-url|--source-file` — URL/file evidence
+- [x] Shadow mode calibration — `provenant calibrate [--sweep]`, FP rate vs 10% target
+- [x] Cron on persistent host — `.github/workflows/provenant-ingest.yml`, daily at 06:00 UTC
+- [x] Voyage AI embedding provider — `VoyageEmbeddingProvider`, `VOYAGE_API_KEY` env
+
+## Remaining Review Items (lower priority)
 
 ### Adapters
-- [ ] Linear adapter (`src/adapters/linear.ts`) — GraphQL query correctness, pagination, signal model weights
-- [ ] Slack adapter (`src/adapters/slack.ts`) — rate limiting (1 req/min for new apps as of March 2026), thread handling
-- [ ] Confidence scoring (`src/scoring/confidence.ts`) — are default thresholds (0.7/0.4) reasonable?
+- [ ] Linear adapter — verify GraphQL query correctness, pagination
+- [ ] Slack adapter — verify rate limiting (1 req/min for new apps as of March 2026)
 
 ### CLI
-- [ ] All commands share `--db` flag with default `.provenant/graph.db` — should this be configurable via env var or config file?
-- [ ] `provenant query` requires `ANTHROPIC_API_KEY` — should it work without Claude (keyword-only mode)?
-- [ ] `provenant review expire` auto-promotes >=0.55 with stale flag — is this the right policy?
+- [ ] `--db` flag could be configurable via `PROVENANT_DB` env var
+- [ ] `provenant query` could work without Claude (keyword-only mode)
+- [ ] `provenant review expire` auto-promote policy (>=0.55 with stale flag)
 
-## Phase 2 TODOs (not started)
-- [ ] `provenant log-override` — rejection log CLI (PRD Section 9)
-- [ ] REST API — 5 endpoints, local-only, API key gate for remote (PRD Section 10.2)
-- [ ] `provenant log-decision` — support attaching URL/file as source evidence
-- [ ] Shadow mode calibration — run classifier against 30d historical data, tune until FP <10%
-- [ ] Cron on persistent host — GitHub Actions scheduled workflow for daily batch (PRD Section 7.5)
-- [ ] Voyage AI embedding provider (currently OpenAI only, TODO in `src/embed/client.ts`)
+## Phase 3 Ideas
+- [ ] GitHub adapter (PRs, issues, discussions as decision sources)
+- [ ] Notion adapter
+- [ ] REST API auth (API key gate for remote access)
+- [ ] Web dashboard for graph visualization
+- [ ] Webhook endpoint for real-time ingestion
 
 ## File Map
 
@@ -52,15 +68,20 @@ packages/provenant/
 │   ├── scoring/
 │   │   └── confidence.ts     # Pluggable confidence scorer
 │   ├── embed/
-│   │   └── client.ts         # OpenAI embeddings + cosine similarity
+│   │   └── client.ts         # OpenAI + Voyage AI embeddings + cosine similarity
 │   ├── pipeline/
 │   │   └── ingest.ts         # Ingestion pipeline
 │   ├── query/
 │   │   └── engine.ts         # NL → search → context → Claude
+│   ├── api/
+│   │   └── server.ts         # REST API (5 endpoints, Node http)
 │   ├── cli/
-│   │   ├── index.ts          # 7 commands
+│   │   ├── index.ts          # 11 commands
 │   │   ├── registry.ts       # Adapter registry
-│   │   └── commands/         # log-decision, status, ingest, query, resolve, review
+│   │   └── commands/         # log-decision, status, ingest, query, resolve, review,
+│   │                         # log-override, serve, calibrate
 │   └── __tests__/
-│       └── pipeline.test.ts  # 6 tests
+│       ├── pipeline.test.ts  # 6 tests
+│       ├── database.test.ts  # 18 tests
+│       └── confidence.test.ts # 10 tests
 ```
