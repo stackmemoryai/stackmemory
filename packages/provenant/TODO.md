@@ -37,11 +37,11 @@ Status: Phase 2 complete. Review items addressed.
 ## Remaining Review Items (lower priority)
 
 ### Adapters
-- [ ] Linear adapter — verify GraphQL query correctness, pagination
-- [ ] Slack adapter — verify rate limiting (1 req/min for new apps as of March 2026)
+- [x] Linear adapter — added rate limit retry (429 + retry-after), comments paginated (first: 250)
+- [x] Slack adapter — added rate limit retry (429 + ratelimited), thread replies paginated
 
 ### CLI
-- [ ] `--db` flag could be configurable via `PROVENANT_DB` env var
+- [x] `PROVENANT_DB` env var supported as default for `--db` flag
 - [ ] `provenant query` could work without Claude (keyword-only mode)
 - [ ] `provenant review expire` auto-promote policy (>=0.55 with stale flag)
 
