@@ -253,7 +253,13 @@ For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor
 - Maps drift to specific doc fixes (missing guidance, stale memory, ambiguous instruction)
 - Trigger: user says "this is wrong", "not what I wanted", "off the rails", repeated corrections
 
+**`/next`** — Run at session start or when asking "what's next":
+- Scans git log, TODO files, Linear issues, and memory for actionable items
+- Prioritizes: unfinished work > flagged issues > queued tasks > continuations
+- Trigger: session start, "what's next", "whats next", between tasks
+
 **When to use which:**
+- Starting a session or between tasks → `/next` (pick what to work on)
 - Session producing wrong results → `/recover` (diagnose + fix now)
 - Routine maintenance, nothing broken → `/update-docs` (proactive gardening)
 - After publishing a new version → `/update-docs` (catch version/path drift)
