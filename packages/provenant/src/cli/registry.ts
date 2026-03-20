@@ -2,6 +2,7 @@ import type { SourceAdapter } from '../adapters/adapter.js';
 import { ManualAdapter } from '../adapters/manual.js';
 import { LinearAdapter } from '../adapters/linear.js';
 import { SlackAdapter } from '../adapters/slack.js';
+import { GitHubAdapter } from '../adapters/github.js';
 
 const adapters = new Map<string, SourceAdapter>();
 
@@ -18,6 +19,12 @@ if (linear) {
 const slack = SlackAdapter.fromEnv();
 if (slack) {
   adapters.set('slack', slack);
+}
+
+// Register GitHub if token and repo are available
+const github = GitHubAdapter.fromEnv();
+if (github) {
+  adapters.set('github', github);
 }
 
 export function registerAdapter(adapter: SourceAdapter): void {
