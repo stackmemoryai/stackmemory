@@ -974,9 +974,7 @@ export class LinearClient {
     return result.commentUpdate.comment;
   }
 
-  async getComments(
-    issueId: string
-  ): Promise<
+  async getComments(issueId: string): Promise<
     Array<{
       id: string;
       body: string;
