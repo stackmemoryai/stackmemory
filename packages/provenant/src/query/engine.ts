@@ -26,7 +26,7 @@ export interface Citation {
 }
 
 export interface QueryConfig {
-  anthropicApiKey: string;
+  anthropicApiKey?: string; // omit for keyword-only mode (no LLM)
   model?: string; // default: claude-sonnet-4-6
   maxNodes?: number; // max nodes to include in context (default 20)
   actorFilter?: string;
@@ -80,7 +80,7 @@ export async function query(
   const uniqueContradictions = dedup(contradictions, (c) => c.id);
   const unresolvedRejections = db.getUnresolvedRejections().length;
 
-  // Step 3: Build context and ask Claude
+  // Step 3: Build context and optionally ask Claude
   const context = buildContext(
     citations,
     uniqueStale,
@@ -88,16 +88,21 @@ export async function query(
     unresolvedRejections
   );
   let answer: string;
-  try {
-    answer = await askClaude(question, context, config);
-  } catch (err) {
-    // LLM unavailable — return raw context as the answer
-    const msg = err instanceof Error ? err.message : 'unknown error';
-    // Sanitize error message to avoid leaking API keys in auth errors
-    const safeMsg = msg
-      .replace(/sk-[a-zA-Z0-9-_]+/g, '[REDACTED]')
-      .replace(/key[_-]?[a-zA-Z0-9]{16,}/gi, '[REDACTED]');
-    answer = `[Claude unavailable: ${safeMsg}]\n\nRaw context:\n${context}`;
+  if (!config.anthropicApiKey) {
+    // Keyword-only mode — return raw context without LLM summarization
+    answer = context;
+  } else {
+    try {
+      answer = await askClaude(question, context, config);
+    } catch (err) {
+      // LLM unavailable — return raw context as the answer
+      const msg = err instanceof Error ? err.message : 'unknown error';
+      // Sanitize error message to avoid leaking API keys in auth errors
+      const safeMsg = msg
+        .replace(/sk-[a-zA-Z0-9-_]+/g, '[REDACTED]')
+        .replace(/key[_-]?[a-zA-Z0-9]{16,}/gi, '[REDACTED]');
+      answer = `[Claude unavailable: ${safeMsg}]\n\nRaw context:\n${context}`;
+    }
   }
 
   return {

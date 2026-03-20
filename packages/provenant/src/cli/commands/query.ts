@@ -23,8 +23,9 @@ export async function runQuery(
 
   const apiKey = process.env['ANTHROPIC_API_KEY'];
   if (!apiKey) {
-    console.error('ANTHROPIC_API_KEY not set. Required for query.');
-    process.exit(1);
+    console.log(
+      'Running in keyword-only mode (set ANTHROPIC_API_KEY for AI answers)'
+    );
   }
 
   const db = new Database(opts.db);
