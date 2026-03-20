@@ -1521,6 +1521,18 @@ class LocalStackMemoryMCP {
               result = await this.handleLinearStatus(args);
               break;
 
+            case 'linear_create_comment':
+              result = await this.handleLinearCreateComment(args);
+              break;
+
+            case 'linear_update_comment':
+              result = await this.handleLinearUpdateComment(args);
+              break;
+
+            case 'linear_list_comments':
+              result = await this.handleLinearListComments(args);
+              break;
+
             case 'get_traces':
               result = await this.handleGetTraces(args);
               break;
@@ -3067,6 +3079,118 @@ class LocalStackMemoryMCP {
             text: `❌ Linear status check failed: ${message}`,
           },
         ],
+      };
+    }
+  }
+
+  private async getLinearClient() {
+    const { LinearClient } = await import('../linear/client.js');
+    const tokens = this.linearAuthManager.loadTokens();
+    if (!tokens) {
+      throw new Error('Linear not configured. Run: stackmemory linear setup');
+    }
+    return new LinearClient({
+      apiKey: tokens.accessToken,
+      useBearer: true,
+      onUnauthorized: async () => {
+        const refreshed = await this.linearAuthManager.refreshAccessToken();
+        return refreshed.accessToken;
+      },
+    });
+  }
+
+  private async handleLinearCreateComment(args: any) {
+    const { issue_id, body } = args;
+    if (!issue_id || !body) {
+      return {
+        content: [
+          { type: 'text', text: 'Error: issue_id and body are required' },
+        ],
+      };
+    }
+    try {
+      const client = await this.getLinearClient();
+      const comment = await client.createComment(issue_id, body);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Comment created on ${issue_id}\nID: ${comment.id}\nPreview: ${body.slice(0, 100)}${body.length > 100 ? '...' : ''}`,
+          },
+        ],
+        metadata: { id: comment.id, issueId: issue_id },
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error creating comment: ${msg}` }],
+      };
+    }
+  }
+
+  private async handleLinearUpdateComment(args: any) {
+    const { comment_id, body } = args;
+    if (!comment_id || !body) {
+      return {
+        content: [
+          { type: 'text', text: 'Error: comment_id and body are required' },
+        ],
+      };
+    }
+    try {
+      const client = await this.getLinearClient();
+      const comment = await client.updateComment(comment_id, body);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Comment ${comment_id} updated\nPreview: ${body.slice(0, 100)}${body.length > 100 ? '...' : ''}`,
+          },
+        ],
+        metadata: { id: comment.id, updatedAt: comment.updatedAt },
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error updating comment: ${msg}` }],
+      };
+    }
+  }
+
+  private async handleLinearListComments(args: any) {
+    const { issue_id } = args;
+    if (!issue_id) {
+      return {
+        content: [{ type: 'text', text: 'Error: issue_id is required' }],
+      };
+    }
+    try {
+      const client = await this.getLinearClient();
+      const comments = await client.getComments(issue_id);
+      const lines = comments.map(
+        (c) =>
+          `${c.id.slice(0, 8)} | ${c.user?.name ?? 'unknown'} | ${new Date(c.createdAt).toISOString().slice(0, 10)} | ${c.body.slice(0, 60).replace(/\n/g, ' ')}${c.body.length > 60 ? '...' : ''}`
+      );
+      const text =
+        comments.length > 0
+          ? `${comments.length} comments on ${issue_id}:\n${lines.join('\n')}`
+          : `No comments on ${issue_id}`;
+      return {
+        content: [{ type: 'text', text }],
+        metadata: {
+          count: comments.length,
+          comments: comments.map((c) => ({
+            id: c.id,
+            author: c.user?.name,
+            createdAt: c.createdAt,
+            bodyPreview: c.body.slice(0, 200),
+          })),
+        },
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error listing comments: ${msg}` }],
       };
     }
   }

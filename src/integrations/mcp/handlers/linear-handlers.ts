@@ -265,4 +265,117 @@ export class LinearHandlers {
       };
     }
   }
+
+  /**
+   * Create a comment on a Linear issue
+   */
+  async handleLinearCreateComment(args: any): Promise<any> {
+    try {
+      const { issue_id, body } = args;
+      if (!issue_id || !body) {
+        throw new Error('issue_id and body are required');
+      }
+
+      const client = await this.getClient();
+      const comment = await client.createComment(issue_id, body);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Comment created on ${issue_id}\nID: ${comment.id}\nPreview: ${body.slice(0, 100)}${body.length > 100 ? '...' : ''}`,
+          },
+        ],
+        metadata: {
+          id: comment.id,
+          issueId: issue_id,
+          createdAt: comment.createdAt,
+        },
+      };
+    } catch (error: unknown) {
+      logger.error(
+        'Error creating Linear comment',
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing comment on a Linear issue
+   */
+  async handleLinearUpdateComment(args: any): Promise<any> {
+    try {
+      const { comment_id, body } = args;
+      if (!comment_id || !body) {
+        throw new Error('comment_id and body are required');
+      }
+
+      const client = await this.getClient();
+      const comment = await client.updateComment(comment_id, body);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Comment ${comment_id} updated\nPreview: ${body.slice(0, 100)}${body.length > 100 ? '...' : ''}`,
+          },
+        ],
+        metadata: {
+          id: comment.id,
+          updatedAt: comment.updatedAt,
+        },
+      };
+    } catch (error: unknown) {
+      logger.error(
+        'Error updating Linear comment',
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * List comments on a Linear issue
+   */
+  async handleLinearListComments(args: any): Promise<any> {
+    try {
+      const { issue_id } = args;
+      if (!issue_id) {
+        throw new Error('issue_id is required');
+      }
+
+      const client = await this.getClient();
+      const comments = await client.getComments(issue_id);
+
+      const lines = comments.map(
+        (c) =>
+          `${c.id.slice(0, 8)} | ${c.user?.name ?? 'unknown'} | ${new Date(c.createdAt).toISOString().slice(0, 10)} | ${c.body.slice(0, 60).replace(/\n/g, ' ')}${c.body.length > 60 ? '...' : ''}`
+      );
+
+      const text =
+        comments.length > 0
+          ? `${comments.length} comments on ${issue_id}:\n${lines.join('\n')}`
+          : `No comments on ${issue_id}`;
+
+      return {
+        content: [{ type: 'text', text }],
+        metadata: {
+          count: comments.length,
+          comments: comments.map((c) => ({
+            id: c.id,
+            author: c.user?.name,
+            createdAt: c.createdAt,
+            bodyPreview: c.body.slice(0, 200),
+          })),
+        },
+      };
+    } catch (error: unknown) {
+      logger.error(
+        'Error listing Linear comments',
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
 }

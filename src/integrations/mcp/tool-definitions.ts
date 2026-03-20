@@ -409,6 +409,60 @@ export class MCPToolDefinitions {
           properties: {},
         },
       },
+      {
+        name: 'linear_create_comment',
+        description:
+          'Create a comment on a Linear issue (useful for workpad updates)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            issue_id: {
+              type: 'string',
+              description:
+                'Linear issue ID or identifier (e.g. STA-123 or UUID)',
+            },
+            body: {
+              type: 'string',
+              description: 'Comment body (supports markdown)',
+            },
+          },
+          required: ['issue_id', 'body'],
+        },
+      },
+      {
+        name: 'linear_update_comment',
+        description: 'Update an existing comment on a Linear issue',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            comment_id: {
+              type: 'string',
+              description: 'Comment ID to update',
+            },
+            body: {
+              type: 'string',
+              description: 'New comment body (supports markdown)',
+            },
+          },
+          required: ['comment_id', 'body'],
+        },
+      },
+      {
+        name: 'linear_list_comments',
+        description:
+          'List comments on a Linear issue (useful for finding workpad)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            issue_id: {
+              type: 'string',
+              description:
+                'Linear issue ID or identifier (e.g. STA-123 or UUID)',
+            },
+          },
+          required: ['issue_id'],
+        },
+      },
     ];
   }
 

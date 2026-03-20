@@ -895,4 +895,123 @@ export class LinearClient {
       };
     }
   }
+
+  // --- Comment CRUD ---
+
+  async createComment(
+    issueId: string,
+    body: string
+  ): Promise<{ id: string; body: string; createdAt: string }> {
+    const mutation = `
+      mutation CreateComment($input: CommentCreateInput!) {
+        commentCreate(input: $input) {
+          success
+          comment {
+            id
+            body
+            createdAt
+            user { id name }
+          }
+        }
+      }
+    `;
+
+    const result = await this.graphql<{
+      commentCreate: {
+        success: boolean;
+        comment: {
+          id: string;
+          body: string;
+          createdAt: string;
+          user: { id: string; name: string };
+        };
+      };
+    }>(mutation, { input: { issueId, body } });
+
+    if (!result.commentCreate.success) {
+      throw new IntegrationError(
+        'Failed to create comment',
+        ErrorCode.LINEAR_API_ERROR,
+        { issueId }
+      );
+    }
+
+    return result.commentCreate.comment;
+  }
+
+  async updateComment(
+    commentId: string,
+    body: string
+  ): Promise<{ id: string; body: string; updatedAt: string }> {
+    const mutation = `
+      mutation UpdateComment($id: String!, $input: CommentUpdateInput!) {
+        commentUpdate(id: $id, input: $input) {
+          success
+          comment {
+            id
+            body
+            updatedAt
+          }
+        }
+      }
+    `;
+
+    const result = await this.graphql<{
+      commentUpdate: {
+        success: boolean;
+        comment: { id: string; body: string; updatedAt: string };
+      };
+    }>(mutation, { id: commentId, input: { body } });
+
+    if (!result.commentUpdate.success) {
+      throw new IntegrationError(
+        'Failed to update comment',
+        ErrorCode.LINEAR_API_ERROR,
+        { commentId }
+      );
+    }
+
+    return result.commentUpdate.comment;
+  }
+
+  async getComments(
+    issueId: string
+  ): Promise<
+    Array<{
+      id: string;
+      body: string;
+      createdAt: string;
+      user: { name: string } | null;
+    }>
+  > {
+    const query = `
+      query GetComments($issueId: String!) {
+        issue(id: $issueId) {
+          comments(first: 100) {
+            nodes {
+              id
+              body
+              createdAt
+              user { name }
+            }
+          }
+        }
+      }
+    `;
+
+    const result = await this.graphql<{
+      issue: {
+        comments: {
+          nodes: Array<{
+            id: string;
+            body: string;
+            createdAt: string;
+            user: { name: string } | null;
+          }>;
+        };
+      };
+    }>(query, { issueId });
+
+    return result.issue.comments.nodes;
+  }
 }
