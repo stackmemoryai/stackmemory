@@ -1,33 +1,22 @@
 /**
  * MCP Skill Handlers
  * Handlers for persistent agent learning and skill operations
+ * Backed by SQLite via SkillRegistry (replaces Redis)
  */
 
 import { logger } from '../../../core/monitoring/logger.js';
-
-// Type-safe environment variable access
-function _getEnv(key: string, defaultValue?: string): string {
-  const value = process.env[key];
-  if (value === undefined) {
-    if (defaultValue !== undefined) return defaultValue;
-    throw new Error(`Environment variable ${key} is required`);
-  }
-  return value;
-}
-
-function _getOptionalEnv(key: string): string | undefined {
-  return process.env[key];
-}
-
 import {
-  SkillStorageService,
-  getSkillStorage,
-  getDefaultUserId,
+  SkillRegistry,
+  getSkillRegistry,
+  matchPromptFromRegistry,
+} from '../../../core/skills/index.js';
+import type {
   Skill,
   SkillCategory,
   SkillPriority,
   JournalEntryType,
   SkillQuery,
+  MatchResult,
 } from '../../../core/skills/index.js';
 
 export interface SkillHandlerContext {
@@ -37,54 +26,25 @@ export interface SkillHandlerContext {
 }
 
 export class SkillHandlers {
-  private skillStorage: SkillStorageService | null = null;
-  private userId: string;
+  private registry: SkillRegistry | null = null;
 
-  constructor(
-    private redisUrl?: string,
-    userId?: string
-  ) {
-    this.userId = userId || getDefaultUserId();
-  }
+  constructor(private dbPath?: string) {}
 
-  /**
-   * Lazy initialization of skill storage
-   */
-  private getStorage(): SkillStorageService {
-    if (!this.skillStorage) {
-      const url = this.redisUrl || process.env['REDIS_URL'];
-      if (!url) {
-        throw new Error('REDIS_URL not configured for skill storage');
-      }
-      this.skillStorage = getSkillStorage({
-        redisUrl: url,
-        userId: this.userId,
-      });
+  private getRegistry(): SkillRegistry {
+    if (!this.registry) {
+      this.registry = getSkillRegistry(this.dbPath);
     }
-    return this.skillStorage;
+    return this.registry;
   }
 
-  /**
-   * Get current user ID
-   */
-  getUserId(): string {
-    return this.userId;
-  }
-
-  /**
-   * Check if skill storage is available
-   */
   isAvailable(): boolean {
-    return !!(this.redisUrl || process.env['REDIS_URL']);
+    return !!(process.env['STACKMEMORY_SKILLS'] || process.env['SM_SKILLS']);
   }
 
   // ============================================================
   // SKILL OPERATIONS
   // ============================================================
 
-  /**
-   * Record a new skill/learning
-   */
   async recordSkill(
     args: {
       content: string;
@@ -97,9 +57,8 @@ export class SkillHandlers {
     context: SkillHandlerContext
   ): Promise<{ success: boolean; skill?: Skill; error?: string }> {
     try {
-      const storage = this.getStorage();
-
-      const skill = await storage.createSkill({
+      const registry = this.getRegistry();
+      const skill = registry.createSkill({
         content: args.content,
         category: args.category as SkillCategory,
         priority: (args.priority || 'medium') as SkillPriority,
@@ -108,12 +67,6 @@ export class SkillHandlers {
         source: (args.source || 'observation') as Skill['source'],
         sessionId: context.sessionId,
       });
-
-      logger.info('Recorded skill via MCP', {
-        skillId: skill.id,
-        category: skill.category,
-      });
-
       return { success: true, skill };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -122,9 +75,6 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Get relevant skills for current context
-   */
   async getRelevantSkills(args: {
     tool?: string;
     language?: string;
@@ -133,17 +83,14 @@ export class SkillHandlers {
     limit?: number;
   }): Promise<{ success: boolean; skills?: Skill[]; error?: string }> {
     try {
-      const storage = this.getStorage();
-
-      const skills = await storage.getRelevantSkills({
+      const registry = this.getRegistry();
+      const skills = registry.getRelevantSkills({
         tool: args.tool,
         language: args.language,
         framework: args.framework,
         tags: args.tags,
       });
-
       const limited = args.limit ? skills.slice(0, args.limit) : skills;
-
       return { success: true, skills: limited };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -152,9 +99,6 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Query skills with filters
-   */
   async querySkills(args: {
     categories?: string[];
     priorities?: string[];
@@ -170,8 +114,7 @@ export class SkillHandlers {
     error?: string;
   }> {
     try {
-      const storage = this.getStorage();
-
+      const registry = this.getRegistry();
       const query: SkillQuery = {
         categories: args.categories as SkillCategory[],
         priorities: args.priorities as SkillPriority[],
@@ -183,9 +126,7 @@ export class SkillHandlers {
         sortBy: (args.sortBy || 'priority') as SkillQuery['sortBy'],
         sortOrder: 'desc',
       };
-
-      const skills = await storage.querySkills(query);
-
+      const skills = registry.querySkills(query);
       return { success: true, skills, total: skills.length };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -194,20 +135,13 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Validate/reinforce a skill
-   */
   async validateSkill(args: {
     skill_id: string;
   }): Promise<{ success: boolean; skill?: Skill; error?: string }> {
     try {
-      const storage = this.getStorage();
-
-      const skill = await storage.validateSkill(args.skill_id);
-      if (!skill) {
-        return { success: false, error: 'Skill not found' };
-      }
-
+      const registry = this.getRegistry();
+      const skill = registry.validateSkill(args.skill_id);
+      if (!skill) return { success: false, error: 'Skill not found' };
       return { success: true, skill };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -216,9 +150,6 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Update a skill
-   */
   async updateSkill(args: {
     skill_id: string;
     content?: string;
@@ -226,19 +157,14 @@ export class SkillHandlers {
     tags?: string[];
   }): Promise<{ success: boolean; skill?: Skill; error?: string }> {
     try {
-      const storage = this.getStorage();
-
-      const skill = await storage.updateSkill({
+      const registry = this.getRegistry();
+      const skill = registry.updateSkill({
         id: args.skill_id,
         content: args.content,
         priority: args.priority as SkillPriority,
         tags: args.tags,
       });
-
-      if (!skill) {
-        return { success: false, error: 'Skill not found' };
-      }
-
+      if (!skill) return { success: false, error: 'Skill not found' };
       return { success: true, skill };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -247,20 +173,13 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Delete a skill
-   */
   async deleteSkill(args: {
     skill_id: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const storage = this.getStorage();
-
-      const deleted = await storage.deleteSkill(args.skill_id);
-      if (!deleted) {
-        return { success: false, error: 'Skill not found' };
-      }
-
+      const registry = this.getRegistry();
+      const deleted = registry.deleteSkill(args.skill_id);
+      if (!deleted) return { success: false, error: 'Skill not found' };
       return { success: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -270,12 +189,26 @@ export class SkillHandlers {
   }
 
   // ============================================================
+  // MATCH PROMPT (NEW)
+  // ============================================================
+
+  async matchPrompt(args: {
+    prompt: string;
+  }): Promise<{ success: boolean; result?: MatchResult; error?: string }> {
+    try {
+      const result = matchPromptFromRegistry(args.prompt);
+      return { success: true, result };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to match prompt', { error: message });
+      return { success: false, error: message };
+    }
+  }
+
+  // ============================================================
   // SESSION JOURNAL OPERATIONS
   // ============================================================
 
-  /**
-   * Record a journal entry
-   */
   async recordJournalEntry(
     args: {
       type: string;
@@ -287,17 +220,15 @@ export class SkillHandlers {
     context: SkillHandlerContext
   ): Promise<{ success: boolean; entryId?: string; error?: string }> {
     try {
-      const storage = this.getStorage();
+      const registry = this.getRegistry();
       const sessionId = context.sessionId || 'default';
-
-      const entry = await storage.createJournalEntry(
+      const entry = registry.createJournalEntry(
         sessionId,
         args.type as JournalEntryType,
         args.title,
         args.content,
         { tool: args.tool, file: args.file }
       );
-
       return { success: true, entryId: entry.id };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -306,21 +237,14 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Get session journal
-   */
   async getSessionJournal(
-    args: {
-      session_id?: string;
-    },
+    args: { session_id?: string },
     context: SkillHandlerContext
-  ): Promise<{ success: boolean; entries?: any[]; error?: string }> {
+  ): Promise<{ success: boolean; entries?: unknown[]; error?: string }> {
     try {
-      const storage = this.getStorage();
+      const registry = this.getRegistry();
       const sessionId = args.session_id || context.sessionId || 'default';
-
-      const entries = await storage.getSessionJournal(sessionId);
-
+      const entries = registry.getSessionJournal(sessionId);
       return { success: true, entries };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -329,27 +253,19 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * Promote a journal entry to a skill
-   */
   async promoteToSkill(args: {
     entry_id: string;
     category: string;
     priority?: string;
   }): Promise<{ success: boolean; skill?: Skill; error?: string }> {
     try {
-      const storage = this.getStorage();
-
-      const skill = await storage.promoteToSkill(
+      const registry = this.getRegistry();
+      const skill = registry.promoteToSkill(
         args.entry_id,
         args.category as SkillCategory,
         (args.priority || 'medium') as SkillPriority
       );
-
-      if (!skill) {
-        return { success: false, error: 'Journal entry not found' };
-      }
-
+      if (!skill) return { success: false, error: 'Journal entry not found' };
       return { success: true, skill };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -362,15 +278,12 @@ export class SkillHandlers {
   // SESSION MANAGEMENT
   // ============================================================
 
-  /**
-   * Start session tracking
-   */
   async startSession(args: {
     session_id: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const storage = this.getStorage();
-      await storage.startSession(args.session_id);
+      const registry = this.getRegistry();
+      registry.startSession(args.session_id);
       return { success: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -379,20 +292,13 @@ export class SkillHandlers {
     }
   }
 
-  /**
-   * End session and get summary
-   */
   async endSession(args: {
     session_id: string;
-  }): Promise<{ success: boolean; summary?: any; error?: string }> {
+  }): Promise<{ success: boolean; summary?: unknown; error?: string }> {
     try {
-      const storage = this.getStorage();
-      const summary = await storage.endSession(args.session_id);
-
-      if (!summary) {
-        return { success: false, error: 'Session not found' };
-      }
-
+      const registry = this.getRegistry();
+      const summary = registry.endSession(args.session_id);
+      if (!summary) return { success: false, error: 'Session not found' };
       return { success: true, summary };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -402,78 +308,17 @@ export class SkillHandlers {
   }
 
   // ============================================================
-  // KNOWLEDGE MANAGEMENT
+  // METRICS
   // ============================================================
 
-  /**
-   * Get promotion candidates
-   */
-  async getPromotionCandidates(): Promise<{
-    success: boolean;
-    skills?: Skill[];
-    error?: string;
-  }> {
-    try {
-      const storage = this.getStorage();
-      const skills = await storage.getPromotionCandidates();
-      return { success: true, skills };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to get promotion candidates', { error: message });
-      return { success: false, error: message };
-    }
-  }
-
-  /**
-   * Promote skill priority
-   */
-  async promoteSkillPriority(args: {
-    skill_id: string;
-  }): Promise<{ success: boolean; skill?: Skill; error?: string }> {
-    try {
-      const storage = this.getStorage();
-      const skill = await storage.promoteSkill(args.skill_id);
-
-      if (!skill) {
-        return { success: false, error: 'Skill not found' };
-      }
-
-      return { success: true, skill };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to promote skill priority', { error: message });
-      return { success: false, error: message };
-    }
-  }
-
-  /**
-   * Archive stale skills
-   */
-  async archiveStaleSkills(args: {
-    days_threshold?: number;
-  }): Promise<{ success: boolean; archivedCount?: number; error?: string }> {
-    try {
-      const storage = this.getStorage();
-      const count = await storage.archiveStaleSkills(args.days_threshold || 90);
-      return { success: true, archivedCount: count };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to archive stale skills', { error: message });
-      return { success: false, error: message };
-    }
-  }
-
-  /**
-   * Get skill storage metrics
-   */
   async getSkillMetrics(): Promise<{
     success: boolean;
-    metrics?: any;
+    metrics?: unknown;
     error?: string;
   }> {
     try {
-      const storage = this.getStorage();
-      const metrics = await storage.getMetrics();
+      const registry = this.getRegistry();
+      const metrics = registry.getMetrics();
       return { success: true, metrics };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -671,6 +516,21 @@ export const SKILL_TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object' as const,
       properties: {},
+    },
+  },
+  {
+    name: 'match_prompt',
+    description:
+      'Match a prompt against skill rules and return scored skill suggestions',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'The prompt text to match against skill rules',
+        },
+      },
+      required: ['prompt'],
     },
   },
 ];

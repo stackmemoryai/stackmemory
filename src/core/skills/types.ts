@@ -203,68 +203,91 @@ export const SkillQuerySchema = z.object({
 export type SkillQuery = z.infer<typeof SkillQuerySchema>;
 
 // ============================================================
-// REDIS KEY PATTERNS
+// SKILL RULE / MATCHER TYPES
 // ============================================================
 
 /**
- * Redis key generators - all keys are namespaced by userId
- * Use 'global' as userId for shared/team skills
+ * Trigger conditions for a skill rule
  */
-export const REDIS_KEYS = {
-  // Skills (namespaced by user)
-  skill: (userId: string, id: string) => `user:${userId}:skill:${id}`,
-  skillsByTool: (userId: string, tool: string) =>
-    `user:${userId}:skills:tool:${tool}`,
-  skillsByCategory: (userId: string, category: SkillCategory) =>
-    `user:${userId}:skills:category:${category}`,
-  skillsByTag: (userId: string, tag: string) =>
-    `user:${userId}:skills:tag:${tag}`,
-  skillsRecent: (userId: string) => `user:${userId}:skills:recent`,
-  skillsValidated: (userId: string) => `user:${userId}:skills:validated`,
-
-  // Session journal (namespaced by user)
-  journalEntry: (userId: string, id: string) =>
-    `user:${userId}:journal:entry:${id}`,
-  journalSession: (userId: string, sessionId: string) =>
-    `user:${userId}:journal:session:${sessionId}`,
-  journalRecent: (userId: string) => `user:${userId}:journal:recent`,
-
-  // Session tracking (namespaced by user)
-  sessionSummary: (userId: string, sessionId: string) =>
-    `user:${userId}:session:summary:${sessionId}`,
-  sessionsActive: (userId: string) => `user:${userId}:sessions:active`,
-
-  // Promotion tracking (namespaced by user)
-  promotionCandidates: (userId: string) =>
-    `user:${userId}:skills:promotion:candidates`,
-
-  // Locks (global)
-  syncLock: (resource: string) => `lock:skill:${resource}`,
-} as const;
-
-// ============================================================
-// CACHE TTL CONSTANTS (in seconds)
-// ============================================================
-
-export const CACHE_TTL = {
-  // Base skill TTL: 7 days minimum
-  skillBase: 604800, // 7 days
-  // Max skill TTL: 90 days for frequently used skills
-  skillMax: 7776000, // 90 days
-  // TTL increment per validation/use: +7 days
-  skillIncrement: 604800, // 7 days
-
-  skillIndex: 86400, // 1 day (was 1 hour)
-  session: 604800, // 7 days
-  journal: 2592000, // 30 days
-  lock: 30, // 30 seconds
-} as const;
+export interface SkillTriggers {
+  keywords?: string[];
+  keywordPatterns?: string[];
+  pathPatterns?: string[];
+  intentPatterns?: string[];
+  contentPatterns?: string[];
+  contextPatterns?: string[];
+}
 
 /**
- * Calculate TTL for a skill based on usage
- * Base: 7 days, +7 days per validation, max 90 days
+ * A single skill rule definition (from skill-rules.json)
  */
-export function calculateSkillTTL(validatedCount: number): number {
-  const ttl = CACHE_TTL.skillBase + validatedCount * CACHE_TTL.skillIncrement;
-  return Math.min(ttl, CACHE_TTL.skillMax);
+export interface SkillRule {
+  description: string;
+  priority: number;
+  triggers: SkillTriggers;
+  excludePatterns?: string[];
+  relatedSkills?: string[];
+  suggestion?: string;
+}
+
+/**
+ * Result of matching a single skill against a prompt
+ */
+export interface SkillMatch {
+  name: string;
+  score: number;
+  reasons: string[];
+  priority: number;
+}
+
+/**
+ * Full result of matching all rules against a prompt
+ */
+export interface MatchResult {
+  matches: SkillMatch[];
+  filePaths: string[];
+  relatedSkills: string[];
+}
+
+/**
+ * Global matcher configuration
+ */
+export interface MatcherConfig {
+  minConfidenceScore: number;
+  showMatchReasons: boolean;
+  maxSkillsToShow: number;
+}
+
+/**
+ * Scoring weights per match type
+ */
+export interface ScoringWeights {
+  keyword: number;
+  keywordPattern: number;
+  pathPattern: number;
+  directoryMatch: number;
+  intentPattern: number;
+  contentPattern: number;
+  contextPattern: number;
+}
+
+/**
+ * Directory path → skill name mapping
+ */
+export type DirectoryMapping = Record<string, string>;
+
+/**
+ * Confidence level label
+ */
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+
+/**
+ * Complete rules file structure (mirrors skill-rules.json)
+ */
+export interface SkillRulesFile {
+  version: string;
+  config: MatcherConfig;
+  scoring: ScoringWeights;
+  directoryMappings: DirectoryMapping;
+  skills: Record<string, SkillRule>;
 }
