@@ -66,6 +66,7 @@ import { createTeamCommands } from './commands/team.js';
 import { createDesiresCommands } from './commands/desires.js';
 import { createConductorCommands } from './commands/orchestrate.js';
 import { createPreflightCommand } from './commands/preflight.js';
+import { createRulesCommand } from './commands/rules.js';
 import { createSnapshotCommand } from './commands/snapshot.js';
 import { createLoopCommand } from './commands/loop.js';
 import chalk from 'chalk';
@@ -696,6 +697,7 @@ program.addCommand(createConductorCommands());
 program.addCommand(createPreflightCommand());
 program.addCommand(createSnapshotCommand());
 program.addCommand(createLoopCommand());
+program.addCommand(createRulesCommand());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);
