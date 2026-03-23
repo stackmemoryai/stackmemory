@@ -9,12 +9,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import { RuleEngine } from '../../core/rules/rule-engine.js';
-import type {
-  RuleContext,
-  RuleTrigger,
-  RuleSeverity,
-  RuleRow,
-} from '../../core/rules/types.js';
+import type { RuleContext, RuleTrigger } from '../../core/rules/types.js';
 import { filterByScope } from '../../core/rules/built-in-rules.js';
 
 function getDb(): Database.Database {

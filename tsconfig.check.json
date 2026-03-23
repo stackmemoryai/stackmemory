@@ -6,9 +6,9 @@
     "declarationMap": false,
     "sourceMap": false,
     "incremental": true,
-    "tsBuildInfoFile": ".tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuildinfo-check"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "scripts/**/*"],
   "exclude": [
     "node_modules",
     "dist",

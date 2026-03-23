@@ -5,7 +5,7 @@ vendor/
 
 # Build outputs
 dist/
-.tsbuildinfo
+.tsbuildinfo*
 build/
 out/
 *.out
