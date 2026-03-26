@@ -127,3 +127,7 @@ external/
 # DiffMem subpackage (cloned repo)
 packages/diffmem/
 .env.diffmem
+
+# GEPA runtime state (modified by hooks)
+scripts/gepa/.hook-state.json
+scripts/gepa/results/scores.jsonl
