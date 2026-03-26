@@ -38,13 +38,30 @@ if (fs.existsSync(envPath)) {
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 
-// Profile support: --profile <name> overrides config sections
+// --target <name> selects from targets[] array (multi-target mode)
+const targetIdx = process.argv.indexOf('--target');
+const targetName = targetIdx !== -1 ? process.argv[targetIdx + 1] : null;
+if (targetIdx !== -1) process.argv.splice(targetIdx, 2);
+
+if (targetName && config.targets) {
+  const target = config.targets.find((t) => t.name === targetName);
+  if (!target) {
+    console.error(
+      `Error: Unknown target "${targetName}". Available: ${config.targets.map((t) => t.name).join(', ')}`
+    );
+    process.exit(1);
+  }
+  config.target.file = target.file;
+  if (target.evals) config.evals.files = target.evals;
+  console.log(`Target: ${targetName} (${target.description || target.file})`);
+}
+
+// --profile <name> overrides config sections (legacy single-target mode)
 const profileIdx = process.argv.indexOf('--profile');
 const profileName = profileIdx !== -1 ? process.argv[profileIdx + 1] : null;
-if (profileName) {
-  // Remove --profile <name> from argv so it doesn't interfere with command parsing
-  process.argv.splice(profileIdx, 2);
+if (profileIdx !== -1) process.argv.splice(profileIdx, 2);
 
+if (profileName) {
   const profiles = config.profiles || {};
   if (!profiles[profileName]) {
     console.error(
@@ -943,6 +960,14 @@ async function scoreAndSelect() {
   // Sort by score
   scores.sort((a, b) => b.score - a.score);
 
+  // Show condensed delta for each variant
+  const baselinePath = getGenPath(gen, 'baseline');
+  const baselineContent = fs.existsSync(baselinePath)
+    ? fs.readFileSync(baselinePath, 'utf8')
+    : '';
+  const baselineScore =
+    scores.find((s) => s.variant === 'baseline')?.score || 0;
+
   console.log('\nResults:');
   scores.forEach((s, i) => {
     const marker = i === 0 ? ' <-- BEST' : '';
@@ -950,6 +975,37 @@ async function scoreAndSelect() {
       `  ${i + 1}. ${s.variant}: ${(s.score * 100).toFixed(1)}%${marker}`
     );
   });
+
+  // Show delta summaries for top variants (skip baseline)
+  const topVariants = scores
+    .filter((s) => s.variant !== 'baseline')
+    .slice(0, 3);
+  if (topVariants.length && baselineContent) {
+    console.log('\n--- Delta Summaries ---\n');
+    for (const s of topVariants) {
+      const vPath = getGenPath(gen, s.variant);
+      if (fs.existsSync(vPath)) {
+        const vContent = fs.readFileSync(vPath, 'utf8');
+        // Find strategy from variant index (round-robin through strategies)
+        const variantIdx = s.variant.charCodeAt(s.variant.length - 1) - 97;
+        const strategy =
+          config.evolution.mutationStrategies[
+            variantIdx % config.evolution.mutationStrategies.length
+          ];
+        console.log(
+          generateDelta(
+            baselineContent,
+            vContent,
+            s.variant,
+            strategy,
+            s.score,
+            baselineScore
+          )
+        );
+        console.log('');
+      }
+    }
+  }
 
   // Select best
   const best = scores[0];
@@ -1018,7 +1074,7 @@ async function run(generations = config.evolution.generations) {
   console.log(`Best variant: ${state.bestVariant}`);
   console.log(`Best score: ${(state.bestScore * 100).toFixed(1)}%`);
   console.log(`Generations: ${state.currentGeneration}`);
-  console.log(`\nTo apply: cp generations/current /path/to/your/CLAUDE.md`);
+  console.log(`\nTo apply: node optimize.js apply`);
 }
 
 /**
@@ -1041,9 +1097,93 @@ function status() {
 }
 
 /**
- * Diff two variants
+ * Generate a condensed delta summary between two variant files.
+ * Shows added/changed/removed sections + unified diff — not full files.
  */
-function diff(a, b) {
+function generateDelta(
+  baseContent,
+  variantContent,
+  variantName,
+  strategy,
+  score,
+  baseScore
+) {
+  const baseLines = baseContent.split('\n');
+  const variantLines = variantContent.split('\n');
+
+  const baseSections = parseSections(baseLines);
+  const variantSections = parseSections(variantLines);
+
+  const added = [];
+  const changed = [];
+  const removed = [];
+
+  // Detect added/changed sections
+  for (const [heading, content] of Object.entries(variantSections)) {
+    if (!baseSections[heading]) {
+      added.push(heading);
+    } else if (baseSections[heading] !== content) {
+      changed.push(heading);
+    }
+  }
+
+  // Detect removed sections
+  for (const heading of Object.keys(baseSections)) {
+    if (!variantSections[heading]) {
+      removed.push(heading);
+    }
+  }
+
+  // Build condensed output
+  const lines = [];
+  const scoreDelta =
+    score !== undefined && baseScore !== undefined
+      ? ` (${score > baseScore ? '+' : ''}${((score - baseScore) * 100).toFixed(1)}% from baseline)`
+      : '';
+
+  lines.push(`## ${variantName} — Strategy: ${strategy || 'unknown'}`);
+  lines.push(
+    `Score: ${score !== undefined ? (score * 100).toFixed(1) + '%' : 'pending'}${scoreDelta}`
+  );
+  lines.push(`Tokens: ${baseLines.length} → ${variantLines.length} lines`);
+  lines.push('');
+
+  if (added.length) lines.push(...added.map((s) => `+ Added: ${s}`));
+  if (changed.length) lines.push(...changed.map((s) => `~ Changed: ${s}`));
+  if (removed.length) lines.push(...removed.map((s) => `- Removed: ${s}`));
+
+  if (!added.length && !changed.length && !removed.length) {
+    lines.push('  (no structural changes)');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Parse markdown into section map: heading → content
+ */
+function parseSections(lines) {
+  const sections = {};
+  let currentHeading = '__preamble__';
+  let currentContent = [];
+
+  for (const line of lines) {
+    if (/^#{1,4}\s/.test(line)) {
+      sections[currentHeading] = currentContent.join('\n').trim();
+      currentHeading = line.replace(/^#+\s*/, '').trim();
+      currentContent = [];
+    } else {
+      currentContent.push(line);
+    }
+  }
+  sections[currentHeading] = currentContent.join('\n').trim();
+  return sections;
+}
+
+/**
+ * Diff two variants — condensed delta by default, --full for unified diff
+ */
+function diff(a, b, showFull = false) {
   const state = getState();
   const gen = state.currentGeneration;
 
@@ -1055,17 +1195,157 @@ function diff(a, b) {
     return;
   }
 
+  const baseContent = fs.readFileSync(pathA, 'utf8');
+  const variantContent = fs.readFileSync(pathB, 'utf8');
+
+  // Always show condensed delta
+  const delta = generateDelta(
+    baseContent,
+    variantContent,
+    b || state.bestVariant,
+    null,
+    state.bestScore,
+    0
+  );
+  console.log(delta);
+
+  // Show unified diff only with --full flag
+  if (showFull) {
+    console.log('\n--- Unified Diff ---');
+    try {
+      execSync(`diff -u ${pathA} ${pathB}`, { stdio: 'inherit' });
+    } catch {
+      // diff returns non-zero when files differ
+    }
+  }
+}
+
+/**
+ * Apply best variant to target file with confirmation
+ */
+async function apply() {
+  const state = getState();
+
+  if (!state.bestVariant || state.bestVariant === 'baseline') {
+    console.log('No improved variant to apply (still on baseline).');
+    return;
+  }
+
+  const variantPath = getGenPath(state.currentGeneration, state.bestVariant);
+  const targetPath = state.targetPath;
+
+  if (!fs.existsSync(variantPath)) {
+    console.error(`Variant file not found: ${variantPath}`);
+    return;
+  }
+
+  if (!fs.existsSync(targetPath)) {
+    console.error(`Target file not found: ${targetPath}`);
+    return;
+  }
+
+  const baseContent = fs.readFileSync(targetPath, 'utf8');
+  const variantContent = fs.readFileSync(variantPath, 'utf8');
+
+  // Show condensed delta
+  const delta = generateDelta(
+    baseContent,
+    variantContent,
+    state.bestVariant,
+    null,
+    state.bestScore,
+    0
+  );
+  console.log(delta);
+  console.log(`\n--- Unified Diff ---`);
   try {
-    execSync(`diff -u ${pathA} ${pathB}`, { stdio: 'inherit' });
-  } catch (e) {
+    execSync(`diff -u "${targetPath}" "${variantPath}"`, { stdio: 'inherit' });
+  } catch {
     // diff returns non-zero when files differ
   }
+
+  // Backup original
+  if (config.target.backup !== false) {
+    const backupPath = `${targetPath}.bak.${Date.now()}`;
+    fs.copyFileSync(targetPath, backupPath);
+    console.log(`\nBackup: ${backupPath}`);
+  }
+
+  // Patch in place
+  fs.copyFileSync(variantPath, targetPath);
+  console.log(`Applied ${state.bestVariant} → ${targetPath}`);
+}
+
+/**
+ * List all configured targets
+ */
+function listTargets() {
+  const targets = config.targets || [];
+  if (!targets.length) {
+    console.log('No targets configured. Add a targets[] array to config.json.');
+    return;
+  }
+  console.log('Configured targets:\n');
+  for (const t of targets) {
+    const resolved = t.file.startsWith('~')
+      ? path.join(process.env.HOME, t.file.slice(1))
+      : t.file;
+    const exists = fs.existsSync(resolved) ? '✓' : '✗';
+    console.log(`  ${exists} ${t.name.padEnd(15)} ${t.file}`);
+    if (t.description) console.log(`    ${t.description}`);
+    if (t.evals) console.log(`    evals: ${t.evals.join(', ')}`);
+    console.log('');
+  }
+}
+
+/**
+ * Run optimization across ALL targets sequentially
+ */
+async function runAll(generations = 3) {
+  const targets = config.targets || [];
+  if (!targets.length) {
+    console.log('No targets configured.');
+    return;
+  }
+
+  console.log(
+    `Running GEPA on ${targets.length} targets (${generations} generations each)\n`
+  );
+
+  for (const target of targets) {
+    const resolved = target.file.startsWith('~')
+      ? path.join(process.env.HOME, target.file.slice(1))
+      : path.resolve(target.file);
+
+    if (!fs.existsSync(resolved)) {
+      console.log(`Skipping ${target.name}: ${resolved} not found\n`);
+      continue;
+    }
+
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`TARGET: ${target.name} (${target.file})`);
+    console.log(`${'═'.repeat(60)}\n`);
+
+    // Override config for this target
+    config.target.file = target.file;
+    if (target.evals) config.evals.files = target.evals;
+
+    await init(resolved);
+    await run(generations);
+
+    console.log(`\nCompleted ${target.name}\n`);
+  }
+
+  console.log('\n' + '═'.repeat(60));
+  console.log('ALL TARGETS COMPLETE');
+  console.log('═'.repeat(60));
 }
 
 // CLI
 const command = process.argv[2];
 const arg1 = process.argv[3];
 const arg2 = process.argv[4];
+const hasFlag = (flag) => process.argv.includes(flag);
 
 switch (command) {
   case 'init':
@@ -1088,7 +1368,16 @@ switch (command) {
     status();
     break;
   case 'diff':
-    diff(arg1, arg2);
+    diff(arg1, arg2, hasFlag('--full'));
+    break;
+  case 'apply':
+    apply();
+    break;
+  case 'targets':
+    listTargets();
+    break;
+  case 'run-all':
+    runAll(parseInt(arg1) || 3);
     break;
   default:
     console.log(`
@@ -1101,10 +1390,17 @@ Usage:
   node optimize.js score                 Score all variants, select best
   node optimize.js run [generations]     Full optimization loop
   node optimize.js status                Show current status
-  node optimize.js diff [a] [b]          Compare two variants
+  node optimize.js diff [a] [b]          Compare two variants (condensed delta)
+  node optimize.js diff [a] [b] --full   Compare with unified diff
+  node optimize.js apply                 Apply best variant to target file
+
+  node optimize.js targets                List available targets
+  node optimize.js run-all [generations]  Run optimization on ALL targets
 
 Options:
-  --profile <name>                       Use a named profile (default: claude-md)
-                                         Available: claude-md, conductor
+  --target <name>                        Select target from targets[] config
+                                         Available: ${(config.targets || []).map((t) => t.name).join(', ')}
+  --profile <name>                       Use a named profile (legacy)
+                                         Available: ${Object.keys(config.profiles || {}).join(', ')}
 `);
 }

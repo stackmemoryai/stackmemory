@@ -8,6 +8,33 @@
     "backup": true
   },
 
+  "targets": [
+    {
+      "name": "global",
+      "file": "~/.claude/CLAUDE.md",
+      "evals": ["coding-tasks.jsonl"],
+      "description": "Global rules affecting every session"
+    },
+    {
+      "name": "provenantai",
+      "file": "~/Dev/provenantai/.claude/CLAUDE.md",
+      "evals": ["coding-tasks.jsonl"],
+      "description": "Project conventions (Express, Jest, migrations)"
+    },
+    {
+      "name": "dispatch",
+      "file": "~/Dev/provenantai/.claude/commands/dispatch.md",
+      "evals": ["conductor-tasks.jsonl"],
+      "description": "Agent orchestration prompt"
+    },
+    {
+      "name": "stackmemory",
+      "file": "CLAUDE.md",
+      "evals": ["stackmemory-tasks.jsonl"],
+      "description": "StackMemory project prompt"
+    }
+  ],
+
   "evolution": {
     "populationSize": 4,
     "generations": 10,
