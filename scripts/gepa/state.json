@@ -44,6 +44,56 @@
       ],
       "best": "baseline",
       "timestamp": "2026-03-09T15:41:55.313Z"
+    },
+    {
+      "generation": 2,
+      "action": "mutate",
+      "variants": [
+        "variant-a",
+        "variant-b",
+        "variant-c",
+        "variant-d"
+      ],
+      "timestamp": "2026-03-26T20:36:33.560Z"
+    },
+    {
+      "generation": 2,
+      "action": "select",
+      "scores": [
+        {
+          "variant": "baseline",
+          "score": 0.07826086956521738
+        },
+        {
+          "variant": "variant-a",
+          "score": 0.07826086956521738
+        },
+        {
+          "variant": "variant-b",
+          "score": 0.07826086956521738
+        },
+        {
+          "variant": "variant-c",
+          "score": 0.07826086956521738
+        },
+        {
+          "variant": "variant-d",
+          "score": 0.07826086956521738
+        }
+      ],
+      "best": "baseline",
+      "timestamp": "2026-03-26T20:40:26.767Z"
+    },
+    {
+      "generation": 2,
+      "action": "mutate",
+      "variants": [
+        "variant-a",
+        "variant-b",
+        "variant-c",
+        "variant-d"
+      ],
+      "timestamp": "2026-03-26T21:38:14.137Z"
     }
   ]
 }

@@ -1,0 +1,218 @@
+{
+  "variant": "variant-c",
+  "generation": 2,
+  "results": [
+    {
+      "taskId": "eval-001",
+      "taskName": "simple_function",
+      "weight": 1,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "has_function": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "handles_edge_cases": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "is_tested": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 6831,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "eval-002",
+      "taskName": "refactor_code",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "uses_async": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "preserves_behavior": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_nested_callbacks": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 6971,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "eval-003",
+      "taskName": "fix_bug",
+      "weight": 1.2,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "bug_fixed": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "no_new_bugs": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "explains_fix": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 6224,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "eval-004",
+      "taskName": "add_feature",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "has_pagination": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "has_limit": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "has_offset": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "backwards_compatible": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 4796,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "eval-005",
+      "taskName": "code_review",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "identifies_security_issue": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "identifies_performance_issue": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "actionable_feedback": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 5281,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "cond-001",
+      "taskName": "bug_fix_includes_validation",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "mentions_lint_test": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "commit_format": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "bug_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "validation_step": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 6668,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "cond-002",
+      "taskName": "feature_issue_guides_implementation",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "implementation_guidance": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "test_requirements": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "existing_patterns": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "code_quality": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "commit_conventions": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 9422,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "cond-003",
+      "taskName": "retry_context_handling",
+      "weight": 2,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "reads_prior_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "avoids_repeating_mistakes": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "different_approach": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "preserves_prior_work": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 7583,
+      "output": "Invalid API key · Fix external API key\n"
+    }
+  ]
+}
