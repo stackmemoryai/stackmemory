@@ -132,3 +132,4 @@ packages/diffmem/
 scripts/gepa/.hook-state.json
 scripts/gepa/results/scores.jsonl
 scripts/gepa/state.json
+scripts/gepa/results/
