@@ -131,3 +131,4 @@ packages/diffmem/
 # GEPA runtime state (modified by hooks)
 scripts/gepa/.hook-state.json
 scripts/gepa/results/scores.jsonl
+scripts/gepa/state.json
