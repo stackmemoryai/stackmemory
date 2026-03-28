@@ -649,6 +649,40 @@ program.addCommand(clearCommand);
 program.addCommand(serviceCommand);
 program.addCommand(createHooksCommand());
 
+// Board command — launches Agent Viewer / Kanban UI
+program
+  .command('board')
+  .description('Open the StackMemory Board (agent kanban + diff viewer)')
+  .option('-p, --port <port>', 'Port to serve on', '3456')
+  .option('--no-open', 'Do not auto-open browser')
+  .action(async (options) => {
+    const { spawn: spawnProc } = await import('child_process');
+    const { join } = await import('path');
+    const { existsSync } = await import('fs');
+
+    // Find the board server — check common locations
+    const candidates = [
+      join(process.cwd(), 'tools', 'agent-viewer', 'server.js'),
+      join(process.env.PROVENANTAI_ROOT || '', 'tools', 'agent-viewer', 'server.js'),
+      join(process.env.HOME || '', 'Dev', 'provenantai', 'tools', 'agent-viewer', 'server.js'),
+    ];
+
+    const serverPath = candidates.find((c) => existsSync(c));
+    if (!serverPath) {
+      console.error('Board server not found. Run from a repo with tools/agent-viewer/server.js');
+      process.exit(1);
+    }
+
+    console.log(`Starting StackMemory Board on port ${options.port}...`);
+    const child = spawnProc('node', [serverPath, '--port', options.port], {
+      stdio: 'inherit',
+      env: { ...process.env, FORCE_COLOR: '1' },
+    });
+
+    child.on('close', (code) => process.exit(code || 0));
+    process.on('SIGINT', () => { child.kill('SIGINT'); process.exit(0); });
+  });
+
 // Register feature-flagged commands (awaited before parse)
 const lazyCommands: Promise<void>[] = [];
 
