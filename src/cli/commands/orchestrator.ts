@@ -1846,11 +1846,10 @@ export class Conductor {
       const claudeBin = this.findClaudeBinary();
       const args = [
         '-p',
+        '--bare',
         '--output-format',
         'stream-json',
         '--dangerously-skip-permissions',
-        '--settings',
-        '{"hooks":{}}',
       ];
       if (selectedModel) {
         args.push('--model', selectedModel);
@@ -2312,16 +2311,32 @@ export class Conductor {
     }
     const priorContext = contextParts.join('\n');
 
-    // Try custom template first
-    if (existsSync(templatePath)) {
+    // Select template by issue type (labels or title heuristics)
+    const templateDir = join(__dirname, '..', '..', '..', 'scripts', 'conductor', 'templates');
+    const labelNames = issue.labels.map((l) => l.name.toLowerCase());
+    let templateName = 'implement-feature.md';
+    if (labelNames.includes('bug') || labelNames.includes('fix') || /\bfix\b|\bbug\b/i.test(issue.title)) {
+      templateName = 'fix-bug.md';
+    } else if (labelNames.includes('test') || labelNames.includes('coverage') || /\btest\b|\bcoverage\b/i.test(issue.title)) {
+      templateName = 'write-tests.md';
+    }
+
+    // Try typed template first, then custom template, then default
+    const typedTemplatePath = join(templateDir, templateName);
+    const selectedPath = existsSync(typedTemplatePath) ? typedTemplatePath : templatePath;
+
+    if (existsSync(selectedPath)) {
       try {
-        let template = readFileSync(templatePath, 'utf-8');
+        let template = readFileSync(selectedPath, 'utf-8');
+        // Strip frontmatter (initialPrompt metadata)
+        template = template.replace(/^---[\s\S]*?---\n?/, '');
         template = template
           .replace(/\{\{ISSUE_ID\}\}/g, issue.identifier)
           .replace(/\{\{TITLE\}\}/g, issue.title)
           .replace(/\{\{DESCRIPTION\}\}/g, issue.description || '')
           .replace(/\{\{LABELS\}\}/g, labels)
           .replace(/\{\{PRIORITY\}\}/g, priority)
+          .replace(/\{\{SCOPE\}\}/g, issue.identifier.toLowerCase().replace(/-\d+$/, ''))
           .replace(/\{\{ATTEMPT\}\}/g, String(attempt))
           .replace(/\{\{PRIOR_CONTEXT\}\}/g, priorContext);
         return template;
