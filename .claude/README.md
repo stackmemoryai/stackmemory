@@ -83,6 +83,20 @@ Edit `skill-rules.json` to:
 - Adjust confidence scoring
 - Update directory mappings
 
+## Knowledge Skills (.claude/skills/knowledge/*.skill.md)
+
+Domain-specific knowledge files loaded on keyword match. See `skills/knowledge/` for available skills.
+
+```
+[LOAD]on keyword match from frontmatter `activates_on` → read matching .skill.md
+[FALLBACK]if `expires` date passed → use Context7 `context7` field or fetch `sources[]`
+[CACHE]loaded skills persist for session|don't re-read same skill
+[FORMAT]frontmatter: name,version,domain,expires,activates_on[],sources[],context7
+```
+
+Available: `esbuild-esm`, `vitest`, `better-sqlite3`, `mcp-protocol`, `commander-cli`
+Plus global skills at `~/.claude/skills/knowledge/`: `stripe-api`, `railway-deploy`, `anthropic-sdk`
+
 ## StackMemory-Specific Patterns
 
 Key patterns enforced by hooks and agents:
