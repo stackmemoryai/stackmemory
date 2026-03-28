@@ -69,6 +69,7 @@ import { createPreflightCommand } from './commands/preflight.js';
 import { createRulesCommand } from './commands/rules.js';
 import { createSnapshotCommand } from './commands/snapshot.js';
 import { createLoopCommand } from './commands/loop.js';
+import { createSkillCommand } from './commands/skill.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -698,6 +699,7 @@ program.addCommand(createPreflightCommand());
 program.addCommand(createSnapshotCommand());
 program.addCommand(createLoopCommand());
 program.addCommand(createRulesCommand());
+program.addCommand(createSkillCommand());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);
