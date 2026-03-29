@@ -42,10 +42,7 @@ type LinearAuthManager = import('../linear/auth.js').LinearAuthManager;
 type LinearSyncEngine = import('../linear/sync.js').LinearSyncEngine;
 
 // Re-export task types for handlers (these are just enums/types, not runtime deps)
-export {
-  TaskPriority,
-  TaskStatus,
-} from '../../features/tasks/linear-task-manager.js';
+export type { TaskPriority, TaskStatus } from '../../types/task.js';
 import { BrowserMCPIntegration } from '../../features/browser/browser-mcp.js';
 import { TraceDetector } from '../../core/trace/trace-detector.js';
 import { ToolCall, _Trace } from '../../core/trace/types.js';
