@@ -23,7 +23,7 @@ DB_PATH="$REPO_ROOT/.stackmemory/context.db"
 STATE_FILE="$DSPY_DIR/optimized_state.json"
 LAST_RUN_FILE="$DSPY_DIR/.last_run"
 LOG_FILE="$REPO_ROOT/.stackmemory/dspy-loop.log"
-MIN_NEW_ROWS=20
+MIN_NEW_ROWS=10
 FORCE=false
 DRY_RUN=false
 
