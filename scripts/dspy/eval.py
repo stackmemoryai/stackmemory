@@ -63,7 +63,8 @@ def run_eval(db_path: Path, model: str, optimized_path: Path | None):
     # Baseline
     baseline = dspy.ChainOfThought(FrameRetrieval)
     evaluate = dspy.Evaluate(devset=eval_set, metric=retrieval_metric, num_threads=2)
-    baseline_score = evaluate(baseline)
+    baseline_result = evaluate(baseline)
+    baseline_score = float(getattr(baseline_result, 'score', baseline_result) or 0)
     print(f"Baseline score: {baseline_score:.3f}")
 
     # Optimized (if available)
@@ -71,7 +72,8 @@ def run_eval(db_path: Path, model: str, optimized_path: Path | None):
         state = json.loads(optimized_path.read_text())
         optimized = dspy.ChainOfThought(FrameRetrieval)
         optimized.load_state(state["retrieval"]["state"])
-        optimized_score = evaluate(optimized)
+        optimized_result = evaluate(optimized)
+        optimized_score = float(getattr(optimized_result, 'score', optimized_result) or 0)
         print(f"Optimized score: {optimized_score:.3f}")
         delta = optimized_score - baseline_score
         print(f"Delta: {delta:+.3f}")

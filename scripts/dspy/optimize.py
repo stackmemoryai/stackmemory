@@ -154,8 +154,10 @@ def optimize_retrieval(db_path: Path, model: str, output_path: Path):
     # Evaluate
     print("\n--- Evaluation ---")
     evaluate = dspy.Evaluate(devset=devset, metric=retrieval_metric, num_threads=2)
-    baseline_score = evaluate(retrieval_module)
-    optimized_score = evaluate(optimized_retrieval)
+    baseline_result = evaluate(retrieval_module)
+    optimized_result = evaluate(optimized_retrieval)
+    baseline_score = float(getattr(baseline_result, 'score', baseline_result) or 0)
+    optimized_score = float(getattr(optimized_result, 'score', optimized_result) or 0)
     print(f"Baseline:  {baseline_score:.3f}")
     print(f"Optimized: {optimized_score:.3f}")
     print(f"Delta:     {optimized_score - baseline_score:+.3f}")
@@ -177,8 +179,10 @@ def optimize_retrieval(db_path: Path, model: str, output_path: Path):
     complexity_eval = dspy.Evaluate(
         devset=complexity_examples[6:], metric=complexity_metric, num_threads=2
     )
-    complexity_baseline = complexity_eval(complexity_module)
-    complexity_optimized = complexity_eval(optimized_complexity)
+    complexity_baseline_result = complexity_eval(complexity_module)
+    complexity_optimized_result = complexity_eval(optimized_complexity)
+    complexity_baseline = float(getattr(complexity_baseline_result, 'score', complexity_baseline_result) or 0)
+    complexity_optimized = float(getattr(complexity_optimized_result, 'score', complexity_optimized_result) or 0)
     print(f"Baseline:  {complexity_baseline:.3f}")
     print(f"Optimized: {complexity_optimized:.3f}")
 
