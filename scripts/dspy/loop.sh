@@ -48,8 +48,10 @@ if [ ! -f "$DB_PATH" ]; then
 fi
 
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-  # Try loading from .env
-  if [ -f "$REPO_ROOT/.env" ]; then
+  # Try shell profile first, then .env
+  [ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" 2>/dev/null || true
+  [ -f "$HOME/.zprofile" ] && source "$HOME/.zprofile" 2>/dev/null || true
+  if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -f "$REPO_ROOT/.env" ]; then
     export $(grep ANTHROPIC_API_KEY "$REPO_ROOT/.env" 2>/dev/null | head -1 | xargs) 2>/dev/null || true
   fi
   if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
