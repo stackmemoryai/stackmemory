@@ -2312,18 +2312,36 @@ export class Conductor {
     const priorContext = contextParts.join('\n');
 
     // Select template by issue type (labels or title heuristics)
-    const templateDir = join(__dirname, '..', '..', '..', 'scripts', 'conductor', 'templates');
+    const templateDir = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'scripts',
+      'conductor',
+      'templates'
+    );
     const labelNames = issue.labels.map((l) => l.name.toLowerCase());
     let templateName = 'implement-feature.md';
-    if (labelNames.includes('bug') || labelNames.includes('fix') || /\bfix\b|\bbug\b/i.test(issue.title)) {
+    if (
+      labelNames.includes('bug') ||
+      labelNames.includes('fix') ||
+      /\bfix\b|\bbug\b/i.test(issue.title)
+    ) {
       templateName = 'fix-bug.md';
-    } else if (labelNames.includes('test') || labelNames.includes('coverage') || /\btest\b|\bcoverage\b/i.test(issue.title)) {
+    } else if (
+      labelNames.includes('test') ||
+      labelNames.includes('coverage') ||
+      /\btest\b|\bcoverage\b/i.test(issue.title)
+    ) {
       templateName = 'write-tests.md';
     }
 
     // Try typed template first, then custom template, then default
     const typedTemplatePath = join(templateDir, templateName);
-    const selectedPath = existsSync(typedTemplatePath) ? typedTemplatePath : templatePath;
+    const selectedPath = existsSync(typedTemplatePath)
+      ? typedTemplatePath
+      : templatePath;
 
     if (existsSync(selectedPath)) {
       try {
@@ -2336,7 +2354,10 @@ export class Conductor {
           .replace(/\{\{DESCRIPTION\}\}/g, issue.description || '')
           .replace(/\{\{LABELS\}\}/g, labels)
           .replace(/\{\{PRIORITY\}\}/g, priority)
-          .replace(/\{\{SCOPE\}\}/g, issue.identifier.toLowerCase().replace(/-\d+$/, ''))
+          .replace(
+            /\{\{SCOPE\}\}/g,
+            issue.identifier.toLowerCase().replace(/-\d+$/, '')
+          )
           .replace(/\{\{ATTEMPT\}\}/g, String(attempt))
           .replace(/\{\{PRIOR_CONTEXT\}\}/g, priorContext);
         return template;
