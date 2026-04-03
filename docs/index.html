@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StackMemory — AI Context That Persists</title>
+  <meta name="description" content="Make AI coding context durable, searchable, and actionable. Memory is storage. Context is a compiled view.">
+
+  <!-- Google Fonts: Doto (variable dot-matrix), Space Grotesk (body/UI), Space Mono (data/labels) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Doto:wght@400;700&family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Nothing Design System Tokens ── */
+    :root {
+      --black: #000000;
+      --surface: #111111;
+      --surface-raised: #1A1A1A;
+      --border: #222222;
+      --border-visible: #333333;
+      --text-disabled: #666666;
+      --text-secondary: #999999;
+      --text-primary: #E8E8E8;
+      --text-display: #FFFFFF;
+      --accent: #D71921;
+      --accent-subtle: rgba(215,25,33,0.15);
+      --success: #4A9E5C;
+      --warning: #D4A843;
+      --interactive: #5B9BF6;
+
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+      --space-3xl: 64px;
+      --space-4xl: 96px;
+    }
+
+    [data-theme="light"] {
+      --black: #F5F5F5;
+      --surface: #FFFFFF;
+      --surface-raised: #F0F0F0;
+      --border: #E8E8E8;
+      --border-visible: #CCCCCC;
+      --text-disabled: #999999;
+      --text-secondary: #666666;
+      --text-primary: #1A1A1A;
+      --text-display: #000000;
+      --interactive: #007AFF;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Base ── */
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background: var(--black);
+      color: var(--text-primary);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* ── Typography ── */
+    .font-display { font-family: 'Doto', 'Space Mono', monospace; }
+    .font-body { font-family: 'Space Grotesk', system-ui, sans-serif; }
+    .font-mono { font-family: 'Space Mono', 'JetBrains Mono', monospace; }
+
+    .label {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      line-height: 1.2;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 var(--space-lg);
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: var(--black);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-md) 0;
+    }
+
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      font-family: 'Doto', monospace;
+      font-size: 18px;
+      color: var(--text-display);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: var(--space-xl);
+      align-items: center;
+    }
+
+    .nav-links a {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+      text-decoration: none;
+      transition: color 200ms ease-out;
+    }
+
+    .nav-links a:hover { color: var(--text-display); }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--border-visible);
+      color: var(--text-secondary);
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: border-color 200ms ease-out, color 200ms ease-out;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--text-primary);
+      color: var(--text-display);
+    }
+
+    /* ── Hero ── */
+    .hero {
+      padding-top: 160px;
+      padding-bottom: var(--space-4xl);
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 80px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: radial-gradient(circle, var(--border) 0.5px, transparent 0.5px);
+      background-size: 16px 16px;
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      margin-bottom: var(--space-lg);
+      position: relative;
+    }
+
+    .hero-title {
+      font-family: 'Doto', monospace;
+      font-size: clamp(48px, 8vw, 96px);
+      line-height: 1.0;
+      letter-spacing: -0.03em;
+      color: var(--text-display);
+      margin-bottom: var(--space-xl);
+      position: relative;
+    }
+
+    .hero-sub {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(18px, 2.5vw, 24px);
+      font-weight: 300;
+      line-height: 1.4;
+      color: var(--text-secondary);
+      max-width: 560px;
+      margin-bottom: var(--space-2xl);
+      position: relative;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: var(--space-2xl);
+      position: relative;
+    }
+
+    .hero-stat-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 48px;
+      line-height: 1.0;
+      color: var(--text-display);
+      letter-spacing: -0.02em;
+    }
+
+    .hero-stat-unit {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: var(--space-md);
+      margin-top: var(--space-2xl);
+      position: relative;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-decoration: none;
+      background: var(--text-display);
+      color: var(--black);
+      border: none;
+      padding: 12px 24px;
+      border-radius: 999px;
+      min-height: 44px;
+      cursor: pointer;
+      transition: opacity 200ms ease-out;
+    }
+
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-decoration: none;
+      background: transparent;
+      color: var(--text-primary);
+      border: 1px solid var(--border-visible);
+      padding: 12px 24px;
+      border-radius: 999px;
+      min-height: 44px;
+      cursor: pointer;
+      transition: border-color 200ms ease-out;
+    }
+
+    .btn-secondary:hover { border-color: var(--text-primary); }
+
+    /* ── Thesis ── */
+    .thesis {
+      padding: var(--space-4xl) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .thesis-quote {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 300;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+      color: var(--text-display);
+      max-width: 720px;
+    }
+
+    .thesis-quote em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .thesis-source {
+      margin-top: var(--space-lg);
+    }
+
+    /* ── Features ── */
+    .features {
+      padding: var(--space-3xl) 0;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      padding: var(--space-xl);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .feature-number {
+      font-family: 'Space Mono', monospace;
+      font-size: 48px;
+      line-height: 1.0;
+      color: var(--text-display);
+      letter-spacing: -0.02em;
+    }
+
+    .feature-number.accent { color: var(--accent); }
+    .feature-number.success { color: var(--success); }
+    .feature-number.warning { color: var(--warning); }
+
+    .feature-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text-display);
+      line-height: 1.3;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* ── Architecture ── */
+    .architecture {
+      padding: var(--space-4xl) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2xl);
+      margin-top: var(--space-2xl);
+    }
+
+    .arch-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--space-xl);
+    }
+
+    .arch-block-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text-display);
+      margin-bottom: var(--space-md);
+    }
+
+    .arch-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .arch-list li {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: var(--space-sm) 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .arch-list li:last-child { border-bottom: none; }
+
+    .arch-list .value {
+      color: var(--text-primary);
+    }
+
+    /* ── Install ── */
+    .install {
+      padding: var(--space-4xl) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .install-box {
+      background: var(--surface);
+      border: 1px solid var(--border-visible);
+      border-radius: 8px;
+      padding: var(--space-xl);
+      margin-top: var(--space-xl);
+      max-width: 640px;
+    }
+
+    .install-cmd {
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      color: var(--text-display);
+      line-height: 2.0;
+    }
+
+    .install-cmd .dim { color: var(--text-disabled); }
+    .install-cmd .accent { color: var(--accent); }
+
+    /* ── Principles ── */
+    .principles {
+      padding: var(--space-4xl) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .principles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-xl);
+      margin-top: var(--space-2xl);
+    }
+
+    .principle {
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--border-visible);
+    }
+
+    .principle-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-display);
+      margin-top: var(--space-sm);
+      margin-bottom: var(--space-sm);
+    }
+
+    .principle-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* ── Segmented Progress (Nothing signature) ── */
+    .seg-bar {
+      display: flex;
+      gap: 2px;
+      height: 8px;
+      margin-top: var(--space-md);
+    }
+
+    .seg-bar .seg {
+      flex: 1;
+      background: var(--border);
+    }
+
+    .seg-bar .seg.filled { background: var(--text-display); }
+    .seg-bar .seg.accent { background: var(--accent); }
+    .seg-bar .seg.success { background: var(--success); }
+
+    /* ── Footer ── */
+    footer {
+      padding: var(--space-2xl) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    footer .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      transition: color 200ms ease-out;
+    }
+
+    footer a:hover { color: var(--text-display); }
+
+    .footer-links {
+      display: flex;
+      gap: var(--space-xl);
+    }
+
+    /* ── Section headers ── */
+    .section-label { margin-bottom: var(--space-sm); }
+
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      color: var(--text-display);
+      line-height: 1.1;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .hero-stats { flex-direction: column; gap: var(--space-xl); }
+      .arch-grid { grid-template-columns: 1fr; }
+      .nav-links { gap: var(--space-md); }
+      .hero-actions { flex-direction: column; align-items: flex-start; }
+      footer .container { flex-direction: column; gap: var(--space-md); text-align: center; }
+      .footer-links { flex-direction: column; gap: var(--space-md); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="container">
+      <a href="#" class="nav-logo">STACKMEMORY</a>
+      <div class="nav-links">
+        <a href="#features">FEATURES</a>
+        <a href="#architecture">ARCHITECTURE</a>
+        <a href="#install">INSTALL</a>
+        <a href="https://github.com/stackmemoryai/stackmemory">GITHUB</a>
+        <button class="theme-toggle" onclick="toggleTheme()">LIGHT</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-eyebrow">
+        <span class="label">AI CONTEXT MANAGEMENT</span>
+      </div>
+      <h1 class="hero-title">STACK<br>MEMORY</h1>
+      <p class="hero-sub">AI coding tools forget everything between sessions. StackMemory makes context durable, searchable, and actionable.</p>
+
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-value">56</div>
+          <div class="hero-stat-unit">MCP TOOLS</div>
+        </div>
+        <div>
+          <div class="hero-stat-value">0ms</div>
+          <div class="hero-stat-unit">SERVER PROCESS</div>
+        </div>
+        <div>
+          <div class="hero-stat-value">&infin;</div>
+          <div class="hero-stat-unit">SESSION MEMORY</div>
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <a href="#install" class="btn-primary">GET STARTED</a>
+        <a href="https://github.com/stackmemoryai/stackmemory" class="btn-secondary">VIEW SOURCE</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Thesis -->
+  <section class="thesis">
+    <div class="container">
+      <blockquote class="thesis-quote">
+        Memory is storage. Context is a <em>compiled view</em>. Context windows compress and vanish. State serialized to disk survives indefinitely.
+      </blockquote>
+      <div class="thesis-source">
+        <span class="label">OPERATING THEORY</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="container">
+      <span class="label section-label">CAPABILITIES</span>
+      <h2 class="section-title">What it does</h2>
+
+      <div class="features-grid" style="margin-top: var(--space-2xl);">
+        <div class="feature-card">
+          <span class="label">ORCHESTRATION</span>
+          <div class="feature-number">5x</div>
+          <div class="feature-title">Conductor</div>
+          <div class="feature-desc">Autonomous agent orchestration via Linear. Creates isolated worktrees per issue, spawns Claude Code agents, manages bounded concurrency with smart retry.</div>
+          <div class="seg-bar">
+            <div class="seg filled"></div>
+            <div class="seg filled"></div>
+            <div class="seg filled"></div>
+            <div class="seg filled"></div>
+            <div class="seg"></div>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <span class="label">ITERATION</span>
+          <div class="feature-number accent">&infin;</div>
+          <div class="feature-title">Ralph Loops</div>
+          <div class="feature-desc">Never-ending worker/reviewer loops until criteria are met. Context-aware iterations with budget management, state reconciliation, and crash recovery.</div>
+          <div class="seg-bar">
+            <div class="seg accent"></div>
+            <div class="seg accent"></div>
+            <div class="seg accent"></div>
+            <div class="seg accent"></div>
+            <div class="seg accent"></div>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <span class="label">INTEGRATION</span>
+          <div class="feature-number">56</div>
+          <div class="feature-title">MCP Server</div>
+          <div class="feature-desc">Full Model Context Protocol server with 56 tool handlers. Frame management, search, retrieval, Linear sync, provenance queries — all via standard MCP.</div>
+        </div>
+
+        <div class="feature-card">
+          <span class="label">INTELLIGENCE</span>
+          <div class="feature-number success">R</div>
+          <div class="feature-title">Retention Decay</div>
+          <div class="feature-desc">Ebbinghaus-inspired scoring. Frames decay over time, reinforced by access. Entity state tracking with temporal queries — as-of, diff, history.</div>
+        </div>
+
+        <div class="feature-card">
+          <span class="label">KNOWLEDGE</span>
+          <div class="feature-number warning">P</div>
+          <div class="feature-title">Provenant Graph</div>
+          <div class="feature-desc">Provenance-aware knowledge graph with confidence scoring. Ingests from Linear, Slack, GitHub. Decision tracking with shadow mode calibration.</div>
+        </div>
+
+        <div class="feature-card">
+          <span class="label">SEARCH</span>
+          <div class="feature-number">BM25</div>
+          <div class="feature-title">FTS5 + Hybrid</div>
+          <div class="feature-desc">SQLite FTS5 with BM25 scoring. Fast, deterministic, zero external dependencies. Optional vector embeddings via feature flag for semantic search.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="architecture" id="architecture">
+    <div class="container">
+      <span class="label section-label">SYSTEM</span>
+      <h2 class="section-title">Architecture bets</h2>
+
+      <div class="arch-grid">
+        <div class="arch-block">
+          <div class="arch-block-title">Storage</div>
+          <ul class="arch-list">
+            <li><span>DATABASE</span> <span class="value">SQLite + FTS5</span></li>
+            <li><span>EMBEDDING</span> <span class="value">Optional / Flagged</span></li>
+            <li><span>SEARCH</span> <span class="value">BM25 + Hybrid</span></li>
+            <li><span>PROCESS</span> <span class="value">Zero (file-based)</span></li>
+            <li><span>OFFLINE</span> <span class="value">Full support</span></li>
+          </ul>
+        </div>
+
+        <div class="arch-block">
+          <div class="arch-block-title">Capture</div>
+          <ul class="arch-list">
+            <li><span>METHOD</span> <span class="value">Hooks, not daemons</span></li>
+            <li><span>FREQUENCY</span> <span class="value">Every 25 tool calls</span></li>
+            <li><span>ISOLATION</span> <span class="value">Git worktrees</span></li>
+            <li><span>ROUTING</span> <span class="value">Multi-model (auto)</span></li>
+            <li><span>CLI</span> <span class="value">Wraps existing tools</span></li>
+          </ul>
+        </div>
+
+        <div class="arch-block">
+          <div class="arch-block-title">Context Model</div>
+          <ul class="arch-list">
+            <li><span>STRUCTURE</span> <span class="value">Call stack (nested)</span></li>
+            <li><span>PERSISTENCE</span> <span class="value">JSON/MD on disk</span></li>
+            <li><span>RETRIEVAL</span> <span class="value">Scoped by subtree</span></li>
+            <li><span>DECAY</span> <span class="value">Ebbinghaus + access</span></li>
+            <li><span>HANDOFF</span> <span class="value">85% context preserved</span></li>
+          </ul>
+        </div>
+
+        <div class="arch-block">
+          <div class="arch-block-title">Rejected</div>
+          <ul class="arch-list">
+            <li><span>Postgres</span> <span class="value" style="color:var(--accent);">Server process</span></li>
+            <li><span>ChromaDB</span> <span class="value" style="color:var(--accent);">15MB native bindings</span></li>
+            <li><span>Dolt</span> <span class="value" style="color:var(--accent);">103MB Go binary</span></li>
+            <li><span>Embeddings-first</span> <span class="value" style="color:var(--accent);">External model req.</span></li>
+            <li><span>IDE plugins</span> <span class="value" style="color:var(--accent);">Terminal lock-in</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Principles -->
+  <section class="principles">
+    <div class="container">
+      <span class="label section-label">PHILOSOPHY</span>
+      <h2 class="section-title">Design principles</h2>
+
+      <div class="principles-grid">
+        <div class="principle">
+          <span class="label">01</span>
+          <div class="principle-title">Context is a call stack</div>
+          <div class="principle-desc">Frames nest hierarchically. A bug fix lives inside a feature frame. Scoped retrieval returns the relevant subtree, not a flat list.</div>
+        </div>
+        <div class="principle">
+          <span class="label">02</span>
+          <div class="principle-title">Serialize to disk</div>
+          <div class="principle-desc">Context windows compress and vanish. State serialized to JSON/Markdown on disk survives indefinitely. Compaction-proof by design.</div>
+        </div>
+        <div class="principle">
+          <span class="label">03</span>
+          <div class="principle-title">Standardize the intersection</div>
+          <div class="principle-desc">Core API works identically across Claude, Codex, and OpenCode. Provider-specific capabilities through explicit opt-in.</div>
+        </div>
+        <div class="principle">
+          <span class="label">04</span>
+          <div class="principle-title">Automate the tedious</div>
+          <div class="principle-desc">Hooks handle mechanical work: checkpointing, syncing, capturing theory updates. The agent decides what to work on.</div>
+        </div>
+        <div class="principle">
+          <span class="label">05</span>
+          <div class="principle-title">Reject needless complexity</div>
+          <div class="principle-desc">Every rejected integration followed the same pattern: large binary, narrow use case, maintenance burden exceeding value.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="install" id="install">
+    <div class="container">
+      <span class="label section-label">GET STARTED</span>
+      <h2 class="section-title">Installation</h2>
+
+      <div class="install-box">
+        <div class="install-cmd">
+          <span class="dim"># Install globally</span><br>
+          npm install -g <span class="accent">@stackmemoryai/stackmemory</span><br>
+          <br>
+          <span class="dim"># Initialize in your project</span><br>
+          stackmemory setup<br>
+          <br>
+          <span class="dim"># Start the MCP server</span><br>
+          stackmemory mcp<br>
+          <br>
+          <span class="dim"># Or use the CLI wrapper</span><br>
+          claude-sm<br>
+          <br>
+          <span class="dim"># Autonomous orchestration</span><br>
+          stackmemory conductor start
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <span class="label">STACKMEMORY v1.9.0</span>
+      <div class="footer-links">
+        <a href="https://github.com/stackmemoryai/stackmemory">GITHUB</a>
+        <a href="https://www.npmjs.com/package/@stackmemoryai/stackmemory">NPM</a>
+        <a href="https://github.com/stackmemoryai/stackmemory/blob/main/docs/SPEC.md">SPEC</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const btn = document.querySelector('.theme-toggle');
+      if (html.dataset.theme === 'light') {
+        html.removeAttribute('data-theme');
+        btn.textContent = 'LIGHT';
+      } else {
+        html.dataset.theme = 'light';
+        btn.textContent = 'DARK';
+      }
+    }
+  </script>
+
+</body>
+</html>

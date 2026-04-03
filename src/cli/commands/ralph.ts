@@ -14,6 +14,7 @@ import { ralphDebugger } from '../../integrations/ralph/visualization/ralph-debu
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { trace } from '../../core/trace/index.js';
 import { SystemError, ErrorCode } from '../../core/errors/index.js';
+import { RetardMaxRunner } from '../../integrations/ralph/retardmax.js';
 
 export function createRalphCommand(): Command {
   const ralph = new Command('ralph').description(
@@ -1371,6 +1372,72 @@ export function createRalphCommand(): Command {
                 '❌ Linear execution failed:',
                 (error as Error).message
               );
+            }
+          }
+        );
+      }
+    );
+
+  // RetardMax mode — aggressive autonomous loop
+  ralph
+    .command('retardmax')
+    .description(
+      'Aggressive autonomous loop: no planning, just go until tests pass'
+    )
+    .argument('<task>', 'What to accomplish')
+    .option(
+      '-c, --criteria <criteria>',
+      'Completion criteria',
+      'All tests pass, lint clean, build succeeds'
+    )
+    .option('--no-worktree', 'Skip git worktree isolation (work in-place)')
+    .option('--max-loops <n>', 'Max loop iterations (0=infinite)', '0')
+    .option('--max-stuck <n>', 'Respawn after N stuck loops', '3')
+    .option('--commit-every <n>', 'Auto-commit every N tool calls', '25')
+    .option('--model <model>', 'Claude model to use', 'sonnet')
+    .action(
+      async (
+        task: string,
+        options: {
+          criteria: string;
+          worktree: boolean;
+          maxLoops: string;
+          maxStuck: string;
+          commitEvery: string;
+          model: string;
+        }
+      ) => {
+        return trace.command(
+          'ralph-retardmax',
+          { task, ...options },
+          async () => {
+            try {
+              console.log('RETARDMAX MODE ACTIVATED');
+              console.log(`Task: ${task}`);
+              console.log(`Criteria: ${options.criteria}`);
+              console.log(
+                `Worktree: ${options.worktree !== false ? 'yes' : 'no'}`
+              );
+              console.log(`Max loops: ${options.maxLoops || 'infinite'}`);
+              console.log('');
+
+              const runner = new RetardMaxRunner({
+                task,
+                criteria: options.criteria,
+                useWorktree: options.worktree !== false,
+                maxLoops: parseInt(options.maxLoops) || 0,
+                maxStuckBeforeRespawn: parseInt(options.maxStuck) || 3,
+                commitEvery: parseInt(options.commitEvery) || 25,
+                model: options.model,
+                verbose: true,
+              });
+
+              await runner.run();
+              await runner.cleanup();
+            } catch (error: unknown) {
+              logger.error('RetardMax failed', error as Error);
+              console.error('RetardMax crashed:', (error as Error).message);
+              process.exit(1);
             }
           }
         );
