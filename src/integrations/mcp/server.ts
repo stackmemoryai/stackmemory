@@ -220,6 +220,13 @@ class LocalStackMemoryMCP {
       logger.error('Failed to initialize Browser MCP', error);
     });
 
+    // Auto-init Obsidian vault adapter if configured
+    import('../../core/storage/obsidian-vault-adapter.js')
+      .then(({ initObsidianVault }) => initObsidianVault())
+      .catch(() => {
+        /* optional */
+      });
+
     logger.info('StackMemory MCP Server initialized', {
       projectRoot: this.projectRoot,
       projectId: this.projectId,

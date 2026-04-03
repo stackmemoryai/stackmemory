@@ -485,3 +485,68 @@ export class ObsidianVaultAdapter {
     logger.info('Obsidian vault adapter cleaned up');
   }
 }
+
+// ── Auto-init singleton ──
+
+let _instance: ObsidianVaultAdapter | null = null;
+
+/**
+ * Initialize the Obsidian vault adapter from StackMemory config.
+ * Safe to call multiple times — only initializes once.
+ * Returns null if obsidian is not configured.
+ */
+export async function initObsidianVault(): Promise<ObsidianVaultAdapter | null> {
+  if (_instance) return _instance;
+
+  try {
+    const configPath = join(process.cwd(), '.stackmemory', 'config.yaml');
+    if (!existsSync(configPath)) return null;
+
+    const content = readFileSync(configPath, 'utf-8');
+    // Simple YAML parse for obsidian.vaultPath
+    const vaultMatch = content.match(
+      /obsidian:\s*\n\s+vaultPath:\s*["']?([^\n"']+)/
+    );
+    if (!vaultMatch) return null;
+
+    const vaultPath = vaultMatch[1].trim();
+    if (!vaultPath || !existsSync(vaultPath)) {
+      logger.warn('Obsidian vaultPath configured but directory not found', {
+        vaultPath,
+      });
+      return null;
+    }
+
+    // Parse optional settings
+    const subdirMatch = content.match(
+      /obsidian:\s*\n(?:\s+\w+:.*\n)*\s+subdir:\s*["']?([^\n"']+)/
+    );
+    const watchRawMatch = content.match(
+      /obsidian:\s*\n(?:\s+\w+:.*\n)*\s+watchRaw:\s*(true|false)/
+    );
+    const autoIndexMatch = content.match(
+      /obsidian:\s*\n(?:\s+\w+:.*\n)*\s+autoIndex:\s*(true|false)/
+    );
+
+    _instance = new ObsidianVaultAdapter({
+      vaultPath,
+      subdir: subdirMatch?.[1]?.trim(),
+      watchRaw: watchRawMatch ? watchRawMatch[1] === 'true' : undefined,
+      autoIndex: autoIndexMatch ? autoIndexMatch[1] === 'true' : undefined,
+    });
+
+    await _instance.initialize();
+    logger.info('Obsidian vault adapter auto-initialized', { vaultPath });
+    return _instance;
+  } catch (err) {
+    logger.debug('Obsidian vault adapter not initialized', {
+      error: (err as Error).message,
+    });
+    return null;
+  }
+}
+
+/** Get the current adapter instance (null if not initialized) */
+export function getObsidianVault(): ObsidianVaultAdapter | null {
+  return _instance;
+}
