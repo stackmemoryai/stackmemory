@@ -1,0 +1,165 @@
+{
+  "retrieval": {
+    "state": {
+      "predict": {
+        "traces": [],
+        "train": [],
+        "demos": [
+          {
+            "query": "What happened in StackMemory v0.3.0 Development?",
+            "token_budget": 4096,
+            "session_summary": "Frames: 50, recent activity in project",
+            "available_frames": "- c05e94b2-3400-438b-bda1-d040c41a4d06: \"StackMemory v0.3.0 Development\" (task, score: 0.50, events: 0)\n- 722d8b90-29d2-462d-8077-a1ce0920db58: \"Test tool call storage\" (task, score: 0.50, events: 0)\n- 5fc00ed8-96a9-430f-a05e-ab83e2a411ac: \"working-on-cli\" (task, score: 0.50, events: 0)\n- 67cb9f1b-a458-4d57-82c0-c29308e00e87: \"cli-session\" (task, score: 0.50, events: 0)\n- 278f2eab-6bd7-4693-b9dc-7d583acadb8c: \"test-frame\" (task, score: 0.50, events: 0)\n- 86001f96-262a-4dd0-9320-f1545bf07b37: \"frame-1\" (task, score: 0.50, events: 0)\n- 88129690-84d0-48f5-825d-29e1f1deae86: \"frame-2\" (task, score: 0.50, events: 0)\n- 4ec15099-8217-453c-97bb-78f9806295e0: \"frame-3\" (task, score: 0.50, events: 0)\n- 67268788-f362-45f9-a68b-31801196e56b: \"test-stack-trace-capture\" (task, score: 0.50, events: 0)\n- 0f48dc4c-3a4b-4a69-ba23-95ac3be8d6e4: \"test-stack-trace-capture\" (task, score: 0.50, events: 0)\n- bd55adfc-6dc6-4dfb-a726-fda040796486: \"cli-session\" (task, score: 0.50, events: 0)\n- 7179084c-e4cc-4fda-82e1-47165c3629fb: \"cli-session\" (task, score: 0.50, events: 0)\n- 2e6692f7-3fc0-4777-8578-b1674658bbdc: \"team_share\" (tool_scope, score: 0.50, events: 0)\n- b41fbc67-c9f1-4fa6-b4f0-f2d523b93b2d: \"team_share\" (tool_scope, score: 0.50, events: 0)\n- d1eabbf4-fdab-4460-985c-5413f7307004: \"team_share\" (tool_scope, score: 0.50, events: 0)",
+            "key_decisions": "- Exit code is 0. The remaining 4 warnings are in `skill-storage.ts`, which is not...\n- I now have a complete picture. Here is the implementation plan.\n\n---\n\n## Impleme...\n- Perfect! I have all the key files. Let me create a comprehensive report of the s...\n- Perfect. Now I have all the information you need. Let me compile a comprehensive...\n- Now I have all the information I need. Let me provide a comprehensive analysis:\n...",
+            "reasoning": "Frame 'StackMemory v0.3.0 Development' directly matches the query topic.",
+            "frames_to_retrieve": "[{\"frameId\": \"c05e94b2-3400-438b-bda1-d040c41a4d06\", \"priority\": 9, \"reason\": \"Direct match\", \"includeEvents\": true, \"includeAnchors\": true}]",
+            "confidence_score": 0.9
+          },
+          {
+            "query": "What happened in cli-session?",
+            "token_budget": 4096,
+            "session_summary": "Frames: 50, recent activity in project",
+            "available_frames": "- c05e94b2-3400-438b-bda1-d040c41a4d06: \"StackMemory v0.3.0 Development\" (task, score: 0.50, events: 0)\n- 722d8b90-29d2-462d-8077-a1ce0920db58: \"Test tool call storage\" (task, score: 0.50, events: 0)\n- 5fc00ed8-96a9-430f-a05e-ab83e2a411ac: \"working-on-cli\" (task, score: 0.50, events: 0)\n- 67cb9f1b-a458-4d57-82c0-c29308e00e87: \"cli-session\" (task, score: 0.50, events: 0)\n- 278f2eab-6bd7-4693-b9dc-7d583acadb8c: \"test-frame\" (task, score: 0.50, events: 0)\n- 86001f96-262a-4dd0-9320-f1545bf07b37: \"frame-1\" (task, score: 0.50, events: 0)\n- 88129690-84d0-48f5-825d-29e1f1deae86: \"frame-2\" (task, score: 0.50, events: 0)\n- 4ec15099-8217-453c-97bb-78f9806295e0: \"frame-3\" (task, score: 0.50, events: 0)\n- 67268788-f362-45f9-a68b-31801196e56b: \"test-stack-trace-capture\" (task, score: 0.50, events: 0)\n- 0f48dc4c-3a4b-4a69-ba23-95ac3be8d6e4: \"test-stack-trace-capture\" (task, score: 0.50, events: 0)\n- bd55adfc-6dc6-4dfb-a726-fda040796486: \"cli-session\" (task, score: 0.50, events: 0)\n- 7179084c-e4cc-4fda-82e1-47165c3629fb: \"cli-session\" (task, score: 0.50, events: 0)\n- 2e6692f7-3fc0-4777-8578-b1674658bbdc: \"team_share\" (tool_scope, score: 0.50, events: 0)\n- b41fbc67-c9f1-4fa6-b4f0-f2d523b93b2d: \"team_share\" (tool_scope, score: 0.50, events: 0)\n- d1eabbf4-fdab-4460-985c-5413f7307004: \"team_share\" (tool_scope, score: 0.50, events: 0)",
+            "key_decisions": "- Exit code is 0. The remaining 4 warnings are in `skill-storage.ts`, which is not...\n- I now have a complete picture. Here is the implementation plan.\n\n---\n\n## Impleme...\n- Perfect! I have all the key files. Let me create a comprehensive report of the s...\n- Perfect. Now I have all the information you need. Let me compile a comprehensive...\n- Now I have all the information I need. Let me provide a comprehensive analysis:\n...",
+            "reasoning": "Frame 'cli-session' directly matches the query topic.",
+            "frames_to_retrieve": "[{\"frameId\": \"67cb9f1b-a458-4d57-82c0-c29308e00e87\", \"priority\": 9, \"reason\": \"Direct match\", \"includeEvents\": true, \"includeAnchors\": true}]",
+            "confidence_score": 0.9
+          }
+        ],
+        "signature": {
+          "instructions": "Select the most relevant context frames for a developer's query.\n\nGiven a query about code, debugging, or project status, analyze the\navailable frames and select those most likely to contain useful context.\nPrioritize recency, relevance to the query topic, and frame quality score.",
+          "fields": [
+            {
+              "prefix": "Query:",
+              "description": "Developer's natural language query"
+            },
+            {
+              "prefix": "Token Budget:",
+              "description": "Maximum tokens available for context"
+            },
+            {
+              "prefix": "Session Summary:",
+              "description": "Compressed summary: frame list, operations, errors, files touched"
+            },
+            {
+              "prefix": "Available Frames:",
+              "description": "Frame IDs with name, type, score, event count"
+            },
+            {
+              "prefix": "Key Decisions:",
+              "description": "Recent key decisions from project history"
+            },
+            {
+              "prefix": "Reasoning:",
+              "description": "Why these frames are relevant to the query"
+            },
+            {
+              "prefix": "Frames To Retrieve:",
+              "description": "JSON array: [{\"frameId\": \"...\", \"priority\": 1-10, \"reason\": \"...\", \"includeEvents\": bool, \"includeAnchors\": bool}]"
+            },
+            {
+              "prefix": "Confidence Score:",
+              "description": "0.0-1.0 confidence in selection"
+            }
+          ]
+        },
+        "lm": null
+      }
+    },
+    "baseline_score": 0.0,
+    "optimized_score": 0.0
+  },
+  "complexity": {
+    "state": {
+      "traces": [],
+      "train": [],
+      "demos": [
+        {
+          "augmented": true,
+          "query": "What errors happened in the last hour?",
+          "complexity": "simple",
+          "use_llm": false,
+          "strategy": "recent"
+        },
+        {
+          "augmented": true,
+          "query": "How does the authentication flow work end to end?",
+          "complexity": "complex",
+          "use_llm": true,
+          "strategy": "semantic"
+        },
+        {
+          "augmented": true,
+          "query": "What did I work on yesterday?",
+          "complexity": "simple",
+          "use_llm": false,
+          "strategy": "recent"
+        },
+        {
+          "query": "What's the current state of the billing integration?",
+          "complexity": "moderate",
+          "use_llm": true,
+          "strategy": "semantic",
+          "reasoning": "Feature-scoped query across multiple frames \u2014 needs semantic matching on billing-related work"
+        },
+        {
+          "query": "Show me the database schema changes this week",
+          "complexity": "moderate",
+          "use_llm": false,
+          "strategy": "keyword",
+          "reasoning": "File-type filter (migrations) + time constraint \u2014 keyword search on .sql files"
+        },
+        {
+          "query": "Why is the API returning 500 on the /users endpoint?",
+          "complexity": "complex",
+          "use_llm": true,
+          "strategy": "hybrid",
+          "reasoning": "Debugging requires correlating error events, recent changes to user routes, and related decisions"
+        }
+      ],
+      "signature": {
+        "instructions": "Assess query complexity to decide retrieval strategy.\n\nSimple queries (single file lookup, recent status) use heuristic retrieval.\nComplex queries (cross-cutting concerns, debugging, architecture) use LLM analysis.\nThis saves tokens by skipping LLM when heuristics suffice.",
+        "fields": [
+          {
+            "prefix": "Query:",
+            "description": "Developer's query"
+          },
+          {
+            "prefix": "Frame Count:",
+            "description": "Number of available frames"
+          },
+          {
+            "prefix": "Has Time Constraint:",
+            "description": "Whether query has time filters"
+          },
+          {
+            "prefix": "Has File Constraint:",
+            "description": "Whether query mentions specific files"
+          },
+          {
+            "prefix": "Complexity:",
+            "description": "simple, moderate, or complex"
+          },
+          {
+            "prefix": "Use Llm:",
+            "description": "Whether LLM analysis would improve results"
+          },
+          {
+            "prefix": "Strategy:",
+            "description": "keyword, recent, semantic, or hybrid"
+          }
+        ]
+      },
+      "lm": null
+    },
+    "baseline_score": 75.0,
+    "optimized_score": 100.0
+  },
+  "metadata": {
+    "model": "anthropic/claude-haiku-4-5-20251001",
+    "db_path": "/Users/jwu/Dev/stackmemory/.stackmemory/context.db",
+    "train_size": 6,
+    "dev_size": 2,
+    "frames_available": 50
+  }
+}

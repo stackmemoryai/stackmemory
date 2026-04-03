@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "tsBuildInfoFile": ".tsbuildinfo-config-check" },
+  "include": ["src/cli/commands/config.ts"]
+}
