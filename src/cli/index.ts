@@ -661,18 +661,24 @@ program
     const { existsSync } = await import('fs');
 
     // Find the board server — check common locations
+    const { fileURLToPath: toPath } = await import('url');
+    const pkgRoot = join(
+      toPath(import.meta.url),
+      '..',
+      '..',
+      '..',
+      '..',
+      'tools',
+      'agent-viewer',
+      'server.cjs'
+    );
     const candidates = [
       join(process.cwd(), 'tools', 'agent-viewer', 'server.js'),
-      join(
-        process.env.PROVENANTAI_ROOT || '',
-        'tools',
-        'agent-viewer',
-        'server.js'
-      ),
+      pkgRoot,
       join(
         process.env.HOME || '',
         'Dev',
-        'provenantai',
+        'stackmemory',
         'tools',
         'agent-viewer',
         'server.js'
@@ -682,7 +688,7 @@ program
     const serverPath = candidates.find((c) => existsSync(c));
     if (!serverPath) {
       console.error(
-        'Board server not found. Run from a repo with tools/agent-viewer/server.js'
+        'Board server not found. Run from the stackmemory repo or install globally.'
       );
       process.exit(1);
     }
@@ -692,6 +698,22 @@ program
       stdio: 'inherit',
       env: { ...process.env, FORCE_COLOR: '1' },
     });
+
+    // Auto-open browser
+    if (options.open !== false) {
+      setTimeout(async () => {
+        const url = `http://localhost:${options.port}`;
+        const cp = await import('child_process');
+        try {
+          cp.execSync(
+            process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`,
+            { stdio: 'ignore' }
+          );
+        } catch {
+          // ignore
+        }
+      }, 1000);
+    }
 
     child.on('close', (code) => process.exit(code || 0));
     process.on('SIGINT', () => {
