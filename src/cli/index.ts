@@ -663,13 +663,27 @@ program
     // Find the board server — check common locations
     const candidates = [
       join(process.cwd(), 'tools', 'agent-viewer', 'server.js'),
-      join(process.env.PROVENANTAI_ROOT || '', 'tools', 'agent-viewer', 'server.js'),
-      join(process.env.HOME || '', 'Dev', 'provenantai', 'tools', 'agent-viewer', 'server.js'),
+      join(
+        process.env.PROVENANTAI_ROOT || '',
+        'tools',
+        'agent-viewer',
+        'server.js'
+      ),
+      join(
+        process.env.HOME || '',
+        'Dev',
+        'provenantai',
+        'tools',
+        'agent-viewer',
+        'server.js'
+      ),
     ];
 
     const serverPath = candidates.find((c) => existsSync(c));
     if (!serverPath) {
-      console.error('Board server not found. Run from a repo with tools/agent-viewer/server.js');
+      console.error(
+        'Board server not found. Run from a repo with tools/agent-viewer/server.js'
+      );
       process.exit(1);
     }
 
@@ -680,7 +694,10 @@ program
     });
 
     child.on('close', (code) => process.exit(code || 0));
-    process.on('SIGINT', () => { child.kill('SIGINT'); process.exit(0); });
+    process.on('SIGINT', () => {
+      child.kill('SIGINT');
+      process.exit(0);
+    });
   });
 
 // Register feature-flagged commands (awaited before parse)
