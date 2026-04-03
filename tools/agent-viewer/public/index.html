@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StackMemory Board</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Doto:wght@400;700&family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <!-- xterm.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+
+  <!-- Socket.io -->
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+
+  <style>
+    :root {
+      --black: #000000;
+      --surface: #111111;
+      --surface-raised: #1A1A1A;
+      --border: #222222;
+      --border-visible: #333333;
+      --text-disabled: #666666;
+      --text-secondary: #999999;
+      --text-primary: #E8E8E8;
+      --text-display: #FFFFFF;
+      --accent: #D71921;
+      --success: #4A9E5C;
+      --warning: #D4A843;
+      --interactive: #5B9BF6;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--black);
+      color: var(--text-primary);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 14px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .label {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    /* Layout: sidebar + main */
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-title {
+      font-family: 'Doto', monospace;
+      font-size: 18px;
+      color: var(--text-display);
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-sections {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .section-header {
+      padding: 12px 16px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Agent cards */
+    .agent-list {
+      padding: 0 8px 16px;
+    }
+
+    .agent-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      transition: border-color 200ms ease-out;
+    }
+
+    .agent-card:hover { border-color: var(--border-visible); }
+    .agent-card.active { border-color: var(--interactive); }
+
+    .agent-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .agent-card-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: var(--text-display);
+    }
+
+    .agent-card-phase {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .phase-reading { color: var(--interactive); }
+    .phase-planning { color: var(--interactive); }
+    .phase-implementing { color: var(--warning); }
+    .phase-testing { color: #C77DFF; }
+    .phase-committing { color: var(--success); }
+
+    .agent-card-meta {
+      display: flex;
+      gap: 12px;
+    }
+
+    .agent-card-meta span {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--text-disabled);
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    .status-dot.alive { background: var(--success); }
+    .status-dot.dead { background: var(--accent); }
+    .status-dot.stale { background: var(--warning); }
+
+    /* Session cards */
+    .session-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      transition: border-color 200ms ease-out;
+    }
+
+    .session-card:hover { border-color: var(--border-visible); }
+    .session-card.active { border-color: var(--success); }
+
+    /* New session button */
+    .new-session-btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-visible);
+      border-radius: 999px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 200ms ease-out;
+    }
+
+    .new-session-btn:hover {
+      color: var(--text-display);
+      border-color: var(--text-primary);
+    }
+
+    /* Main panel */
+    .main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+    }
+
+    .main-header-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-display);
+    }
+
+    .main-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .kill-btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+
+    .kill-btn:hover { background: var(--accent); color: var(--black); }
+
+    /* Terminal area */
+    .terminal-container {
+      flex: 1;
+      padding: 8px;
+      overflow: hidden;
+    }
+
+    #terminal {
+      height: 100%;
+    }
+
+    /* Input bar */
+    .input-bar {
+      padding: 8px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-bar input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border-visible);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-display);
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .input-bar input:focus { border-color: var(--text-primary); }
+
+    .input-bar input::placeholder { color: var(--text-disabled); }
+
+    .send-btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--text-display);
+      color: var(--black);
+      border: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      cursor: pointer;
+      min-width: 80px;
+    }
+
+    .send-btn:hover { opacity: 0.85; }
+    .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+    }
+
+    .empty-state-title {
+      font-family: 'Doto', monospace;
+      font-size: 36px;
+      color: var(--text-display);
+    }
+
+    .empty-state-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Segmented bar */
+    .seg-bar {
+      display: flex;
+      gap: 2px;
+      height: 4px;
+      margin-top: 8px;
+    }
+
+    .seg-bar .seg { flex: 1; background: var(--border); }
+    .seg-bar .seg.filled { background: var(--text-display); }
+    .seg-bar .seg.accent { background: var(--accent); }
+    .seg-bar .seg.success { background: var(--success); }
+    .seg-bar .seg.warning { background: var(--warning); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">BOARD</span>
+        <button class="new-session-btn" onclick="showNewSession()">+ NEW</button>
+      </div>
+      <div class="sidebar-sections">
+        <!-- Interactive Sessions -->
+        <div class="section-header">
+          <span class="label">SESSIONS</span>
+        </div>
+        <div class="agent-list" id="sessions-list"></div>
+
+        <!-- Conductor Agents -->
+        <div class="section-header">
+          <span class="label">CONDUCTOR AGENTS</span>
+          <button class="new-session-btn" onclick="refreshAgents()" style="font-size:10px;padding:4px 10px;">REFRESH</button>
+        </div>
+        <div class="agent-list" id="agents-list"></div>
+      </div>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="main">
+      <div class="main-header" id="main-header">
+        <span class="label" id="header-title">SELECT OR CREATE A SESSION</span>
+        <div class="main-header-actions" id="header-actions"></div>
+      </div>
+
+      <div class="terminal-container" id="terminal-area">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state-title">BOARD</div>
+          <div class="empty-state-desc">Click + NEW to start an interactive Claude Code session</div>
+        </div>
+        <div id="terminal" style="display:none;"></div>
+      </div>
+
+      <div class="input-bar" id="input-bar" style="display:none;">
+        <input type="text" id="message-input" placeholder="Send a message..." onkeydown="if(event.key==='Enter')sendMessage()">
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Session Modal -->
+  <div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;display:none;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border-visible);border-radius:16px;padding:24px;width:480px;max-width:90vw;">
+      <div class="label" style="margin-bottom:16px;">NEW SESSION</div>
+      <div style="margin-bottom:12px;">
+        <div class="label" style="margin-bottom:4px;">PROMPT</div>
+        <textarea id="new-prompt" rows="4" style="width:100%;background:var(--surface-raised);border:1px solid var(--border-visible);border-radius:8px;padding:10px;color:var(--text-display);font-family:'Space Mono',monospace;font-size:13px;resize:vertical;outline:none;" placeholder="What should Claude work on?"></textarea>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;">
+          <div class="label" style="margin-bottom:4px;">MODEL</div>
+          <select id="new-model" style="width:100%;background:var(--surface-raised);border:1px solid var(--border-visible);border-radius:8px;padding:8px;color:var(--text-display);font-family:'Space Mono',monospace;font-size:13px;outline:none;">
+            <option value="sonnet">Sonnet</option>
+            <option value="opus">Opus</option>
+            <option value="haiku">Haiku</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="new-session-btn" onclick="hideModal()">CANCEL</button>
+        <button class="send-btn" onclick="createSession()">START</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ──
+    let socket = null;
+    let terminal = null;
+    let fitAddon = null;
+    let activeSessionId = null;
+
+    // ── Init ──
+    function init() {
+      socket = io();
+
+      socket.on('connect', () => {
+        console.log('Connected to board server');
+        refreshAgents();
+        refreshSessions();
+      });
+
+      // Session events
+      socket.on('session:created', ({ sessionId, pid }) => {
+        console.log(`Session created: ${sessionId} (pid=${pid})`);
+        attachToSession(sessionId);
+        refreshSessions();
+      });
+
+      socket.on('session:event', ({ sessionId, event }) => {
+        if (sessionId !== activeSessionId) return;
+        renderEvent(event);
+      });
+
+      socket.on('session:raw', ({ sessionId, data }) => {
+        if (sessionId !== activeSessionId || !terminal) return;
+        terminal.writeln(data);
+      });
+
+      socket.on('session:stderr', ({ sessionId, data }) => {
+        if (sessionId !== activeSessionId || !terminal) return;
+        terminal.writeln(`\x1b[2m${data}\x1b[0m`);
+      });
+
+      socket.on('session:exit', ({ sessionId, code }) => {
+        if (sessionId !== activeSessionId || !terminal) return;
+        terminal.writeln(`\r\n\x1b[33m[session exited with code ${code}]\x1b[0m`);
+        document.getElementById('send-btn').disabled = true;
+        refreshSessions();
+      });
+
+      socket.on('session:history', ({ sessionId, output }) => {
+        if (sessionId !== activeSessionId || !terminal) return;
+        for (const line of output) {
+          try {
+            const event = JSON.parse(line);
+            renderEvent(event);
+          } catch {
+            terminal.writeln(line);
+          }
+        }
+      });
+
+      socket.on('session:error', ({ error }) => {
+        if (terminal) terminal.writeln(`\x1b[31m[error: ${error}]\x1b[0m`);
+      });
+
+      // Init terminal
+      initTerminal();
+
+      // Poll agents every 10s
+      setInterval(refreshAgents, 10000);
+    }
+
+    function initTerminal() {
+      terminal = new window.Terminal({
+        theme: {
+          background: '#000000',
+          foreground: '#E8E8E8',
+          cursor: '#E8E8E8',
+          selectionBackground: '#333333',
+          black: '#000000',
+          red: '#D71921',
+          green: '#4A9E5C',
+          yellow: '#D4A843',
+          blue: '#5B9BF6',
+          magenta: '#C77DFF',
+          cyan: '#80CBC4',
+          white: '#E8E8E8',
+        },
+        fontFamily: "'Space Mono', 'JetBrains Mono', monospace",
+        fontSize: 13,
+        lineHeight: 1.4,
+        cursorBlink: false,
+        disableStdin: true,
+        scrollback: 10000,
+      });
+
+      fitAddon = new window.FitAddon.FitAddon();
+      terminal.loadAddon(fitAddon);
+
+      window.addEventListener('resize', () => {
+        if (fitAddon && document.getElementById('terminal').style.display !== 'none') {
+          fitAddon.fit();
+        }
+      });
+    }
+
+    // ── Rendering ──
+
+    function renderEvent(event) {
+      if (!terminal) return;
+
+      switch (event.type) {
+        case 'assistant':
+          // Claude's response text
+          if (event.message?.content) {
+            for (const block of event.message.content) {
+              if (block.type === 'text') {
+                terminal.writeln(`\r\n\x1b[1;37m${escapeAnsi(block.text)}\x1b[0m`);
+              } else if (block.type === 'tool_use') {
+                terminal.writeln(`\r\n\x1b[36m[${block.name}]\x1b[0m`);
+                if (block.input) {
+                  const preview = JSON.stringify(block.input).slice(0, 200);
+                  terminal.writeln(`\x1b[2m${preview}\x1b[0m`);
+                }
+              }
+            }
+          }
+          // Usage stats
+          if (event.message?.usage) {
+            const u = event.message.usage;
+            terminal.writeln(`\x1b[2m[tokens: in=${u.input_tokens} out=${u.output_tokens}]\x1b[0m`);
+          }
+          break;
+
+        case 'tool_result':
+          if (event.content) {
+            const text = typeof event.content === 'string'
+              ? event.content
+              : JSON.stringify(event.content).slice(0, 500);
+            terminal.writeln(`\x1b[2;32m${escapeAnsi(text)}\x1b[0m`);
+          }
+          break;
+
+        case 'user':
+          if (event.message?.content) {
+            const text = typeof event.message.content === 'string'
+              ? event.message.content
+              : event.message.content.map(b => b.text || '').join('');
+            terminal.writeln(`\r\n\x1b[33m> ${escapeAnsi(text)}\x1b[0m`);
+          }
+          break;
+
+        case 'system':
+          terminal.writeln(`\x1b[2m[system: ${escapeAnsi(JSON.stringify(event))}]\x1b[0m`);
+          break;
+
+        default:
+          // Other events — show type
+          if (event.type) {
+            terminal.writeln(`\x1b[2m[${event.type}]\x1b[0m`);
+          }
+      }
+    }
+
+    function escapeAnsi(text) {
+      if (!text) return '';
+      // Split long lines for xterm
+      return String(text).replace(/\r?\n/g, '\r\n');
+    }
+
+    // ── Session Management ──
+
+    function attachToSession(sessionId) {
+      if (activeSessionId) {
+        socket.emit('session:detach', activeSessionId);
+      }
+
+      activeSessionId = sessionId;
+
+      // Show terminal
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('terminal').style.display = 'block';
+      document.getElementById('input-bar').style.display = 'flex';
+
+      // Open terminal if not already
+      const termEl = document.getElementById('terminal');
+      if (!termEl.querySelector('.xterm')) {
+        terminal.open(termEl);
+      }
+      terminal.clear();
+      fitAddon.fit();
+
+      // Update header
+      document.getElementById('header-title').textContent = sessionId;
+      document.getElementById('header-actions').innerHTML =
+        `<button class="kill-btn" onclick="killSession('${sessionId}')">KILL</button>`;
+
+      document.getElementById('send-btn').disabled = false;
+
+      // Attach via socket
+      socket.emit('session:attach', sessionId);
+
+      // Highlight in sidebar
+      document.querySelectorAll('.session-card').forEach(el => el.classList.remove('active'));
+      const card = document.querySelector(`[data-session="${sessionId}"]`);
+      if (card) card.classList.add('active');
+
+      // Focus input
+      document.getElementById('message-input').focus();
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('message-input');
+      const message = input.value.trim();
+      if (!message || !activeSessionId) return;
+
+      socket.emit('session:input', { sessionId: activeSessionId, message });
+      terminal.writeln(`\r\n\x1b[33m> ${escapeAnsi(message)}\x1b[0m`);
+      input.value = '';
+    }
+
+    function killSession(sessionId) {
+      socket.emit('session:signal', { sessionId, signal: 'SIGTERM' });
+    }
+
+    function createSession() {
+      const prompt = document.getElementById('new-prompt').value.trim();
+      const model = document.getElementById('new-model').value;
+
+      if (!prompt) return;
+
+      socket.emit('session:create', { prompt, model, cwd: undefined });
+      hideModal();
+    }
+
+    // ── Data Fetching ──
+
+    async function refreshAgents() {
+      try {
+        const res = await fetch('/api/agents');
+        const agents = await res.json();
+        renderAgents(agents);
+      } catch {
+        // offline
+      }
+    }
+
+    async function refreshSessions() {
+      try {
+        const res = await fetch('/api/sessions');
+        const sessions = await res.json();
+        renderSessions(sessions);
+      } catch {
+        // offline
+      }
+    }
+
+    function renderAgents(agents) {
+      const list = document.getElementById('agents-list');
+      if (agents.length === 0) {
+        list.innerHTML = '<div style="padding:8px;color:var(--text-disabled);font-size:12px;">No conductor agents</div>';
+        return;
+      }
+
+      list.innerHTML = agents.map(a => {
+        const statusClass = a.alive ? (a.stale ? 'stale' : 'alive') : 'dead';
+        const phaseClass = `phase-${a.phase || 'reading'}`;
+        const elapsed = formatElapsed(a.elapsed);
+
+        return `
+          <div class="agent-card">
+            <div class="agent-card-header">
+              <span class="agent-card-title"><span class="status-dot ${statusClass}"></span>${a.issue || a.dir}</span>
+              <span class="agent-card-phase ${phaseClass}">${a.phase || '?'}</span>
+            </div>
+            <div class="agent-card-meta">
+              <span>${a.toolCalls || 0} tools</span>
+              <span>${a.filesModified || 0} files</span>
+              <span>${elapsed}</span>
+            </div>
+            <div class="seg-bar">
+              ${renderPhaseBar(a.phase, a.toolCalls || 0)}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSessions(sessions) {
+      const list = document.getElementById('sessions-list');
+      if (sessions.length === 0) {
+        list.innerHTML = '<div style="padding:8px;color:var(--text-disabled);font-size:12px;">No active sessions</div>';
+        return;
+      }
+
+      list.innerHTML = sessions.map(s => {
+        const isActive = s.id === activeSessionId;
+        const elapsed = formatElapsed(Date.now() - s.startedAt);
+        const statusClass = s.alive ? 'alive' : 'dead';
+
+        return `
+          <div class="session-card ${isActive ? 'active' : ''}" data-session="${s.id}" onclick="attachToSession('${s.id}')">
+            <div class="agent-card-header">
+              <span class="agent-card-title"><span class="status-dot ${statusClass}"></span>${s.model}</span>
+              <span class="label">${elapsed}</span>
+            </div>
+            <div class="agent-card-meta">
+              <span>${s.id.slice(-8)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderPhaseBar(phase, toolCalls) {
+      const phases = ['reading', 'planning', 'implementing', 'testing', 'committing'];
+      const idx = phases.indexOf(phase || 'reading');
+      return phases.map((p, i) => {
+        if (i < idx) return '<div class="seg filled"></div>';
+        if (i === idx) return '<div class="seg success"></div>';
+        return '<div class="seg"></div>';
+      }).join('');
+    }
+
+    function formatElapsed(ms) {
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `${m}m`;
+      const h = Math.floor(m / 60);
+      return `${h}h ${m % 60}m`;
+    }
+
+    // ── Modal ──
+
+    function showNewSession() {
+      document.getElementById('modal-overlay').style.display = 'flex';
+      document.getElementById('new-prompt').focus();
+    }
+
+    function hideModal() {
+      document.getElementById('modal-overlay').style.display = 'none';
+    }
+
+    // Close modal on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hideModal();
+    });
+
+    // ── Boot ──
+    init();
+  </script>
+</body>
+</html>
