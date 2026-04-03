@@ -66,6 +66,17 @@ export interface ProfileConfig {
   performance?: Partial<PerformanceConfig>;
 }
 
+export interface ObsidianConfig {
+  /** Path to Obsidian vault root directory */
+  vaultPath: string;
+  /** Subdirectory within vault for StackMemory data (default: "stackmemory") */
+  subdir?: string;
+  /** Watch raw/ for web clipper input (default: true) */
+  watchRaw?: boolean;
+  /** Auto-update index.md on frame changes (default: true) */
+  autoIndex?: boolean;
+}
+
 export interface StackMemoryConfig {
   version: string;
   profile?: string; // Active profile name
@@ -77,6 +88,8 @@ export interface StackMemoryConfig {
   performance: PerformanceConfig;
   enrichment: EnrichmentConfig;
   profiles?: Record<string, ProfileConfig>;
+  /** Optional Obsidian vault integration */
+  obsidian?: ObsidianConfig;
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {

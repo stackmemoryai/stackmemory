@@ -262,6 +262,11 @@ program
         await sessionManager.initialize();
         await sharedContextLayer.initialize();
 
+        // Auto-init Obsidian vault adapter if configured
+        const { initObsidianVault } =
+          await import('../core/storage/obsidian-vault-adapter.js');
+        await initObsidianVault();
+
         const session = await sessionManager.getOrCreateSession({
           projectPath: projectRoot,
           sessionId: options.session,

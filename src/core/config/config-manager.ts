@@ -98,6 +98,7 @@ export class ConfigManager {
       performance: { ...DEFAULT_CONFIG.performance, ...loaded.performance },
       enrichment: { ...DEFAULT_ENRICHMENT, ...loaded.enrichment },
       profiles: { ...PRESET_PROFILES, ...loaded.profiles },
+      obsidian: loaded.obsidian,
     };
 
     // Apply active profile if specified
