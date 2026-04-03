@@ -1,11 +1,11 @@
 /**
- * RetardMax Mode — Aggressive autonomous Claude Code loop
+ * LoopMax Mode — Aggressive autonomous Claude Code loop
  *
  * Never-ending loop that spawns Claude Code agents until all tests pass.
  * No planning, just execution. Uses git worktrees for isolation,
  * commits often to preserve work, and respawns on failure.
  *
- * Usage: stackmemory ralph retardmax "make all tests pass"
+ * Usage: stackmemory ralph loopmax "make all tests pass"
  */
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
@@ -16,7 +16,7 @@ import { logger } from '../../core/monitoring/logger.js';
 
 // ── Types ──
 
-export interface RetardMaxConfig {
+export interface LoopMaxConfig {
   /** Task description / goal */
   task: string;
   /** Completion criteria — loop stops when this passes */
@@ -48,7 +48,7 @@ export interface LoopIteration {
   stuck: boolean;
 }
 
-interface RetardMaxState {
+interface LoopMaxState {
   task: string;
   criteria: string;
   startedAt: number;
@@ -64,20 +64,20 @@ interface RetardMaxState {
 
 const STUCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 min no output = stuck
 const LOOP_COOLDOWN_MS = 3_000; // 3s between respawns
-const TMP_DRAFT_DIR = join(tmpdir(), 'retardmax-drafts');
+const TMP_DRAFT_DIR = join(tmpdir(), 'loopmax-drafts');
 
 // ── Core ──
 
-export class RetardMaxRunner {
-  private config: Required<RetardMaxConfig>;
-  private state: RetardMaxState;
+export class LoopMaxRunner {
+  private config: Required<LoopMaxConfig>;
+  private state: LoopMaxState;
   private stateFile: string;
   private logFile: string;
   private activeProcess: ChildProcess | null = null;
   private stopped = false;
   private workDir: string;
 
-  constructor(config: RetardMaxConfig) {
+  constructor(config: LoopMaxConfig) {
     this.config = {
       task: config.task,
       criteria: config.criteria,
@@ -117,7 +117,7 @@ export class RetardMaxRunner {
 
   /** Main entry — runs forever until criteria met or stopped */
   async run(): Promise<void> {
-    this.log(`RetardMax starting: ${this.config.task}`);
+    this.log(`LoopMax starting: ${this.config.task}`);
     this.log(`Criteria: ${this.config.criteria}`);
     this.log(`State: ${this.stateFile}`);
     this.log(`Log: ${this.logFile}`);
@@ -178,7 +178,7 @@ export class RetardMaxRunner {
       if (await this.checkCriteria()) {
         this.log('ALL CRITERIA MET — loop complete!');
         this.state.status = 'completed';
-        this.commitAndSummarize('RetardMax complete — all criteria met');
+        this.commitAndSummarize('LoopMax complete — all criteria met');
         break;
       }
 
@@ -231,7 +231,7 @@ export class RetardMaxRunner {
 
       // Auto-commit after each loop
       iteration.commitsMade = this.autoCommit(
-        `retardmax: loop ${this.state.loop} (exit=${result.exitCode})`
+        `loopmax: loop ${this.state.loop} (exit=${result.exitCode})`
       );
       this.state.totalCommits += iteration.commitsMade;
     } catch (err) {
@@ -242,7 +242,7 @@ export class RetardMaxRunner {
 
       // Still try to commit whatever we have
       iteration.commitsMade = this.autoCommit(
-        `retardmax: loop ${this.state.loop} crashed — saving progress`
+        `loopmax: loop ${this.state.loop} crashed — saving progress`
       );
       this.state.totalCommits += iteration.commitsMade;
     }
@@ -275,12 +275,12 @@ export class RetardMaxRunner {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
           ...process.env,
-          RETARDMAX: '1',
-          RETARDMAX_LOOP: String(this.state.loop),
-          RETARDMAX_STATE: this.stateFile,
-          RETARDMAX_TASK: this.config.task,
-          RETARDMAX_CRITERIA: this.config.criteria,
-          RETARDMAX_MODEL: this.config.model,
+          LOOPMAX: '1',
+          LOOPMAX_LOOP: String(this.state.loop),
+          LOOPMAX_STATE: this.stateFile,
+          LOOPMAX_TASK: this.config.task,
+          LOOPMAX_CRITERIA: this.config.criteria,
+          LOOPMAX_MODEL: this.config.model,
         },
       });
 
@@ -358,15 +358,15 @@ export class RetardMaxRunner {
       ``,
       this.config.criteria,
       ``,
-      `# Mode: RetardMax`,
+      `# Mode: LoopMax`,
       ``,
-      `You are in RetardMax mode. Rules:`,
+      `You are in LoopMax mode. Rules:`,
       `1. DO NOT PLAN. Just start coding immediately.`,
       `2. Run tests often. Fix what breaks. Repeat.`,
       `3. Commit to git frequently to preserve your work.`,
       `4. If tests pass and lint is clean, you're done.`,
       `5. If you get stuck, commit what you have and describe the blocker.`,
-      `6. Save any drafts or experiments to /tmp/retardmax-drafts/`,
+      `6. Save any drafts or experiments to /tmp/loopmax-drafts/`,
       `7. Be aggressive — try things, break things, fix things.`,
       `8. Do NOT ask for permission. Do NOT explain your reasoning at length.`,
       `9. Prefer action over analysis. Code over comments.`,
@@ -490,8 +490,8 @@ export class RetardMaxRunner {
         timeout: 10_000,
         env: {
           ...process.env,
-          GIT_AUTHOR_NAME: 'RetardMax',
-          GIT_COMMITTER_NAME: 'RetardMax',
+          GIT_AUTHOR_NAME: 'LoopMax',
+          GIT_COMMITTER_NAME: 'LoopMax',
         },
       });
 
@@ -513,7 +513,7 @@ export class RetardMaxRunner {
       `summary-loop-${this.state.loop}.md`
     );
     const summary = [
-      `# RetardMax Checkpoint`,
+      `# LoopMax Checkpoint`,
       ``,
       `**Reason:** ${reason}`,
       `**Loop:** ${this.state.loop}`,
@@ -538,14 +538,14 @@ export class RetardMaxRunner {
     ].join('\n');
 
     writeFileSync(summaryFile, summary);
-    this.autoCommit(`retardmax: checkpoint — ${reason}`);
+    this.autoCommit(`loopmax: checkpoint — ${reason}`);
     this.saveState();
   }
 
   /** Set up a git worktree for isolated work */
   private async setupWorktree(): Promise<void> {
-    const branch = `retardmax/${Date.now()}`;
-    const worktreePath = join(tmpdir(), `retardmax-wt-${Date.now()}`);
+    const branch = `loopmax/${Date.now()}`;
+    const worktreePath = join(tmpdir(), `loopmax-wt-${Date.now()}`);
 
     this.log(`Creating worktree at ${worktreePath} on branch ${branch}`);
 
@@ -629,7 +629,7 @@ export class RetardMaxRunner {
     const stuckLoops = this.state.iterations.filter((i) => i.stuck).length;
 
     console.log('\n' + '='.repeat(60));
-    console.log('RetardMax Summary');
+    console.log('LoopMax Summary');
     console.log('='.repeat(60));
     console.log(`Status:      ${this.state.status}`);
     console.log(`Total loops: ${this.state.loop}`);
@@ -648,11 +648,11 @@ export class RetardMaxRunner {
 
   private log(msg: string): void {
     const ts = new Date().toISOString().substring(11, 19);
-    const line = `[${ts}] [retardmax] ${msg}`;
+    const line = `[${ts}] [loopmax] ${msg}`;
     if (this.config.verbose) {
       console.log(line);
     }
-    logger.info(msg, { component: 'retardmax', loop: this.state.loop });
+    logger.info(msg, { component: 'loopmax', loop: this.state.loop });
   }
 }
 

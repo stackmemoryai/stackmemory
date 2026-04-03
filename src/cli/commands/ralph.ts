@@ -14,7 +14,7 @@ import { ralphDebugger } from '../../integrations/ralph/visualization/ralph-debu
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { trace } from '../../core/trace/index.js';
 import { SystemError, ErrorCode } from '../../core/errors/index.js';
-import { RetardMaxRunner } from '../../integrations/ralph/retardmax.js';
+import { LoopMaxRunner } from '../../integrations/ralph/loopmax.js';
 
 export function createRalphCommand(): Command {
   const ralph = new Command('ralph').description(
@@ -1378,9 +1378,9 @@ export function createRalphCommand(): Command {
       }
     );
 
-  // RetardMax mode — aggressive autonomous loop
+  // LoopMax mode — aggressive autonomous loop
   ralph
-    .command('retardmax')
+    .command('loopmax')
     .description(
       'Aggressive autonomous loop: no planning, just go until tests pass'
     )
@@ -1408,11 +1408,11 @@ export function createRalphCommand(): Command {
         }
       ) => {
         return trace.command(
-          'ralph-retardmax',
+          'ralph-loopmax',
           { task, ...options },
           async () => {
             try {
-              console.log('RETARDMAX MODE ACTIVATED');
+              console.log('LOOPMAX MODE ACTIVATED');
               console.log(`Task: ${task}`);
               console.log(`Criteria: ${options.criteria}`);
               console.log(
@@ -1421,7 +1421,7 @@ export function createRalphCommand(): Command {
               console.log(`Max loops: ${options.maxLoops || 'infinite'}`);
               console.log('');
 
-              const runner = new RetardMaxRunner({
+              const runner = new LoopMaxRunner({
                 task,
                 criteria: options.criteria,
                 useWorktree: options.worktree !== false,
@@ -1435,8 +1435,8 @@ export function createRalphCommand(): Command {
               await runner.run();
               await runner.cleanup();
             } catch (error: unknown) {
-              logger.error('RetardMax failed', error as Error);
-              console.error('RetardMax crashed:', (error as Error).message);
+              logger.error('LoopMax failed', error as Error);
+              console.error('LoopMax crashed:', (error as Error).message);
               process.exit(1);
             }
           }
