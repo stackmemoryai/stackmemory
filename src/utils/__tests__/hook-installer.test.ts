@@ -18,8 +18,8 @@ const HOOKS_DIR = path.join(os.homedir(), '.claude', 'hooks');
 
 describe('hook-installer', () => {
   describe('CANONICAL_HOOKS', () => {
-    it('defines all 11 hooks', () => {
-      expect(CANONICAL_HOOKS).toHaveLength(11);
+    it('defines all 12 hooks', () => {
+      expect(CANONICAL_HOOKS).toHaveLength(12);
       const names = CANONICAL_HOOKS.map((h) => h.scriptName);
       expect(names).toContain('session-rescue.sh');
       expect(names).toContain('stop-checkpoint.js');
@@ -32,13 +32,14 @@ describe('hook-installer', () => {
       expect(names).toContain('team-teammate-idle.js');
       expect(names).toContain('desire-path-trace.js');
       expect(names).toContain('daemon-auto-start.js');
+      expect(names).toContain('wiki-update.js');
     });
 
     it('core hooks are required, optional hooks are not', () => {
       const required = CANONICAL_HOOKS.filter((h) => h.required);
       const optional = CANONICAL_HOOKS.filter((h) => !h.required);
       expect(required).toHaveLength(5);
-      expect(optional).toHaveLength(6);
+      expect(optional).toHaveLength(7);
       const optionalNames = optional.map((h) => h.scriptName);
       expect(optionalNames).toContain('theory-capture.js');
       expect(optionalNames).toContain('team-subagent-stop.js');
@@ -46,6 +47,7 @@ describe('hook-installer', () => {
       expect(optionalNames).toContain('team-teammate-idle.js');
       expect(optionalNames).toContain('desire-path-trace.js');
       expect(optionalNames).toContain('daemon-auto-start.js');
+      expect(optionalNames).toContain('wiki-update.js');
     });
 
     it('js hooks have node commandPrefix', () => {
@@ -351,8 +353,8 @@ describe('hook-installer', () => {
         (g: { matcher?: string }) => !g.matcher
       );
       expect(matcherlessGroups).toHaveLength(1);
-      // 3 Stop hooks: session-rescue, stop-checkpoint, chime-on-stop
-      expect(matcherlessGroups[0].hooks).toHaveLength(3);
+      // 4 Stop hooks: session-rescue, stop-checkpoint, chime-on-stop, wiki-update
+      expect(matcherlessGroups[0].hooks).toHaveLength(4);
     });
   });
 
