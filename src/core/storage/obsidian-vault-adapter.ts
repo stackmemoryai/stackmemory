@@ -29,6 +29,7 @@ import { join } from 'path';
 import { logger } from '../monitoring/logger.js';
 import { frameLifecycleHooks } from '../context/frame-lifecycle-hooks.js';
 import type { Frame, Anchor, Event } from '../context/frame-types.js';
+import { WikiCompiler } from '../wiki/wiki-compiler.js';
 
 // ── Types ──
 
@@ -57,12 +58,19 @@ export interface IngestCallback {
 
 export class ObsidianVaultAdapter {
   private config: Required<ObsidianVaultConfig>;
-  private dirs: { root: string; frames: string; raw: string; sessions: string };
+  private dirs: {
+    root: string;
+    frames: string;
+    raw: string;
+    sessions: string;
+    wiki: string;
+  };
   private watcher: ReturnType<typeof watch> | null = null;
   private ingestCallback: IngestCallback | null = null;
   private seenRawFiles = new Set<string>();
   private unregisterCreate: (() => void) | null = null;
   private unregisterClose: (() => void) | null = null;
+  private wikiCompiler: WikiCompiler | null = null;
 
   constructor(config: ObsidianVaultConfig) {
     this.config = {
@@ -79,6 +87,7 @@ export class ObsidianVaultAdapter {
       frames: join(root, 'frames'),
       raw: join(root, 'raw'),
       sessions: join(root, 'sessions'),
+      wiki: join(root, 'wiki'),
     };
   }
 
@@ -110,6 +119,10 @@ export class ObsidianVaultAdapter {
         ].join('\n')
       );
     }
+
+    // Initialize wiki compiler
+    this.wikiCompiler = new WikiCompiler({ wikiDir: this.dirs.wiki });
+    await this.wikiCompiler.initialize();
 
     // Register frame lifecycle hooks
     this.unregisterCreate = frameLifecycleHooks.onFrameCreated(
@@ -434,6 +447,21 @@ export class ObsidianVaultAdapter {
 
         if (this.ingestCallback) {
           await this.ingestCallback(filename, content, metadata);
+        }
+
+        // Compile raw ingest into wiki articles
+        if (this.wikiCompiler) {
+          try {
+            await this.wikiCompiler.compileRawIngest(
+              filename,
+              content,
+              metadata
+            );
+          } catch (err) {
+            logger.debug('Wiki compile on raw ingest failed', {
+              error: (err as Error).message,
+            });
+          }
         }
 
         logger.info('Ingested raw file', {

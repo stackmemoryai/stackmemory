@@ -105,6 +105,13 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     commandPrefix: 'node',
     required: false,
   },
+  {
+    scriptName: 'wiki-update.js',
+    eventType: 'Stop',
+    timeout: 10,
+    commandPrefix: 'node',
+    required: false,
+  },
 ];
 
 /** Script names that should be removed from settings (dead/deprecated hooks) */
