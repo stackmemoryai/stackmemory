@@ -112,6 +112,14 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     commandPrefix: 'node',
     required: false,
   },
+  {
+    scriptName: 'doc-ingest.js',
+    eventType: 'PostToolUse',
+    matcher: 'WebFetch',
+    timeout: 15,
+    commandPrefix: 'node',
+    required: false,
+  },
 ];
 
 /** Script names that should be removed from settings (dead/deprecated hooks) */
