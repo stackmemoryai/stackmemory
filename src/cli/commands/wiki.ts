@@ -265,6 +265,54 @@ export function createWikiCommand(): Command {
       console.log(chalk.gray(`  Total articles:    ${result.totalArticles}`));
     });
 
+  // ── ingest ──
+  cmd
+    .command('ingest <source>')
+    .description('Ingest a URL or local path into the wiki')
+    .option('--wiki-dir <path>', 'Override wiki directory')
+    .option('-n, --max-pages <n>', 'Max pages to crawl for URLs', '20')
+    .option('--json', 'Output as JSON')
+    .action(async (source: string, options) => {
+      const compiler = getCompiler(options.wikiDir);
+      await compiler.initialize();
+
+      const isUrl =
+        source.startsWith('http://') || source.startsWith('https://');
+      let result;
+
+      if (isUrl) {
+        console.log(
+          chalk.cyan(`Crawling ${source} (max ${options.maxPages} pages)...`)
+        );
+        result = await compiler.ingestUrl(source, {
+          maxPages: parseInt(options.maxPages),
+        });
+      } else {
+        console.log(chalk.cyan(`Ingesting ${source}...`));
+        result = await compiler.ingestPath(source);
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      console.log(chalk.green('\nIngested.'));
+      console.log(chalk.gray(`  Articles created: ${result.created.length}`));
+      console.log(chalk.gray(`  Total articles:   ${result.totalArticles}`));
+      if (result.created.length > 0) {
+        console.log(chalk.gray('\n  Created:'));
+        result.created
+          .slice(0, 10)
+          .forEach((p) => console.log(chalk.gray(`    - ${p}`)));
+        if (result.created.length > 10) {
+          console.log(
+            chalk.gray(`    ...and ${result.created.length - 10} more`)
+          );
+        }
+      }
+    });
+
   // ── lint ──
   cmd
     .command('lint')

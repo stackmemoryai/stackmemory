@@ -383,6 +383,296 @@ export class WikiCompiler {
     };
   }
 
+  /**
+   * Ingest a URL — fetch page content, convert to markdown, compile into wiki.
+   * Supports single pages and basic site crawling (follows internal links up to maxPages).
+   */
+  async ingestUrl(
+    url: string,
+    opts?: { maxPages?: number; depth?: number }
+  ): Promise<CompileResult> {
+    const maxPages = opts?.maxPages ?? 20;
+    const created: string[] = [];
+    const visited = new Set<string>();
+    const queue = [url];
+    let baseHost: string;
+
+    try {
+      baseHost = new URL(url).hostname;
+    } catch {
+      return {
+        created: [],
+        updated: [],
+        totalArticles: this.countArticles(),
+        compiledAt: Date.now(),
+      };
+    }
+
+    while (queue.length > 0 && visited.size < maxPages) {
+      const pageUrl = queue.shift();
+      if (!pageUrl || visited.has(pageUrl)) continue;
+      visited.add(pageUrl);
+
+      try {
+        const { title, content, links } = await this.fetchPage(pageUrl);
+        if (!content || content.length < 50) continue;
+
+        // Create source article
+        const slug = this.slugify(title || this.urlToSlug(pageUrl));
+        const sourcePath = `sources/${slug}.md`;
+
+        const article = [
+          '---',
+          `title: "${this.escapeYaml(title || pageUrl)}"`,
+          `category: source`,
+          `url: "${pageUrl}"`,
+          `created: ${new Date().toISOString()}`,
+          `updated: ${new Date().toISOString()}`,
+          `tags: [source, web-ingest, ${baseHost}]`,
+          '---',
+          '',
+          `# ${title || pageUrl}`,
+          '',
+          `> Source: ${pageUrl}`,
+          '',
+          content.slice(0, 8000),
+          content.length > 8000 ? '\n\n_...truncated..._' : '',
+          '',
+        ].join('\n');
+
+        this.writeArticle(sourcePath, article);
+        created.push(sourcePath);
+
+        // Queue internal links
+        for (const link of links) {
+          try {
+            const parsed = new URL(link, pageUrl);
+            if (parsed.hostname === baseHost && !visited.has(parsed.href)) {
+              queue.push(parsed.href);
+            }
+          } catch {
+            // skip invalid URLs
+          }
+        }
+      } catch {
+        // skip failed pages
+      }
+    }
+
+    if (created.length > 0) {
+      this.updateIndex();
+      this.appendLog(
+        `## [${new Date().toISOString().slice(0, 10)}] ingest-url | ${baseHost}`,
+        `Crawled ${visited.size} pages from ${url} — ${created.length} articles created`
+      );
+    }
+
+    return {
+      created,
+      updated: [],
+      totalArticles: this.countArticles(),
+      compiledAt: Date.now(),
+    };
+  }
+
+  /**
+   * Ingest a local file or directory into the wiki.
+   */
+  async ingestPath(filePath: string): Promise<CompileResult> {
+    const created: string[] = [];
+    const { statSync } = await import('fs');
+    const stat = statSync(filePath);
+
+    const processFile = (fp: string) => {
+      if (!existsSync(fp)) return;
+      const content = readFileSync(fp, 'utf-8');
+      const basename = fp.split('/').pop() ?? fp;
+      const ext = basename.split('.').pop() ?? '';
+
+      if (
+        ![
+          'md',
+          'txt',
+          'json',
+          'yaml',
+          'yml',
+          'toml',
+          'ts',
+          'js',
+          'py',
+        ].includes(ext)
+      )
+        return;
+
+      const title = basename.replace(/\.[^.]+$/, '');
+      const slug = this.slugify(title);
+      const sourcePath = `sources/${slug}.md`;
+
+      const article = [
+        '---',
+        `title: "${this.escapeYaml(title)}"`,
+        `category: source`,
+        `source_file: "${fp}"`,
+        `created: ${new Date().toISOString()}`,
+        `updated: ${new Date().toISOString()}`,
+        `tags: [source, local-ingest]`,
+        '---',
+        '',
+        `# ${title}`,
+        '',
+        `> Source: \`${fp}\``,
+        '',
+        content.slice(0, 8000),
+        content.length > 8000 ? '\n\n_...truncated..._' : '',
+        '',
+      ].join('\n');
+
+      this.writeArticle(sourcePath, article);
+      created.push(sourcePath);
+    };
+
+    if (stat.isDirectory()) {
+      const entries = readdirSync(filePath, { recursive: true }) as string[];
+      for (const entry of entries) {
+        processFile(join(filePath, entry));
+      }
+    } else {
+      processFile(filePath);
+    }
+
+    if (created.length > 0) {
+      this.updateIndex();
+      this.appendLog(
+        `## [${new Date().toISOString().slice(0, 10)}] ingest-path | ${filePath}`,
+        `${created.length} articles from local path`
+      );
+    }
+
+    return {
+      created,
+      updated: [],
+      totalArticles: this.countArticles(),
+      compiledAt: Date.now(),
+    };
+  }
+
+  /** Fetch a web page and extract title, markdown content, and links */
+  private async fetchPage(
+    url: string
+  ): Promise<{ title: string; content: string; links: string[] }> {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'StackMemory-Wiki/1.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { title: '', content: '', links: [] };
+
+    const html = await res.text();
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch?.[1]?.trim() ?? '';
+
+    // Extract links
+    const links: string[] = [];
+    const linkRe = /href="([^"]+)"/g;
+    let linkMatch;
+    while ((linkMatch = linkRe.exec(html)) !== null) {
+      const href = linkMatch[1] ?? '';
+      if (
+        href &&
+        !href.startsWith('#') &&
+        !href.startsWith('javascript:') &&
+        !href.startsWith('mailto:')
+      ) {
+        links.push(href);
+      }
+    }
+
+    // Convert HTML to markdown (simple extraction)
+    const content = this.htmlToMarkdown(html);
+
+    return { title, content, links };
+  }
+
+  /** Simple HTML to markdown conversion */
+  private htmlToMarkdown(html: string): string {
+    let text = html;
+
+    // Remove script, style, nav, footer, header
+    text = text.replace(
+      /<(script|style|nav|footer|header|aside)[^>]*>[\s\S]*?<\/\1>/gi,
+      ''
+    );
+
+    // Extract main/article content if present
+    const mainMatch = text.match(
+      /<(?:main|article)[^>]*>([\s\S]*?)<\/(?:main|article)>/i
+    );
+    if (mainMatch) text = mainMatch[1] ?? text;
+
+    // Headings
+    text = text.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n');
+    text = text.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n');
+    text = text.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n');
+    text = text.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n#### $1\n');
+
+    // Paragraphs and line breaks
+    text = text.replace(/<p[^>]*>/gi, '\n');
+    text = text.replace(/<\/p>/gi, '\n');
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+
+    // Lists
+    text = text.replace(/<li[^>]*>/gi, '- ');
+    text = text.replace(/<\/li>/gi, '\n');
+
+    // Bold, italic
+    text = text.replace(
+      /<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi,
+      '**$1**'
+    );
+    text = text.replace(/<(?:em|i)[^>]*>([\s\S]*?)<\/(?:em|i)>/gi, '*$1*');
+
+    // Code
+    text = text.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
+    text = text.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '\n```\n$1\n```\n');
+
+    // Links
+    text = text.replace(
+      /<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+      '[$2]($1)'
+    );
+
+    // Strip remaining tags
+    text = text.replace(/<[^>]+>/g, '');
+
+    // Clean up entities
+    text = text.replace(/&amp;/g, '&');
+    text = text.replace(/&lt;/g, '<');
+    text = text.replace(/&gt;/g, '>');
+    text = text.replace(/&quot;/g, '"');
+    text = text.replace(/&#39;/g, "'");
+    text = text.replace(/&nbsp;/g, ' ');
+
+    // Clean up whitespace
+    text = text.replace(/\n{3,}/g, '\n\n');
+    text = text.trim();
+
+    return text;
+  }
+
+  /** Convert URL path to a readable slug */
+  private urlToSlug(url: string): string {
+    try {
+      const parsed = new URL(url);
+      const path = parsed.pathname.replace(/^\/|\/$/g, '');
+      return path
+        ? this.slugify(path.replace(/\//g, '-'))
+        : this.slugify(parsed.hostname);
+    } catch {
+      return this.slugify(url);
+    }
+  }
+
   /** Lint the wiki for health issues */
   async lint(): Promise<WikiLintResult> {
     const allArticles = this.listAllArticles();
