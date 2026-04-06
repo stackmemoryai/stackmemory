@@ -1,6 +1,6 @@
 {
   "name": "@stackmemoryai/stackmemory",
-  "version": "1.10.4",
+  "version": "1.10.5",
   "description": "Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, pre-flight overlap checks, Claude/Codex/OpenCode wrappers, Linear sync, and automatic hooks.",
   "engines": {
     "node": ">=20.0.0",
