@@ -736,18 +736,44 @@ export class Conductor {
     // Initialize Linear client
     this.client = await this.createLinearClient();
 
-    // Auto-detect team ID if not provided
-    if (!this.config.teamId && this.client) {
+    // Resolve team — name/key → UUID, or auto-detect if not provided
+    if (this.client) {
       try {
-        const team = await this.client.getTeam();
-        this.config.teamId = team.id;
-        logger.info('Auto-detected Linear team', {
-          id: team.id,
-          name: team.name,
-          key: team.key,
-        });
+        if (this.config.teamId) {
+          // Check if teamId is a UUID (skip resolution) or name/key (needs resolution)
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(this.config.teamId);
+          if (!isUuid) {
+            const teams = await this.client.getTeams();
+            const needle = this.config.teamId.toLowerCase();
+            const match = teams.find(
+              (t) =>
+                t.name.toLowerCase() === needle ||
+                t.key.toLowerCase() === needle
+            );
+            if (match) {
+              logger.info('Resolved team name to ID', {
+                name: this.config.teamId,
+                id: match.id,
+                key: match.key,
+              });
+              this.config.teamId = match.id;
+            } else {
+              logger.warn('Team not found by name/key, will try as ID', {
+                team: this.config.teamId,
+              });
+            }
+          }
+        } else {
+          const team = await this.client.getTeam();
+          this.config.teamId = team.id;
+          logger.info('Auto-detected Linear team', {
+            id: team.id,
+            name: team.name,
+            key: team.key,
+          });
+        }
       } catch (err) {
-        logger.warn('Failed to auto-detect team', {
+        logger.warn('Failed to resolve team', {
           error: (err as Error).message,
         });
       }
@@ -778,7 +804,9 @@ export class Conductor {
     try {
       await this.poll();
     } catch (err) {
-      logger.error('Initial poll failed', { error: (err as Error).message });
+      const e = err as Error;
+      logger.error('Initial poll failed', { error: e.message, stack: e.stack });
+      console.error(`[conductor] Initial poll failed: ${e.message}`);
     }
 
     // Schedule recurring polls
