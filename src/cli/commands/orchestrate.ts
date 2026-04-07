@@ -1312,6 +1312,7 @@ export function createConductorCommands(): Command {
     .description('Clean up completed/dead agents that conductor missed')
     .option('--dry-run', 'Show what would be done without doing it', false)
     .action(async (options) => {
+      const agentsDir = join(homedir(), '.stackmemory', 'conductor', 'agents');
       const statuses = scanAgentStatuses();
 
       // Find agents that are dead or stale (1 hour threshold for finalize)
