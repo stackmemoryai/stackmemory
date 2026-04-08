@@ -1185,15 +1185,14 @@ export class Conductor {
 
     const allCandidates: LinearIssue[] = [];
 
-    // Fetch issues for each active state
-    // Linear API filters by state type, but we need state name matching
-    // Use 'unstarted' type which covers Todo-like states
+    // Fetch issues with unstarted state type (covers Todo-like states)
+    // Then filter by exact state name match
     const issues = await this.client.getIssues({
       teamId: this.config.teamId,
+      stateType: 'unstarted',
       limit: 50,
     });
 
-    // Filter by active state names (case-insensitive, pre-computed)
     for (const issue of issues) {
       const stateName = issue.state.name.trim().toLowerCase();
       if (this.activeStatesLower.includes(stateName)) {
