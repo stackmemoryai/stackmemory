@@ -112,7 +112,7 @@ When adding or renaming GitHub Actions workflows that should be triggerable via 
 | Workflow | Script path | Category |
 |---|---|---|
 | `weekly-start.yml` | `voyager/scripts/content-brief.mjs` + `voyager/scripts/content-audit.mjs` + `ops/fathom-social-content.mjs` + `ops/fathom-testimonial-scan.mjs` + `ops/perplexity-citation-audit.mjs` + `commit/profound-aeo-pulse.mjs` + `voyager/scripts/generate-blog-scaffold.mjs` + `ops/ahrefs-firehose-digest.mjs` + `ops/export-dripify.mjs` + `commit/prospect-discovery.mjs` + `ops/repush-clay-leads.mjs` + `ops/snitcher-outreach.mjs` | GHA cron (Mon) |
-| `weekly-end.yml` | `diag/fathom-demo-scorecard.mjs` + `commit/feedback/collect-*.mjs` | GHA cron (Fri) |
+| `weekly-end.yml` | `diag/fathom-demo-scorecard.mjs` + `commit/feedback/collect-*.mjs` + `commit/feedback/collect-ops-feedback.mjs` + `diag/weekly-retro.mjs` | GHA cron (Fri) |
 | `anneal-keywords.yml` | `commit/anneal-keywords.mjs` | GHA cron (Sun) |
 | `g2-review-monitor.yml` | `ops/g2-to-senja.mjs` | GHA cron (Daily) |
 | `testimonial-pipeline.yml` | `commit/testimonial-pipeline.mjs` | Manual |

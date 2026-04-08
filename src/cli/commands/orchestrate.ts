@@ -2045,6 +2045,11 @@ export function createConductorCommands(): Command {
       '--no-pr',
       'Disable automatic GitHub PR creation after agent success'
     )
+    .option(
+      '--workspace-mode <mode>',
+      'Workspace mode: "auto" (detect GitButler), "gitbutler", or "worktree"',
+      'auto'
+    )
     .action(async (options) => {
       // Ensure default prompt template exists on first start
       ensureDefaultPromptTemplate();
@@ -2065,6 +2070,7 @@ export function createConductorCommands(): Command {
         agentMode: options.mode === 'adapter' ? 'adapter' : 'cli',
         model: options.model,
         autoPR: options.pr,
+        workspaceMode: options.workspaceMode,
       });
 
       await conductor.start();
