@@ -52,6 +52,7 @@ import { DiffMemHandlers } from './handlers/diffmem-handlers.js';
 import { GreptileHandlers } from './handlers/greptile-handlers.js';
 import { CordHandlers } from './handlers/cord-handlers.js';
 import { TeamHandlers } from './handlers/team-handlers.js';
+import { CrossSearchHandlers } from './handlers/cross-search-handlers.js';
 import { SQLiteAdapter } from '../../core/database/sqlite-adapter.js';
 import {
   generateChronologicalDigest,
@@ -59,6 +60,10 @@ import {
 } from '../../core/digest/chronological-digest.js';
 import { fuzzyEdit } from '../../utils/fuzzy-edit.js';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  resolveToolAlias,
+  resolveParamAliases,
+} from './tool-alias-registry.js';
 import {
   DEFAULT_PLANNER_MODEL,
   DEFAULT_IMPLEMENTER,
@@ -103,6 +108,7 @@ class LocalStackMemoryMCP {
     | null = null;
   private cordHandlers: CordHandlers | null = null;
   private teamHandlers: TeamHandlers | null = null;
+  private crossSearchHandlers: CrossSearchHandlers;
   private pendingPlans: Map<string, any> = new Map();
 
   constructor() {
@@ -202,6 +208,9 @@ class LocalStackMemoryMCP {
 
     // Initialize Greptile Handlers
     this.greptileHandlers = new GreptileHandlers();
+
+    // Initialize Cross-Project Search Handlers
+    this.crossSearchHandlers = new CrossSearchHandlers({});
 
     // Initialize Cord and Team Handlers (async - best effort)
     this.initCordTeamHandlers();
@@ -1427,6 +1436,79 @@ class LocalStackMemoryMCP {
                 required: ['period'],
               },
             },
+            // Cross-project search tools
+            {
+              name: 'sm_cross_search',
+              description:
+                'Search frames across all registered project databases using FTS5/BM25. Returns results ranked by relevance with source project attribution.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: {
+                    type: 'string',
+                    description: 'Search query (natural language or keywords)',
+                  },
+                  limit: {
+                    type: 'number',
+                    default: 20,
+                    description: 'Maximum results to return',
+                  },
+                  exclude_current: {
+                    type: 'boolean',
+                    default: false,
+                    description: 'Exclude the current project from results',
+                  },
+                },
+                required: ['query'],
+              },
+            },
+            {
+              name: 'sm_cross_discover',
+              description:
+                'Auto-discover project databases by scanning common directories for .stackmemory/context.db files.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  paths: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Custom directory paths to scan',
+                  },
+                },
+              },
+            },
+            {
+              name: 'sm_cross_register',
+              description:
+                'Manually register a project database for cross-project search.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  name: {
+                    type: 'string',
+                    description: 'Project display name',
+                  },
+                  path: {
+                    type: 'string',
+                    description: 'Project root directory path',
+                  },
+                  db_path: {
+                    type: 'string',
+                    description: 'Path to the SQLite context.db file',
+                  },
+                },
+                required: ['name', 'path', 'db_path'],
+              },
+            },
+            {
+              name: 'sm_cross_list',
+              description:
+                'List all project databases registered for cross-project search.',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+              },
+            },
           ],
         };
       }
@@ -1442,7 +1524,28 @@ class LocalStackMemoryMCP {
         }),
       }),
       async (request) => {
-        const { name, arguments: args } = request.params;
+        const { name: rawName, arguments: rawArgs } = request.params;
+
+        // Resolve tool name aliases (e.g., "sm_save" -> "save_context")
+        const aliasResolution = resolveToolAlias(rawName);
+        const name = aliasResolution.canonicalName;
+
+        // Resolve parameter aliases for the canonical tool
+        const paramResolution = resolveParamAliases(name, rawArgs);
+        const args = paramResolution.resolvedParams;
+
+        // Log alias resolution for observability
+        if (
+          aliasResolution.wasAlias ||
+          Object.keys(paramResolution.renames).length > 0
+        ) {
+          logger.debug('Tool alias resolved', {
+            originalTool: rawName,
+            canonicalTool: name,
+            paramRenames: paramResolution.renames,
+          });
+        }
+
         const callId = uuidv4();
         const startTime = Date.now();
 
@@ -1453,6 +1556,7 @@ class LocalStackMemoryMCP {
             tool_name: name,
             arguments: args,
             timestamp: startTime,
+            ...(aliasResolution.wasAlias ? { alias_from: rawName } : {}),
           });
         }
 
@@ -1828,6 +1932,22 @@ class LocalStackMemoryMCP {
 
             case 'sm_desire_paths':
               result = this.handleDesirePaths(args);
+              break;
+
+            case 'sm_cross_search':
+              result = await this.crossSearchHandlers.handleCrossSearch(args);
+              break;
+
+            case 'sm_cross_discover':
+              result = await this.crossSearchHandlers.handleCrossDiscover(args);
+              break;
+
+            case 'sm_cross_register':
+              result = await this.crossSearchHandlers.handleCrossRegister(args);
+              break;
+
+            case 'sm_cross_list':
+              result = await this.crossSearchHandlers.handleCrossList();
               break;
 
             default:

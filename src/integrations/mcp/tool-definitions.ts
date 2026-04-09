@@ -37,6 +37,7 @@ export class MCPToolDefinitions {
       ...this.getDigestTools(),
       ...this.getDesirePathTools(),
       ...this.getProvenantTools(),
+      ...this.getCrossSearchTools(),
     ];
   }
 
@@ -47,7 +48,8 @@ export class MCPToolDefinitions {
     return [
       {
         name: 'get_context',
-        description: 'Get current project context and active frame information',
+        description:
+          'Get current project context and active frame information. Aliases: context, get_ctx, sm_context, fetch_context',
         inputSchema: {
           type: 'object',
           properties: {
@@ -65,7 +67,8 @@ export class MCPToolDefinitions {
       },
       {
         name: 'add_decision',
-        description: 'Record a decision, constraint, or important information',
+        description:
+          'Record a decision, constraint, or important information. Aliases: record_decision, log_decision, save_decision',
         inputSchema: {
           type: 'object',
           properties: {
@@ -84,7 +87,8 @@ export class MCPToolDefinitions {
       },
       {
         name: 'start_frame',
-        description: 'Start a new frame (task/subtask) on the call stack',
+        description:
+          'Start a new frame (task/subtask) on the call stack. Aliases: push_frame, open_frame, begin_frame',
         inputSchema: {
           type: 'object',
           properties: {
@@ -193,7 +197,7 @@ export class MCPToolDefinitions {
     return [
       {
         name: 'create_task',
-        description: 'Create a new task',
+        description: 'Create a new task. Aliases: new_task, add_task, sm_task',
         inputSchema: {
           type: 'object',
           properties: {
@@ -257,7 +261,8 @@ export class MCPToolDefinitions {
       },
       {
         name: 'get_active_tasks',
-        description: 'Get active tasks with optional filtering',
+        description:
+          'Get active tasks with optional filtering. Aliases: list_tasks, tasks, sm_tasks, active_tasks',
         inputSchema: {
           type: 'object',
           properties: {
@@ -730,7 +735,7 @@ export class MCPToolDefinitions {
       {
         name: 'smart_context',
         description:
-          'LLM-driven context retrieval - intelligently selects relevant frames based on query',
+          'LLM-driven context retrieval - intelligently selects relevant frames based on query. Aliases: smart, sm_smart, intelligent_context',
         inputSchema: {
           type: 'object',
           properties: {
@@ -775,7 +780,7 @@ export class MCPToolDefinitions {
       {
         name: 'sm_discover',
         description:
-          'Discover relevant files based on current context. Extracts keywords from active frames and searches codebase for related files.',
+          'Discover relevant files based on current context. Extracts keywords from active frames and searches codebase for related files. Aliases: discover, sm_explore, explore',
         inputSchema: {
           type: 'object',
           properties: {
@@ -855,7 +860,7 @@ export class MCPToolDefinitions {
       {
         name: 'sm_search',
         description:
-          'Search across StackMemory context - frames, events, decisions, and tasks.',
+          'Search across StackMemory context - frames, events, decisions, and tasks. Aliases: search, context_search, sm_find, sm_context_search',
         inputSchema: {
           type: 'object',
           properties: {
@@ -889,7 +894,7 @@ export class MCPToolDefinitions {
       {
         name: 'sm_edit',
         description:
-          "Fuzzy file edit — fallback when Claude Code's Edit tool fails on whitespace or indentation mismatches. Uses four-tier matching: exact, whitespace-normalized, indentation-insensitive, and line-level fuzzy (Levenshtein).",
+          "Fuzzy file edit — fallback when Claude Code's Edit tool fails on whitespace or indentation mismatches. Uses four-tier matching: exact, whitespace-normalized, indentation-insensitive, and line-level fuzzy (Levenshtein). Aliases: fuzzy_edit, edit, sm_fuzzy_edit",
         inputSchema: {
           type: 'object',
           properties: {
@@ -1185,7 +1190,7 @@ export class MCPToolDefinitions {
       {
         name: 'delegate_to_model',
         description:
-          'Route a prompt to a specific provider/model. Uses smart cost-based routing by default.',
+          'Route a prompt to a specific provider/model. Uses smart cost-based routing by default. Aliases: delegate, route, send_to_model',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1271,7 +1276,7 @@ export class MCPToolDefinitions {
       {
         name: 'sm_digest',
         description:
-          'Generate a chronological activity digest for a time period',
+          'Generate a chronological activity digest for a time period. Aliases: digest, activity_digest, daily_digest',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1295,7 +1300,7 @@ export class MCPToolDefinitions {
       {
         name: 'sm_desire_paths',
         description:
-          'Analyze failed tool calls (desire paths) — what agents want but cannot get. Use mode "summary" for aggregated counts or "list" for recent failures.',
+          'Analyze failed tool calls (desire paths) — what agents want but cannot get. Use mode "summary" for aggregated counts or "list" for recent failures. Aliases: desire_paths, desires, failed_tools',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1427,7 +1432,7 @@ export class MCPToolDefinitions {
       {
         name: 'cord_spawn',
         description:
-          'Create a subtask with clean context (spawn). Child sees only its prompt and completed blocker results.',
+          'Create a subtask with clean context (spawn). Child sees only its prompt and completed blocker results. Aliases: spawn, subtask',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1554,7 +1559,7 @@ export class MCPToolDefinitions {
       {
         name: 'provenant_search',
         description:
-          'Search the decision graph for past decisions, patterns, and context by meaning',
+          'Search the decision graph for past decisions, patterns, and context by meaning. Aliases: decision_search, search_decisions',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1582,7 +1587,7 @@ export class MCPToolDefinitions {
       {
         name: 'provenant_log',
         description:
-          'Log a decision to the graph. Use when a product or technical decision is made during a session.',
+          'Log a decision to the graph. Use when a product or technical decision is made during a session. Aliases: decision_log, log_decision_graph',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1651,6 +1656,89 @@ export class MCPToolDefinitions {
   }
 
   /**
+   * Cross-project search tools
+   */
+  getCrossSearchTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'sm_cross_search',
+        description:
+          'Search frames across all registered project databases using FTS5/BM25. Returns results ranked by relevance with source project attribution.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search query (natural language or keywords)',
+            },
+            limit: {
+              type: 'number',
+              default: 20,
+              description: 'Maximum results to return',
+            },
+            exclude_current: {
+              type: 'boolean',
+              default: false,
+              description:
+                'Exclude the current project from results (useful when searching for external context)',
+            },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'sm_cross_discover',
+        description:
+          'Auto-discover project databases by scanning common directories for .stackmemory/context.db files.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            paths: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Custom directory paths to scan (defaults to ~/Dev, ~/Projects, etc.)',
+            },
+          },
+        },
+      },
+      {
+        name: 'sm_cross_register',
+        description:
+          'Manually register a project database for cross-project search.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Project display name',
+            },
+            path: {
+              type: 'string',
+              description: 'Project root directory path',
+            },
+            db_path: {
+              type: 'string',
+              description:
+                'Path to the SQLite context.db file (e.g. /path/to/project/.stackmemory/context.db)',
+            },
+          },
+          required: ['name', 'path', 'db_path'],
+        },
+      },
+      {
+        name: 'sm_cross_list',
+        description:
+          'List all project databases registered for cross-project search.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    ];
+  }
+
+  /**
    * Get tool definition by name
    */
   getToolDefinition(name: string): MCPToolDefinition | undefined {
@@ -1679,6 +1767,7 @@ export class MCPToolDefinitions {
       | 'cord'
       | 'digest'
       | 'provenant'
+      | 'cross_search'
   ): MCPToolDefinition[] {
     switch (category) {
       case 'context':
@@ -1716,6 +1805,8 @@ export class MCPToolDefinitions {
       case 'desire_paths':
         return this.getDesirePathTools();
       case 'provenant':
+        return this.getProvenantTools();
+      case 'cross_search':
         return this.getProvenantTools();
       default:
         return [];
