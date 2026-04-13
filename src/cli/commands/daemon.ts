@@ -140,6 +140,7 @@ The daemon provides:
           const services = [];
           if (newStatus.services.context.enabled) services.push('context');
           if (newStatus.services.linear.enabled) services.push('linear');
+          if (newStatus.services.github?.enabled) services.push('github');
           if (newStatus.services.maintenance?.enabled)
             services.push('maintenance');
           if (newStatus.services.memory?.enabled) services.push('memory');
@@ -300,6 +301,26 @@ The daemon provides:
         }
         if (lin.syncCount) {
           console.log(chalk.gray(`    Syncs: ${lin.syncCount}`));
+        }
+      }
+
+      const gh = status.services.github;
+      if (gh) {
+        console.log(
+          `  GitHub: ${gh.enabled ? chalk.green('Enabled') : chalk.gray('Disabled')}`
+        );
+        if (gh.enabled) {
+          console.log(
+            chalk.gray(`    Interval: ${config.github.interval} min`)
+          );
+          if (gh.syncCount) {
+            console.log(chalk.gray(`    Refreshes: ${gh.syncCount}`));
+          }
+          if (gh.lastProjectionState) {
+            console.log(
+              chalk.gray(`    Last PR state: ${gh.lastProjectionState}`)
+            );
+          }
         }
       }
 
@@ -844,6 +865,27 @@ function getServiceHealthChecks(
     });
   }
 
+  const gh = status.services.github;
+  if (gh?.enabled) {
+    const intervalMs = config.github.interval * 60_000;
+    const overdue = gh.lastRun
+      ? Date.now() - gh.lastRun > intervalMs * 2
+      : false;
+    checks.push({
+      name: 'GitHub Service',
+      status: overdue ? 'warn' : 'ok',
+      detail: gh.lastRun
+        ? `Last refresh: ${formatTimeAgo(gh.lastRun)} | Refreshes: ${gh.syncCount ?? 0}${gh.lastProjectionState ? ` | Last PR state: ${gh.lastProjectionState}` : ''}`
+        : `Enabled (interval: ${config.github.interval}m) | No refreshes yet`,
+    });
+  } else {
+    checks.push({
+      name: 'GitHub Service',
+      status: 'ok',
+      detail: 'Disabled',
+    });
+  }
+
   // Maintenance service
   const maint = status.services.maintenance;
   if (maint?.enabled) {
@@ -979,6 +1021,11 @@ function buildHealthReport(
       key: 'linear',
       enabled: status.services.linear.enabled,
       lastRun: status.services.linear.lastRun,
+    },
+    {
+      key: 'github',
+      enabled: status.services.github?.enabled ?? false,
+      lastRun: status.services.github?.lastRun,
     },
     {
       key: 'maintenance',

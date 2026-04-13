@@ -26,6 +26,7 @@ import {
 } from './daemon-config.js';
 import { DaemonContextService } from './services/context-service.js';
 import { DaemonLinearService } from './services/linear-service.js';
+import { DaemonGitHubService } from './services/github-service.js';
 import { DaemonMaintenanceService } from './services/maintenance-service.js';
 import { DaemonMemoryService } from './services/memory-service.js';
 
@@ -42,6 +43,7 @@ export class UnifiedDaemon {
   private paths: ReturnType<typeof getDaemonPaths>;
   private contextService: DaemonContextService;
   private linearService: DaemonLinearService;
+  private githubService: DaemonGitHubService;
   private maintenanceService: DaemonMaintenanceService;
   private memoryService: DaemonMemoryService;
   private heartbeatInterval?: NodeJS.Timeout;
@@ -61,6 +63,11 @@ export class UnifiedDaemon {
     this.linearService = new DaemonLinearService(
       this.config.linear,
       (level, msg, data) => this.log(level, 'linear', msg, data)
+    );
+
+    this.githubService = new DaemonGitHubService(
+      this.config.github,
+      (level, msg, data) => this.log(level, 'github', msg, data)
     );
 
     this.maintenanceService = new DaemonMaintenanceService(
@@ -142,6 +149,7 @@ export class UnifiedDaemon {
   private updateStatus(): void {
     const maintenanceState = this.maintenanceService.getState();
     const memoryState = this.memoryService.getState();
+    const githubState = this.githubService.getState();
     const status: DaemonStatus = {
       running: true,
       pid: process.pid,
@@ -157,6 +165,12 @@ export class UnifiedDaemon {
           enabled: this.config.linear.enabled,
           lastRun: this.linearService.getState().lastSyncTime || undefined,
           syncCount: this.linearService.getState().syncCount,
+        },
+        github: {
+          enabled: this.config.github.enabled,
+          lastRun: githubState.lastSyncTime || undefined,
+          syncCount: githubState.syncCount,
+          lastProjectionState: githubState.lastProjectionState,
         },
         maintenance: {
           enabled: this.config.maintenance.enabled,
@@ -180,6 +194,7 @@ export class UnifiedDaemon {
       errors: [
         ...this.contextService.getState().errors.slice(-5),
         ...this.linearService.getState().errors.slice(-5),
+        ...githubState.errors.slice(-5),
         ...maintenanceState.errors.slice(-5),
         ...memoryState.errors.slice(-5),
       ],
@@ -240,6 +255,12 @@ export class UnifiedDaemon {
           enabled: false,
           syncCount: this.linearService.getState().syncCount,
         },
+        github: {
+          enabled: false,
+          syncCount: this.githubService.getState().syncCount,
+          lastProjectionState:
+            this.githubService.getState().lastProjectionState,
+        },
         maintenance: {
           enabled: false,
           staleFramesCleaned:
@@ -266,6 +287,7 @@ export class UnifiedDaemon {
       uptime: Date.now() - this.startTime,
       contextSaves: this.contextService.getState().saveCount,
       linearSyncs: this.linearService.getState().syncCount,
+      githubSyncs: this.githubService.getState().syncCount,
       maintenanceRuns: this.maintenanceService.getState().ftsRebuilds,
       memoryTriggers: this.memoryService.getState().triggerCount,
     });
@@ -279,6 +301,7 @@ export class UnifiedDaemon {
     // Stop services
     this.contextService.stop();
     this.linearService.stop();
+    this.githubService.stop();
     this.maintenanceService.stop();
     this.memoryService.stop();
 
@@ -312,6 +335,7 @@ export class UnifiedDaemon {
       config: {
         context: this.config.context.enabled,
         linear: this.config.linear.enabled,
+        github: this.config.github.enabled,
         maintenance: this.config.maintenance.enabled,
         memory: this.config.memory.enabled,
         fileWatch: this.config.fileWatch.enabled,
@@ -321,6 +345,7 @@ export class UnifiedDaemon {
     // Start services
     this.contextService.start();
     await this.linearService.start();
+    await this.githubService.start();
     this.maintenanceService.start();
     this.memoryService.start();
 
@@ -336,6 +361,7 @@ export class UnifiedDaemon {
   getStatus(): DaemonStatus {
     const maintenanceState = this.maintenanceService.getState();
     const memoryState = this.memoryService.getState();
+    const githubState = this.githubService.getState();
     return {
       running: !this.isShuttingDown,
       pid: process.pid,
@@ -351,6 +377,12 @@ export class UnifiedDaemon {
           enabled: this.config.linear.enabled,
           lastRun: this.linearService.getState().lastSyncTime || undefined,
           syncCount: this.linearService.getState().syncCount,
+        },
+        github: {
+          enabled: this.config.github.enabled,
+          lastRun: githubState.lastSyncTime || undefined,
+          syncCount: githubState.syncCount,
+          lastProjectionState: githubState.lastProjectionState,
         },
         maintenance: {
           enabled: this.config.maintenance.enabled,

@@ -65,6 +65,7 @@ export interface DaemonConfig {
   version: string;
   context: ContextServiceConfig;
   linear: LinearServiceConfig;
+  github: DaemonServiceConfig;
   maintenance: MaintenanceServiceConfig;
   memory: MemoryServiceConfig;
   fileWatch: FileWatchConfig;
@@ -86,6 +87,10 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     quietHours: { start: 22, end: 7 },
     retryAttempts: 3,
     retryDelay: 30000,
+  },
+  github: {
+    enabled: false,
+    interval: 5,
   },
   maintenance: {
     enabled: true,
@@ -124,6 +129,12 @@ export interface DaemonStatus {
   services: {
     context: { enabled: boolean; lastRun?: number; saveCount?: number };
     linear: { enabled: boolean; lastRun?: number; syncCount?: number };
+    github: {
+      enabled: boolean;
+      lastRun?: number;
+      syncCount?: number;
+      lastProjectionState?: string;
+    };
     maintenance: {
       enabled: boolean;
       lastRun?: number;
@@ -200,6 +211,7 @@ export function loadDaemonConfig(): DaemonConfig {
       ...config,
       context: { ...DEFAULT_DAEMON_CONFIG.context, ...config.context },
       linear: { ...DEFAULT_DAEMON_CONFIG.linear, ...config.linear },
+      github: { ...DEFAULT_DAEMON_CONFIG.github, ...config.github },
       maintenance: {
         ...DEFAULT_DAEMON_CONFIG.maintenance,
         ...config.maintenance,
@@ -223,6 +235,7 @@ export function saveDaemonConfig(config: Partial<DaemonConfig>): void {
     ...config,
     context: { ...currentConfig.context, ...config.context },
     linear: { ...currentConfig.linear, ...config.linear },
+    github: { ...currentConfig.github, ...config.github },
     maintenance: { ...currentConfig.maintenance, ...config.maintenance },
     memory: { ...currentConfig.memory, ...config.memory },
     fileWatch: { ...currentConfig.fileWatch, ...config.fileWatch },
@@ -241,6 +254,7 @@ export function readDaemonStatus(): DaemonStatus {
     services: {
       context: { enabled: false },
       linear: { enabled: false },
+      github: { enabled: false },
       maintenance: { enabled: false },
       memory: { enabled: false },
       fileWatch: { enabled: false },

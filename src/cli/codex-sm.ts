@@ -13,6 +13,10 @@ import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
+import {
+  canonicalStateStore,
+  projectIdFromIdentifier,
+} from '../core/shared-state/canonical-store.js';
 
 interface CodexConfig {
   instanceId: string;
@@ -29,6 +33,9 @@ interface CodexConfig {
 class CodexSM {
   private config: CodexConfig;
   private stackmemoryPath: string;
+  private sessionId: string;
+  private ownsSession: boolean;
+  private sessionEnded: boolean;
 
   constructor() {
     this.config = {
@@ -40,6 +47,9 @@ class CodexSM {
     };
 
     this.stackmemoryPath = this.findStackMemory();
+    this.sessionId = process.env['STACKMEMORY_SESSION'] || uuidv4();
+    this.ownsSession = !process.env['STACKMEMORY_SESSION'];
+    this.sessionEnded = false;
   }
 
   private getRepoRoot(): string | null {
@@ -111,6 +121,24 @@ class CodexSM {
     } catch {
       return 'main';
     }
+  }
+
+  private getProjectId(): string | undefined {
+    const root = this.getRepoRoot() || process.cwd();
+
+    try {
+      const remote = execSync('git config --get remote.origin.url', {
+        cwd: root,
+        encoding: 'utf8',
+      }).trim();
+      if (remote) {
+        return projectIdFromIdentifier(remote);
+      }
+    } catch {
+      // Fall back to current path below.
+    }
+
+    return projectIdFromIdentifier(root);
   }
 
   private hasUncommittedChanges(): boolean {
@@ -220,18 +248,17 @@ class CodexSM {
     if (!this.config.contextEnabled) return;
     try {
       console.log(chalk.blue('📚 Loading previous context...'));
-      const cmd = `${this.stackmemoryPath} context list --limit 5 --format json`;
-      const output = execSync(cmd, { encoding: 'utf8' });
-      const contexts = JSON.parse(output);
-      if (Array.isArray(contexts) && contexts.length > 0) {
-        console.log(chalk.gray('Recent context loaded:'));
-        contexts.forEach(
-          (ctx: { message: string; metadata?: { timestamp?: string } }) => {
-            console.log(
-              chalk.gray(`  - ${ctx.message} (${ctx.metadata?.timestamp})`)
-            );
-          }
-        );
+      const cmd = `${this.stackmemoryPath} context show`;
+      const output = execSync(cmd, {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const lines = output
+        .trim()
+        .split('\n')
+        .filter((line) => line.trim());
+      if (lines.length > 3) {
+        console.log(chalk.gray('Context stack loaded'));
       }
     } catch {
       // ignore
@@ -244,6 +271,111 @@ class CodexSM {
       console.log(
         chalk.gray('   Consider using --worktree to work in isolation')
       );
+    }
+  }
+
+  private async publishSessionStart(): Promise<void> {
+    const projectPath = process.cwd();
+    const projectId = this.getProjectId();
+    const branch = this.isGitRepo() ? this.getCurrentBranch() : undefined;
+
+    await canonicalStateStore.upsertSession({
+      sessionId: this.sessionId,
+      tool: 'codex',
+      projectId,
+      projectPath,
+      branch,
+      instanceId: this.config.instanceId,
+      metadata: {
+        task: this.config.task,
+      },
+    });
+
+    await canonicalStateStore.upsertInstance({
+      instanceId: this.config.instanceId,
+      tool: 'codex',
+      sessionId: this.sessionId,
+      projectId,
+      projectPath,
+      branch,
+      worktreePath: this.config.worktreePath,
+      pid: process.pid,
+      status: 'active',
+      metadata: {
+        task: this.config.task,
+      },
+    });
+
+    await canonicalStateStore.appendEvent({
+      type: 'session_start',
+      tool: 'codex',
+      sessionId: this.sessionId,
+      instanceId: this.config.instanceId,
+      projectId,
+      projectPath,
+      branch,
+      payload: {
+        task: this.config.task,
+        worktreePath: this.config.worktreePath,
+      },
+    });
+
+    const claimResult = await canonicalStateStore.claimPaths({
+      tool: 'codex',
+      sessionId: this.sessionId,
+      instanceId: this.config.instanceId,
+      projectId,
+      projectPath,
+      branch,
+      paths: [],
+      metadata: {
+        task: this.config.task,
+        scope: 'branch',
+      },
+    });
+
+    if (claimResult.conflicts.length > 0) {
+      console.log(chalk.yellow('⚠️  Shared state conflict detected'));
+      for (const conflict of claimResult.conflicts.slice(0, 3)) {
+        console.log(
+          chalk.gray(
+            `   Claim ${conflict.claimId.slice(0, 8)} already owns ${conflict.branch || 'overlapping work'}`
+          )
+        );
+      }
+    }
+  }
+
+  private async publishSessionEnd(
+    eventType: 'session_end' | 'session_interrupt' | 'session_terminate',
+    payload: Record<string, unknown> = {}
+  ): Promise<void> {
+    if (this.sessionEnded) {
+      return;
+    }
+    this.sessionEnded = true;
+
+    const projectPath = process.cwd();
+    const projectId = this.getProjectId();
+    const branch = this.isGitRepo() ? this.getCurrentBranch() : undefined;
+
+    await canonicalStateStore.appendEvent({
+      type: eventType,
+      tool: 'codex',
+      sessionId: this.sessionId,
+      instanceId: this.config.instanceId,
+      projectId,
+      projectPath,
+      branch,
+      payload,
+    });
+    await canonicalStateStore.releaseClaims({
+      instanceId: this.config.instanceId,
+      reason: eventType,
+    });
+    await canonicalStateStore.endInstance(this.config.instanceId);
+    if (this.ownsSession) {
+      await canonicalStateStore.endSession(this.sessionId);
     }
   }
 
@@ -350,10 +482,13 @@ class CodexSM {
     this.loadContext();
 
     process.env['CODEX_INSTANCE_ID'] = this.config.instanceId;
+    process.env['STACKMEMORY_SESSION'] = this.sessionId;
     if (this.config.worktreePath)
       process.env['CODEX_WORKTREE_PATH'] = this.config.worktreePath;
+    await this.publishSessionStart();
 
     console.log(chalk.gray(`🤖 Instance ID: ${this.config.instanceId}`));
+    console.log(chalk.gray(`🧠 Session ID: ${this.sessionId.slice(0, 8)}`));
     console.log(chalk.gray(`📁 Working in: ${process.cwd()}`));
 
     console.log();
@@ -401,9 +536,12 @@ class CodexSM {
       process.exit(1);
     });
 
-    child.on('exit', (code) => {
+    child.on('exit', async (code) => {
       this.saveContext('Codex session ended', {
         action: 'session_end',
+        exitCode: code,
+      });
+      await this.publishSessionEnd('session_end', {
         exitCode: code,
       });
 
@@ -434,17 +572,19 @@ class CodexSM {
       process.exit(code || 0);
     });
 
-    process.on('SIGINT', () => {
+    process.on('SIGINT', async () => {
       this.saveContext('Codex session interrupted', {
         action: 'session_interrupt',
       });
+      await this.publishSessionEnd('session_interrupt');
       child.kill('SIGINT');
     });
 
-    process.on('SIGTERM', () => {
+    process.on('SIGTERM', async () => {
       this.saveContext('Codex session terminated', {
         action: 'session_terminate',
       });
+      await this.publishSessionEnd('session_terminate');
       child.kill('SIGTERM');
     });
   }
