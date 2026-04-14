@@ -13,6 +13,12 @@ import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
+import { resolveRealCliBin } from './utils/real-cli-bin.js';
+import {
+  type DeterminismWatcherHandle,
+  startDeterminismWatcher,
+  stopDeterminismWatcher,
+} from './utils/determinism-watcher.js';
 import {
   canonicalStateStore,
   projectIdFromIdentifier,
@@ -36,6 +42,7 @@ class CodexSM {
   private sessionId: string;
   private ownsSession: boolean;
   private sessionEnded: boolean;
+  private determinismWatcher: DeterminismWatcherHandle | null;
 
   constructor() {
     this.config = {
@@ -50,6 +57,7 @@ class CodexSM {
     this.sessionId = process.env['STACKMEMORY_SESSION'] || uuidv4();
     this.ownsSession = !process.env['STACKMEMORY_SESSION'];
     this.sessionEnded = false;
+    this.determinismWatcher = null;
   }
 
   private getRepoRoot(): string | null {
@@ -151,25 +159,26 @@ class CodexSM {
   }
 
   private resolveCodexBin(): string | null {
-    // 1) CLI option
-    if (this.config.codexBin && this.config.codexBin.trim()) {
-      return this.config.codexBin.trim();
-    }
-    // 2) Environment override
-    const envBin = process.env['CODEX_BIN'];
-    if (envBin && envBin.trim()) {
-      return envBin.trim();
-    }
-    // 3) Detect on PATH
-    try {
-      execSync('which codex', { stdio: 'ignore' });
-      return 'codex';
-    } catch {}
-    try {
-      execSync('which codex-cli', { stdio: 'ignore' });
-      return 'codex-cli';
-    } catch {}
-    return null;
+    return resolveRealCliBin({
+      explicitBin: this.config.codexBin,
+      envBin: process.env['CODEX_BIN'],
+      preferredPaths: [
+        path.join(
+          os.homedir(),
+          '.nvm',
+          'versions',
+          'node',
+          'v22.22.0',
+          'bin',
+          'codex'
+        ),
+        '/usr/local/bin/codex',
+        '/opt/homebrew/bin/codex',
+        '/usr/local/bin/codex-cli',
+        '/opt/homebrew/bin/codex-cli',
+      ],
+      pathCommands: ['codex', 'codex-cli'],
+    });
   }
 
   private setupWorktree(): string | null {
@@ -379,6 +388,30 @@ class CodexSM {
     }
   }
 
+  private startDeterminismWatcher(): void {
+    this.determinismWatcher = startDeterminismWatcher({
+      stackmemoryBin: this.stackmemoryPath,
+      cwd: process.cwd(),
+      task: this.config.task,
+      instanceId: this.config.instanceId,
+      sessionId: this.sessionId,
+      tool: 'codex',
+    });
+
+    if (this.determinismWatcher) {
+      const modeLabel =
+        this.determinismWatcher.mode === 'targeted'
+          ? 'targeted'
+          : 'repo-root fallback';
+      console.log(chalk.gray(`🧪 Determinism: ${modeLabel}`));
+    }
+  }
+
+  private stopDeterminismWatcher(): void {
+    stopDeterminismWatcher(this.determinismWatcher);
+    this.determinismWatcher = null;
+  }
+
   public async run(args: string[]): Promise<void> {
     const codexArgs: string[] = [];
     let i = 0;
@@ -486,6 +519,7 @@ class CodexSM {
     if (this.config.worktreePath)
       process.env['CODEX_WORKTREE_PATH'] = this.config.worktreePath;
     await this.publishSessionStart();
+    this.startDeterminismWatcher();
 
     console.log(chalk.gray(`🤖 Instance ID: ${this.config.instanceId}`));
     console.log(chalk.gray(`🧠 Session ID: ${this.sessionId.slice(0, 8)}`));
@@ -537,6 +571,7 @@ class CodexSM {
     });
 
     child.on('exit', async (code) => {
+      this.stopDeterminismWatcher();
       this.saveContext('Codex session ended', {
         action: 'session_end',
         exitCode: code,
@@ -573,6 +608,7 @@ class CodexSM {
     });
 
     process.on('SIGINT', async () => {
+      this.stopDeterminismWatcher();
       this.saveContext('Codex session interrupted', {
         action: 'session_interrupt',
       });
@@ -581,6 +617,7 @@ class CodexSM {
     });
 
     process.on('SIGTERM', async () => {
+      this.stopDeterminismWatcher();
       this.saveContext('Codex session terminated', {
         action: 'session_terminate',
       });

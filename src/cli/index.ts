@@ -7,6 +7,12 @@
 // Set environment flag for CLI usage to skip async context bridge
 process.env['STACKMEMORY_CLI'] = 'true';
 
+// Machine-readable CLI output should not be prefixed by INFO banners unless
+// the caller explicitly opted into a log level.
+if (!process.env['STACKMEMORY_LOG_LEVEL'] && process.argv.includes('--json')) {
+  process.env['STACKMEMORY_LOG_LEVEL'] = 'ERROR';
+}
+
 // Load environment variables (quiet mode to suppress logging)
 import { config as loadDotenv } from 'dotenv';
 loadDotenv({ quiet: true });
@@ -878,6 +884,11 @@ program
   .option('--audit-dir <path>', 'Persist spike results to directory')
   .option('--record-frame', 'Record as real frame with anchors', false)
   .option('--record', 'Record plan & critique into StackMemory context', false)
+  .option(
+    '--deterministic-fixture',
+    'Use deterministic fixture planner/critic for replayable smoke runs',
+    false
+  )
   .option('--json', 'Emit single JSON result (UI-friendly)', false)
   .option('--quiet', 'Minimal output (default)', true)
   .option('--verbose', 'Verbose sectioned output', false)
@@ -904,6 +915,7 @@ program
           auditDir: opts.auditDir,
           recordFrame: Boolean(opts.recordFrame),
           record: Boolean(opts.record),
+          deterministicFixture: Boolean(opts.deterministicFixture),
         }
       );
 
@@ -978,6 +990,10 @@ program
   .option('--audit-dir <path>', 'Persist spike results to directory')
   .option('--record-frame', 'Record as real frame with anchors')
   .option('--record', 'Record plan & critique into StackMemory context')
+  .option(
+    '--deterministic-fixture',
+    'Use deterministic fixture planner/critic for replayable smoke runs'
+  )
   .option('--json', 'Emit single JSON result (UI-friendly)')
   .option('--quiet', 'Minimal output')
   .option('--verbose', 'Verbose sectioned output')
@@ -1032,6 +1048,7 @@ program
           auditDir: opts.auditDir,
           recordFrame: Boolean(opts.recordFrame),
           record: Boolean(opts.record),
+          deterministicFixture: Boolean(opts.deterministicFixture),
         }
       );
 

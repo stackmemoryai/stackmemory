@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import {
@@ -18,6 +19,16 @@ import {
   feedbackLoops,
   _DEFAULT_CONFIG,
 } from '../../core/monitoring/feedback-loops.js';
+import {
+  DETERMINISM_WATCH_IGNORE,
+  DETERMINISM_WATCH_PATTERNS,
+  getDeterminismWatchTargets,
+  persistDeterminismReport,
+  readLatestDeterminismReport,
+  runDeterminismSmoke,
+  type DeterminismReport,
+  type StoredDeterminismReport,
+} from '../../orchestrators/multimodal/determinism.js';
 
 function loadRunMetrics(projectRoot: string): HarnessRunMetrics[] {
   const metricsFile = join(
@@ -64,6 +75,66 @@ function loadSpikeAudits(
       }
     })
     .filter(Boolean) as Array<{ file: string; data: any }>;
+}
+
+function printDeterminismReport(
+  task: string,
+  requestedRuns: number,
+  report: DeterminismReport
+): void {
+  console.log('\nHarness Determinism Smoke');
+  console.log('═'.repeat(60));
+  console.log(`Task:                 ${task}`);
+  console.log(`Runs:                 ${report.runs}`);
+  console.log(`Determinism score:    ${report.score.toFixed(2)}/100`);
+
+  console.log('\nDimension Scores:');
+  for (const dimension of report.dimensions) {
+    console.log(
+      `  ${dimension.name.padEnd(14)} ${dimension.score.toFixed(2).padStart(6)}/100  ${dimension.details}`
+    );
+  }
+
+  if (report.recommendations.length > 0) {
+    console.log('\nRecommended Tightening:');
+    for (const recommendation of report.recommendations) {
+      console.log(`  - ${recommendation}`);
+    }
+  } else {
+    console.log('\nNo drift detected in deterministic fixture mode.');
+  }
+
+  const sample = report.snapshots[0];
+  if (sample) {
+    console.log('\nReference Snapshot:');
+    console.log(`  resultHash:         ${sample.resultHash.slice(0, 16)}`);
+    console.log(`  planHash:           ${sample.planHash.slice(0, 16)}`);
+    console.log(`  critiqueHash:       ${sample.critiqueHash.slice(0, 16)}`);
+    console.log(`  commandsHash:       ${sample.commandsHash.slice(0, 16)}`);
+    console.log(`  iterations:         ${sample.iterations}`);
+    console.log(`  contextTokens:      ${sample.contextTokens}`);
+  }
+
+  if (report.runs !== requestedRuns) {
+    console.log(
+      `\nNote: requested ${requestedRuns} runs, completed ${report.runs}.`
+    );
+  }
+
+  console.log('');
+}
+
+function printStoredDeterminismReport(stored: StoredDeterminismReport): void {
+  console.log('\nCached Determinism Result');
+  console.log('═'.repeat(60));
+  console.log(`Task:                 ${stored.task}`);
+  console.log(`Trigger:              ${stored.trigger}`);
+  console.log(`Timestamp:            ${stored.timestamp}`);
+  console.log(`Determinism score:    ${stored.report.score.toFixed(2)}/100`);
+  if (stored.changedPaths.length > 0) {
+    console.log(`Changed paths:        ${stored.changedPaths.join(', ')}`);
+  }
+  console.log('');
 }
 
 export function createBenchCommand(): Command {
@@ -245,15 +316,201 @@ export function createBenchCommand(): Command {
 
   // Sub-command: bench loops
   bench
+    .command('determinism')
+    .description(
+      'Run deterministic fixture smoke checks for the multimodal harness'
+    )
+    .option(
+      '-t, --task <desc>',
+      'Task description to run through the harness',
+      'Add a small auth guard'
+    )
+    .option('--runs <n>', 'Number of repeated runs', '5')
+    .option(
+      '--planner-model <name>',
+      'Planner model label to include in the run config',
+      'claude-sonnet-4-20250514'
+    )
+    .option(
+      '--reviewer-model <name>',
+      'Reviewer model label to include in the run config',
+      'claude-sonnet-4-20250514'
+    )
+    .option('--implementer <name>', 'codex|claude', 'codex')
+    .option('--max-iters <n>', 'Retry loop iterations', '2')
+    .option(
+      '--watch',
+      'Watch harness-critical files and rerun on changes',
+      false
+    )
+    .option(
+      '--debounce-ms <n>',
+      'Debounce window for write completion in watch mode',
+      '3000'
+    )
+    .option('--latest', 'Show the latest cached determinism result', false)
+    .option('--json', 'Output as JSON', false)
+    .action(async function () {
+      const command = this as Command;
+      const options = command.opts();
+      const json = Boolean(options.json || command.parent?.opts().json);
+      const projectRoot = process.cwd();
+      const runs = Math.max(1, parseInt(options.runs, 10) || 5);
+      const debounceMs = Math.max(
+        250,
+        parseInt(options.debounceMs, 10) || 3000
+      );
+
+      if (options.latest) {
+        const stored = readLatestDeterminismReport(projectRoot);
+        if (!stored) {
+          console.error('No cached determinism result found.');
+          process.exitCode = 1;
+          return;
+        }
+
+        if (json) {
+          console.log(JSON.stringify(stored, null, 2));
+          return;
+        }
+
+        printStoredDeterminismReport(stored);
+        return;
+      }
+
+      const runCheck = async (
+        trigger: string,
+        changedPaths: string[] = []
+      ): Promise<StoredDeterminismReport> => {
+        const report = await runDeterminismSmoke(
+          {
+            task: options.task,
+            repoPath: projectRoot,
+          },
+          {
+            runs,
+            plannerModel: options.plannerModel,
+            reviewerModel: options.reviewerModel,
+            implementer: options.implementer,
+            maxIters: parseInt(options.maxIters, 10) || 2,
+          }
+        );
+
+        const stored = persistDeterminismReport(projectRoot, report, {
+          task: options.task,
+          trigger,
+          changedPaths,
+        });
+
+        if (json) {
+          console.log(JSON.stringify(stored, null, 2));
+        } else {
+          printDeterminismReport(options.task, runs, report);
+        }
+
+        return stored;
+      };
+
+      if (options.watch) {
+        const chokidar = await import('chokidar');
+        const watchTargets = getDeterminismWatchTargets(projectRoot);
+        const watchPatterns = watchTargets.map((pattern) =>
+          join(projectRoot, pattern)
+        );
+        const watcher = chokidar.watch(watchPatterns, {
+          ignoreInitial: true,
+          ignored: DETERMINISM_WATCH_IGNORE.map((pattern) =>
+            join(projectRoot, pattern)
+          ),
+          awaitWriteFinish: {
+            stabilityThreshold: debounceMs,
+            pollInterval: 100,
+          },
+        });
+
+        let running = false;
+        let rerunRequested = false;
+        const pendingPaths = new Set<string>();
+
+        const maybeRun = async (trigger: string) => {
+          if (running) {
+            rerunRequested = true;
+            return;
+          }
+
+          running = true;
+          const changedPaths = Array.from(pendingPaths).sort();
+          pendingPaths.clear();
+
+          try {
+            await runCheck(trigger, changedPaths);
+          } finally {
+            running = false;
+            if (rerunRequested) {
+              rerunRequested = false;
+              await maybeRun('watch:debounced-rerun');
+            }
+          }
+        };
+
+        const onFileEvent = async (trigger: string, filePath: string) => {
+          const relativePath = filePath.startsWith(projectRoot)
+            ? filePath.slice(projectRoot.length + 1)
+            : filePath;
+          pendingPaths.add(relativePath);
+          if (!json) {
+            console.log(
+              chalk.gray(`determinism watcher: ${trigger} ${relativePath}`)
+            );
+          }
+          await maybeRun(`watch:${trigger}`);
+        };
+
+        watcher.on('all', async (eventName: string, filePath: string) => {
+          if (eventName !== 'add' && eventName !== 'change') {
+            return;
+          }
+          await onFileEvent(eventName, filePath);
+        });
+
+        if (!json) {
+          console.log('\nHarness Determinism Watch');
+          console.log('═'.repeat(60));
+          console.log(`Task:                 ${options.task}`);
+          console.log(`Watching:             ${watchTargets.join(', ')}`);
+          console.log(`Debounce:             ${debounceMs}ms`);
+          console.log(chalk.gray('Press Ctrl+C to stop.\n'));
+        }
+
+        await runCheck('watch:initial');
+        await new Promise<void>((resolve) => {
+          const stop = () => {
+            void watcher.close();
+            resolve();
+          };
+          process.once('SIGINT', stop);
+          process.once('SIGTERM', stop);
+        });
+        return;
+      }
+
+      await runCheck('manual');
+    });
+
+  // Sub-command: bench loops
+  bench
     .command('loops')
     .description('Show feedback loop configuration, status, and recent events')
     .option('--json', 'Output as JSON', false)
-    .action((options) => {
+    .action(function () {
+      const command = this as Command;
+      const options = command.opts();
+      const json = Boolean(options.json || command.parent?.opts().json);
       const config = feedbackLoops.getConfig();
       const stats = feedbackLoops.getStats();
       const history = feedbackLoops.getHistory(undefined, 20);
 
-      if (options.json) {
+      if (json) {
         console.log(JSON.stringify({ config, stats, history }, null, 2));
         return;
       }

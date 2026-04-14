@@ -17,10 +17,17 @@ import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
+import { resolveRealCliBin } from './utils/real-cli-bin.js';
+import {
+  type DeterminismWatcherHandle,
+  startDeterminismWatcher,
+  stopDeterminismWatcher,
+} from './utils/determinism-watcher.js';
 import {
   canonicalStateStore,
   projectIdFromIdentifier,
 } from '../core/shared-state/canonical-store.js';
+import { loadProjectHandoff } from '../core/session/project-handoff.js';
 import {
   getModelRouter,
   loadModelRouterConfig,
@@ -136,6 +143,8 @@ class ClaudeSM {
   private sessionId: string;
   private ownsSession: boolean;
   private sessionEnded: boolean;
+  private determinismWatcher: DeterminismWatcherHandle | null;
+  private skippedHandoffReason: string | null;
 
   constructor() {
     // Load persistent defaults
@@ -166,6 +175,8 @@ class ClaudeSM {
     this.sessionId = process.env['STACKMEMORY_SESSION'] || uuidv4();
     this.ownsSession = !process.env['STACKMEMORY_SESSION'];
     this.sessionEnded = false;
+    this.determinismWatcher = null;
+    this.skippedHandoffReason = null;
 
     // Ensure config directory exists
     if (!fs.existsSync(this.claudeConfigDir)) {
@@ -275,19 +286,16 @@ class ClaudeSM {
   }
 
   private resolveClaudeBin(): string | null {
-    // 1) CLI-specified
-    if (this.config.claudeBin && this.config.claudeBin.trim()) {
-      return this.config.claudeBin.trim();
-    }
-    // 2) Env override
-    const envBin = process.env['CLAUDE_BIN'];
-    if (envBin && envBin.trim()) return envBin.trim();
-    // 3) PATH detection
-    try {
-      execSync('which claude', { stdio: 'ignore' });
-      return 'claude';
-    } catch {}
-    return null;
+    return resolveRealCliBin({
+      explicitBin: this.config.claudeBin,
+      envBin: process.env['CLAUDE_BIN'],
+      preferredPaths: [
+        path.join(os.homedir(), '.local', 'bin', 'claude'),
+        '/usr/local/bin/claude',
+        '/opt/homebrew/bin/claude',
+      ],
+      pathCommands: ['claude'],
+    });
   }
 
   private gepaProcesses: ReturnType<typeof spawn>[] = [];
@@ -371,6 +379,30 @@ class ClaudeSM {
       proc.kill('SIGTERM');
     }
     this.gepaProcesses = [];
+  }
+
+  private startDeterminismWatcher(): void {
+    this.determinismWatcher = startDeterminismWatcher({
+      stackmemoryBin: this.stackmemoryPath,
+      cwd: process.cwd(),
+      task: this.config.task,
+      instanceId: this.config.instanceId,
+      sessionId: this.sessionId,
+      tool: 'claude',
+    });
+
+    if (this.determinismWatcher) {
+      const modeLabel =
+        this.determinismWatcher.mode === 'targeted'
+          ? 'targeted'
+          : 'repo-root fallback';
+      console.log(chalk.gray(`   Determinism: ${modeLabel}`));
+    }
+  }
+
+  private stopDeterminismWatcher(): void {
+    stopDeterminismWatcher(this.determinismWatcher);
+    this.determinismWatcher = null;
   }
 
   private setupWorktree(): string | null {
@@ -489,19 +521,25 @@ class ClaudeSM {
     if (!this.config.contextEnabled) return null;
 
     try {
-      const handoffPath = path.join(
+      const handoff = loadProjectHandoff(
         process.cwd(),
-        '.stackmemory',
-        'last-handoff.md'
+        this.isGitRepo() ? this.getCurrentBranch() : undefined
       );
-      if (fs.existsSync(handoffPath)) {
-        const content = fs.readFileSync(handoffPath, 'utf8').trim();
-        if (content.length > 0) {
-          // Cap at 8000 chars to avoid excessively long system prompts
-          return content.length > 8000
-            ? content.substring(0, 8000) + '\n\n[...truncated]'
-            : content;
-        }
+      if (!handoff) {
+        this.skippedHandoffReason = null;
+        return null;
+      }
+      if (!handoff.compatible) {
+        this.skippedHandoffReason = handoff.mismatchReason || 'stale handoff';
+        return null;
+      }
+      this.skippedHandoffReason = null;
+      const content = handoff.content.trim();
+      if (content.length > 0) {
+        // Cap at 8000 chars to avoid excessively long system prompts
+        return content.length > 8000
+          ? content.substring(0, 8000) + '\n\n[...truncated]'
+          : content;
       }
     } catch {
       // Silently continue - handoff loading is optional
@@ -759,6 +797,7 @@ class ClaudeSM {
     payload: Record<string, unknown> = {}
   ): Promise<void> {
     this.stopGEPAWatcher();
+    this.stopDeterminismWatcher();
 
     this.saveContext(
       eventType === 'session_end'
@@ -1045,6 +1084,7 @@ class ClaudeSM {
     }
 
     await this.publishSessionStart();
+    this.startDeterminismWatcher();
     console.log(chalk.gray(`🤖 Instance ID: ${this.config.instanceId}`));
     console.log(chalk.gray(`🧠 Session ID: ${this.sessionId.slice(0, 8)}`));
     console.log(chalk.gray(`📁 Working in: ${process.cwd()}`));
@@ -1133,6 +1173,10 @@ class ClaudeSM {
       if (handoffContent) {
         initialInput = handoffContent;
         console.log(chalk.gray('   Handoff context ready'));
+      } else if (this.skippedHandoffReason) {
+        console.log(
+          chalk.gray(`   Handoff skipped: ${this.skippedHandoffReason}`)
+        );
       }
 
       const theoryContent = this.getTheoryContent();
