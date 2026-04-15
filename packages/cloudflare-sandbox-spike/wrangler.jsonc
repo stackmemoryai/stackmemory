@@ -1,0 +1,44 @@
+{
+  "name": "stackmemory-cloudflare-sandbox-spike",
+  "main": "src/index.js",
+  "compatibility_date": "2026-04-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "PROJECT_DATA_BUCKET_NAME": "stackmemory-spike-project-data"
+  },
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "./Dockerfile",
+      "instance_type": "lite",
+      "max_instances": 10
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "Sandbox",
+        "class_name": "Sandbox"
+      }
+    ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "PROJECT_DATA",
+      "bucket_name": "stackmemory-spike-project-data"
+    },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "stackmemory-spike-backups"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Sandbox"]
+    }
+  ]
+}
