@@ -88,6 +88,13 @@ export interface ConductorConfig {
   autoPR?: boolean;
   /** Workspace mode: 'auto' (detect GitButler), 'gitbutler', or 'worktree' (default: 'auto') */
   workspaceMode?: 'auto' | 'gitbutler' | 'worktree';
+  /**
+   * Optional lane branch (e.g. "feature/STA-500-retrieval"). When set:
+   * - agent worktrees branch from laneBranch (not baseBranch)
+   * - branch naming uses "worktree-agent-<id>" (not "conductor/<id>")
+   * - autoPR is suppressed; merge target is the lane, curated by a human
+   */
+  laneBranch?: string;
 }
 
 export interface RunningIssue {
@@ -758,9 +765,18 @@ export class Conductor {
       }
     }
 
-    // Detect workspace mode: GitButler virtual branches or git worktrees
     const wsMode = this.config.workspaceMode || 'auto';
-    if (wsMode === 'gitbutler' || wsMode === 'auto') {
+    const laneMode = Boolean(this.config.laneBranch);
+    if (laneMode && wsMode === 'gitbutler') {
+      throw new Error(
+        '--lane is only supported with git worktrees. Use --workspace-mode worktree or omit --workspace-mode.'
+      );
+    }
+
+    // Detect workspace mode: GitButler virtual branches or git worktrees.
+    // Lane mode always uses worktrees because branches are created from the
+    // lane itself and later inspected/cleaned via `conductor lane`.
+    if (!laneMode && (wsMode === 'gitbutler' || wsMode === 'auto')) {
       try {
         const butVersion = execSync('but --version', {
           cwd: this.config.repoRoot,
@@ -785,6 +801,10 @@ export class Conductor {
         }
         // auto mode: fall through to worktrees
       }
+    } else if (laneMode) {
+      logger.info('Lane mode enabled; using git worktrees', {
+        laneBranch: this.config.laneBranch,
+      });
     }
 
     // Ensure workspace root exists (only needed for worktree mode)
@@ -1747,6 +1767,12 @@ export class Conductor {
   }
 
   private createGitButlerBranch(issue: LinearIssue, wsKey: string): string {
+    if (this.config.laneBranch) {
+      throw new Error(
+        'Lane mode requires git worktrees; GitButler virtual branches are not supported.'
+      );
+    }
+
     const branchName = `conductor/${wsKey}`;
 
     try {
@@ -1795,7 +1821,11 @@ export class Conductor {
       return wsPath;
     }
 
-    const branchName = `conductor/${wsKey}`;
+    // Lane mode: subagents get disposable worktree-agent-<id> branches
+    // rooted at the lane branch. Base mode: conductor/<id> off baseBranch.
+    const lane = this.config.laneBranch;
+    const branchName = lane ? `worktree-agent-${wsKey}` : `conductor/${wsKey}`;
+    const startPoint = lane ? lane : `origin/${this.config.baseBranch}`;
 
     try {
       execSync('git fetch origin', {
@@ -1805,7 +1835,7 @@ export class Conductor {
       });
 
       execSync(
-        `git worktree add "${wsPath}" -b "${branchName}" "origin/${this.config.baseBranch}"`,
+        `git worktree add "${wsPath}" -b "${branchName}" "${startPoint}"`,
         {
           cwd: this.config.repoRoot,
           stdio: 'pipe',
@@ -1817,6 +1847,7 @@ export class Conductor {
         identifier: issue.identifier,
         path: wsPath,
         branch: branchName,
+        lane: lane || null,
       });
     } catch (err) {
       try {
