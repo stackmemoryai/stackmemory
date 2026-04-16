@@ -77,4 +77,4 @@ get_summary
 
 ---
 
-_Built with LLM-driven intelligent context retrieval_
+_Built with LLM-driven context retrieval_

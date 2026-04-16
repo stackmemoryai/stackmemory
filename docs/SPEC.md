@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-StackMemory is a **lossless, project-scoped memory runtime** for development tools that preserves full project context across sessions using a call stack metaphor instead of linear chat logs. It organizes memory as nested frames with smart retrieval, maintaining context across thread resets, model switches, and long-running projects.
+StackMemory is a **lossless, project-scoped memory runtime** for AI coding and writing tools that preserves full project context across sessions using a call stack metaphor instead of linear chat logs. It organizes memory as nested frames with smart retrieval, enabling AI tools to maintain context across thread resets, model switches, and long-running projects.
 
 ## Core Architecture
 
@@ -120,7 +120,7 @@ local_to_remote_migration:
       interval: 300s
       compression: true
       
-    intelligent_batching:
+    smart_batching:
       group_by: "frame"
       wait_for_frame_close: true
       max_wait: 1h
@@ -179,7 +179,7 @@ scoring:
       persistence: 0.3             # Permanent changes critical
 ```
 
-### 4. Intelligent Context Retrieval
+### 4. Smart Context Retrieval
 
 #### 4.1 LLM-Driven Retrieval
 ```yaml
@@ -429,7 +429,7 @@ garbage_collection:
 ```yaml
 digest_generation:
   deterministic: 60%               # Reliable extraction
-  ai_generated: 40%                # Intelligent summary
+  ai_generated: 40%                # AI-generated summary
   
   deterministic_fields:
     - files_modified
@@ -657,11 +657,380 @@ performance_slas:
     max_storage_per_project: "unlimited"
 ```
 
-### 12. Future Extensibility
+### 12. Advanced Memory Patterns
 
-#### 12.1 Roadmap Features
+#### 12.1 Episodic Memory System
+```yaml
+episodic_memory:
+  definition: "Capture and reuse past agent experiences"
+  
+  episode_structure:
+    trigger: "significant_event"        # Decision, error, breakthrough
+    context_snapshot:
+      - pre_state                       # State before episode
+      - action_sequence                 # Tools and decisions
+      - outcome                         # Result and impact
+      - learned_pattern                 # Extracted insight
+      
+  retrieval_strategy:
+    similarity_matching:
+      current_context: true
+      embedding_distance: "cosine"
+      threshold: 0.85
+      
+    temporal_relevance:
+      recent_weight: 0.7
+      historical_weight: 0.3
+      
+  injection_mechanism:
+    when: "similar_context_detected"
+    format: "Past episode: {summary} led to {outcome}"
+    max_episodes: 3
+```
+
+#### 12.2 Memory Synthesis from Execution Logs
+```yaml
+log_synthesis:
+  pattern_extraction:
+    frequency_analysis:
+      - common_error_sequences
+      - repeated_tool_patterns
+      - decision_reversals
+      
+    causality_detection:
+      error_to_fix_chains: true
+      search_to_discovery: true
+      test_to_refactor: true
+      
+  synthesis_output:
+    workflow_patterns:
+      - "Search → Read → Edit → Test → Fix"
+      - "Error → Analyze → Search → Solution"
+      
+    anti_patterns:
+      - "Repeated failed attempts"
+      - "Circular dependencies"
+      
+    optimization_opportunities:
+      - "Batch similar operations"
+      - "Cache frequent queries"
+```
+
+### 13. Feedback Loop Architecture
+
+#### 13.1 Reflection Loop Pattern
+```yaml
+reflection_loop:
+  trigger_conditions:
+    - frame_completion
+    - significant_error
+    - milestone_reached
+    - context_switch
+    
+  reflection_process:
+    analyze:
+      - what_worked: "successful patterns"
+      - what_failed: "error patterns"
+      - alternative_approaches: "unexplored paths"
+      
+    synthesize:
+      key_insights: []
+      patterns_identified: []
+      improvements_suggested: []
+      
+    persist:
+      to_anchors: true              # Save as decisions
+      to_digest: true               # Include in summary
+      score_boost: 0.2              # Important for learning
+```
+
+#### 13.2 Self-Critique Evaluation System
+```yaml
+self_critique:
+  evaluation_dimensions:
+    code_quality:
+      - correctness: "Does it work?"
+      - efficiency: "Is it optimal?"
+      - maintainability: "Is it clean?"
+      
+    decision_quality:
+      - rationale: "Was reasoning sound?"
+      - alternatives: "Were options considered?"
+      - evidence: "Was it data-driven?"
+      
+    process_quality:
+      - methodology: "Was approach systematic?"
+      - tool_usage: "Were tools used effectively?"
+      - time_management: "Was effort proportional?"
+      
+  critique_storage:
+    attach_to_frame: true
+    influence_scoring: true
+    guide_future_retrieval: true
+    
+  continuous_improvement:
+    track_critique_patterns: true
+    adjust_weights_based_on_outcomes: true
+    share_learnings_across_team: true
+```
+
+#### 13.3 Rich Feedback Integration
+```yaml
+feedback_sources:
+  automated:
+    - test_results
+    - linting_output
+    - performance_metrics
+    - security_scans
+    
+  human:
+    - code_review_comments
+    - user_satisfaction
+    - explicit_feedback
+    
+  environmental:
+    - build_success_rate
+    - deployment_outcomes
+    - production_incidents
+    
+  integration:
+    collection: "multi_channel"
+    correlation: "cross_reference"
+    weight_by_reliability: true
+    
+  feedback_to_memory:
+    positive: "boost_frame_score"
+    negative: "annotate_with_lessons"
+    neutral: "record_for_pattern"
+```
+
+### 14. Context Optimization Strategies
+
+#### 14.1 Context Minimization Pattern
+```yaml
+context_minimization:
+  strategies:
+    intelligent_filtering:
+      remove_redundant: true
+      compress_similar: true
+      prioritize_relevant: true
+      
+    hierarchical_summarization:
+      detail_levels:
+        - full: "complete events"
+        - medium: "key operations"
+        - summary: "outcomes only"
+        
+    dynamic_windowing:
+      expand_on: "high_relevance"
+      contract_on: "low_relevance"
+      adaptive_sizing: true
+      
+  benefits:
+    reduced_token_usage: "40-60%"
+    faster_processing: true
+    clearer_focus: true
+```
+
+#### 14.2 Dynamic Context Injection
+```yaml
+dynamic_injection:
+  triggers:
+    - context_switch_detected
+    - new_error_type
+    - unfamiliar_codebase_area
+    - performance_degradation
+    
+  injection_sources:
+    - relevant_documentation
+    - similar_past_solutions
+    - team_knowledge_base
+    - external_references
+    
+  injection_timing:
+    just_in_time: true              # Right before needed
+    predictive: true                # Anticipate needs
+    on_demand: true                 # User requested
+    
+  injection_format:
+    inline_hints: "minimal disruption"
+    sidebar_context: "additional detail"
+    full_frame: "comprehensive context"
+```
+
+#### 14.3 Context Window Anxiety Management
+```yaml
+anxiety_management:
+  monitoring:
+    track_usage: "continuous"
+    alert_threshold: 70%
+    critical_threshold: 90%
+    
+  mitigation_strategies:
+    progressive_compression:
+      - summarize_old_frames
+      - drop_low_score_events
+      - archive_to_retrieval
+      
+    selective_loading:
+      - load_only_relevant
+      - defer_deep_history
+      - use_pointers_not_content
+      
+    smart_truncation:
+      preserve: "decisions_and_outcomes"
+      truncate: "intermediate_steps"
+      compress: "repetitive_patterns"
+```
+
+### 15. Tool Orchestration Patterns
+
+#### 15.1 Progressive Tool Discovery
+```yaml
+tool_discovery:
+  learning_progression:
+    basic: ["read", "write", "search"]
+    intermediate: ["edit", "test", "analyze"]
+    advanced: ["refactor", "optimize", "architect"]
+    
+  discovery_mechanism:
+    observation: "watch_usage_patterns"
+    suggestion: "recommend_when_relevant"
+    education: "explain_tool_benefits"
+    
+  tool_introduction:
+    gradual: true
+    context_appropriate: true
+    with_examples: true
+```
+
+#### 15.2 Conditional Parallel Execution
+```yaml
+parallel_execution:
+  conditions:
+    can_parallelize:
+      - independent_files
+      - different_subsystems
+      - non_conflicting_operations
+      
+    must_serialize:
+      - dependent_changes
+      - shared_resources
+      - ordered_operations
+      
+  orchestration:
+    plan: "identify_parallelizable"
+    execute: "batch_similar_operations"
+    synchronize: "merge_results"
+    handle_conflicts: "retry_or_serialize"
+    
+  benefits:
+    speed: "3-5x improvement"
+    efficiency: "reduced_overhead"
+    atomicity: "group_related_changes"
+```
+
+### 16. Multi-Agent Coordination
+
+#### 16.1 Sub-Agent Spawning Pattern
+```yaml
+sub_agent_spawning:
+  spawn_triggers:
+    - complex_subtask
+    - specialized_domain
+    - parallel_workstream
+    - exploratory_analysis
+    
+  agent_types:
+    analyzer: "deep_investigation"
+    builder: "implementation"
+    reviewer: "quality_check"
+    documenter: "knowledge_capture"
+    
+  coordination:
+    handoff: "clear_context_transfer"
+    results: "structured_return"
+    state: "shared_memory_access"
+    
+  lifecycle:
+    spawn: "with_specific_context"
+    execute: "autonomous_operation"
+    report: "structured_findings"
+    terminate: "clean_resource_release"
+```
+
+#### 16.2 Multi-Agent Debate Pattern
+```yaml
+debate_pattern:
+  participants:
+    proposer: "suggests_solution"
+    critic: "identifies_issues"
+    synthesizer: "merges_perspectives"
+    
+  debate_process:
+    rounds: 3
+    convergence_required: true
+    consensus_threshold: 0.8
+    
+  decision_recording:
+    all_perspectives: true
+    final_consensus: true
+    dissenting_opinions: true
+    
+  benefits:
+    better_decisions: "multiple viewpoints"
+    error_reduction: "critical analysis"
+    learning: "exposed reasoning"
+```
+
+### 17. Evaluation and Scoring Evolution
+
+#### 17.1 Anti-Reward-Hacking Design
+```yaml
+anti_reward_hacking:
+  diverse_metrics:
+    - outcome_based: "actual_results"
+    - process_based: "methodology_quality"
+    - efficiency_based: "resource_usage"
+    - learning_based: "knowledge_gained"
+    
+  dynamic_weights:
+    adjust_based_on:
+      - gaming_detection
+      - metric_reliability
+      - context_importance
+      
+  validation:
+    cross_check_metrics: true
+    human_spot_checks: true
+    anomaly_detection: true
+```
+
+#### 17.2 Continuous Calibration
+```yaml
+calibration:
+  feedback_loop:
+    collect: "outcome_data"
+    analyze: "prediction_vs_actual"
+    adjust: "scoring_weights"
+    
+  calibration_frequency:
+    minor: "daily"
+    major: "weekly"
+    reset: "monthly"
+    
+  drift_detection:
+    monitor: "score_distributions"
+    alert: "significant_changes"
+    auto_adjust: "within_bounds"
+```
+
+### 18. Future Extensibility
+
+#### 18.1 Roadmap Features (Enhanced)
 ```yaml
 planned_features:
+  # Original features
   - cross_repository_memory
   - team_memory_spaces
   - background_project_compilers
@@ -669,9 +1038,18 @@ planned_features:
   - ml_based_importance_scoring
   - predictive_context_loading
   - ide_frame_boundary_visualization
+  
+  # New pattern-based features
+  - episodic_memory_retrieval
+  - reflection_loop_automation
+  - multi_agent_orchestration
+  - context_anxiety_management
+  - progressive_tool_discovery
+  - debate_based_decision_making
+  - continuous_self_improvement
 ```
 
-#### 12.2 Integration Points
+#### 18.2 Integration Points
 ```yaml
 integrations:
   current:
@@ -686,37 +1064,40 @@ integrations:
     - gitlab
     - jira
     - slack
+    
+  pattern_integrations:
+    - langchain: "memory_patterns"
+    - autogen: "multi_agent"
+    - guidance: "structured_generation"
+    - dspy: "optimization_loops"
 ```
 
 ## Implementation Priorities
 
-### Phase 1: Core Runtime ✅ COMPLETE (v0.1.x)
+### Phase 1: Core Runtime (Current)
 - [x] Frame stack management
 - [x] Local SQLite storage
 - [x] MCP server
 - [x] Basic scoring
 - [x] Claude Code integration
 
-### Phase 2: Intelligence Layer ✅ COMPLETE (v0.2.x)
-- [x] LLM-driven retrieval
-- [x] Hybrid digest generation (60/40 deterministic/AI)
-- [x] Smart trace detection and bundling
-- [x] Configurable scoring with weight profiles
-- [x] Railway storage optimization (3-tier)
+### Phase 2: Intelligence Layer
+- [ ] LLM-driven retrieval
+- [ ] Hybrid digest generation
+- [ ] Smart trace detection
+- [ ] Configurable scoring
 
-### Phase 3: Collaboration ✅ COMPLETE (v0.3.x)
-- [x] Shared team stacks (dual stack architecture)
-- [x] Frame handoff workflows (v0.3.4)
-- [x] Context bridge for cross-session sync
-- [x] Linear integration with bidirectional sync
-- [x] Claude Skills for workflow automation
+### Phase 3: Collaboration
+- [ ] Shared team stacks
+- [ ] Frame handoff
+- [ ] Merge conflict resolution
+- [ ] Team analytics
 
-### Phase 4: Scale (Next - v0.4.x)
-- [ ] Remote infinite storage (S3/GCS)
-- [ ] Incremental garbage collection
-- [ ] Performance optimization (<100ms p50)
-- [ ] Enterprise features (SSO, audit logs)
-- [ ] Multi-repository support
+### Phase 4: Scale
+- [ ] Remote infinite storage
+- [ ] Incremental GC
+- [ ] Performance optimization
+- [ ] Enterprise features
 
 ## Success Metrics
 
@@ -766,14 +1147,101 @@ performance:
   retrieval_timeout_ms: 1000  # Allow deeper searches
 ```
 
+## Implementation Guidance
+
+### Pattern Implementation Priority Matrix
+```yaml
+high_impact_easy:
+  # Implement first - quick wins
+  - context_minimization      # 40-60% token savings
+  - reflection_loop           # Improves decision quality
+  - parallel_tool_execution   # 3-5x speed improvement
+  - episodic_memory          # Reuse past solutions
+  
+high_impact_complex:
+  # Phase 2 - significant value
+  - self_critique_system     # Continuous improvement
+  - multi_agent_debate       # Better decisions
+  - dynamic_context_injection # Just-in-time context
+  - log_synthesis           # Learn from patterns
+  
+moderate_impact:
+  # Phase 3 - refinements
+  - progressive_tool_discovery # Gradual capability
+  - anti_reward_hacking       # Robust metrics
+  - sub_agent_spawning       # Task delegation
+  - context_anxiety_mgmt     # Proactive optimization
+```
+
+### Key Design Principles from Patterns
+```yaml
+principles:
+  1_externalize_state:
+    rationale: "Enable persistence across sessions"
+    implementation: "Filesystem + database hybrid"
+    
+  2_minimize_context:
+    rationale: "Maximize efficiency and clarity"
+    implementation: "Hierarchical summarization"
+    
+  3_learn_continuously:
+    rationale: "Improve over time"
+    implementation: "Reflection loops + pattern extraction"
+    
+  4_orchestrate_intelligently:
+    rationale: "Use right tool for task"
+    implementation: "Progressive discovery + conditional execution"
+    
+  5_critique_systematically:
+    rationale: "Ensure quality"
+    implementation: "Multi-dimensional evaluation"
+```
+
+### Practical Implementation Steps
+```yaml
+step_1_baseline:
+  - implement_frame_stack
+  - add_basic_scoring
+  - create_sqlite_storage
+  - build_mcp_interface
+  
+step_2_memory_patterns:
+  - add_episodic_retrieval
+  - implement_log_synthesis
+  - create_reflection_loops
+  - build_pattern_detection
+  
+step_3_optimization:
+  - add_context_minimization
+  - implement_dynamic_injection
+  - create_parallel_execution
+  - optimize_retrieval_speed
+  
+step_4_intelligence:
+  - add_self_critique
+  - implement_debate_patterns
+  - create_continuous_calibration
+  - build_learning_system
+  
+step_5_scale:
+  - add_multi_agent_coordination
+  - implement_distributed_memory
+  - create_team_collaboration
+  - optimize_for_production
+```
+
 ## Conclusion
 
 StackMemory provides a revolutionary approach to AI tool memory management through:
-- **Lossless storage** with intelligent retrieval
+- **Lossless storage** with smart retrieval
 - **Frame-based organization** replacing linear chat logs
 - **Two-tier storage** balancing performance and capacity
 - **LLM-driven context selection** for optimal relevance
 - **Team collaboration** through shared and individual stacks
 - **Configurable scoring** adapting to project needs
+- **Advanced patterns** from agentic AI research
+- **Continuous learning** through reflection and synthesis
+- **Intelligent orchestration** of tools and agents
+- **Context optimization** for efficiency at scale
 
-The system ensures AI tools never lose context while maintaining performance at scale.
+The system ensures AI tools never lose context while maintaining performance at scale, incorporating state-of-the-art patterns from the agentic AI community.
