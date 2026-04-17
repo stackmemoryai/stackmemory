@@ -1421,6 +1421,300 @@ export function createConductorCommands(): Command {
       }
     });
 
+  // --- lane ---
+  // Inspect / clean up disposable worktree-agent-* branches that have been
+  // merged back into a human-curated lane branch.
+
+  // Check whether <branch> is effectively merged into <lane>.
+  // Two-phase:
+  //   1) Fast: `git merge-base --is-ancestor` — catches regular merges + ff.
+  //   2) Fallback: `git cherry` — patch-id matching catches squash-merged
+  //      branches, which BOTH `git branch --merged` and `--is-ancestor` miss.
+  //      Conductor's auto-PR flow often ends in a squash, so this matters.
+  const isMerged = (repo: string, branch: string, lane: string): boolean => {
+    try {
+      execSync(`git merge-base --is-ancestor "${branch}" "${lane}"`, {
+        cwd: repo,
+        stdio: 'pipe',
+        timeout: 5000,
+      });
+      return true;
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status !== 1) throw err; // genuine error, not "false"
+      // not a direct ancestor — fall through to patch-id check
+    }
+    try {
+      const out = execSync(`git cherry "${lane}" "${branch}"`, {
+        cwd: repo,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }).trim();
+      if (!out) return true; // no unique commits (rare non-ancestor case)
+      const lines = out.split('\n').filter(Boolean);
+      // `-` = commit's patch is already in lane; `+` = not in lane.
+      return lines.every((l) => l.startsWith('-'));
+    } catch {
+      return false;
+    }
+  };
+
+  // List all worktree-agent-* branches and bucket by ancestry vs lane.
+  const bucketLaneBranches = (
+    repo: string,
+    lane: string
+  ): { merged: string[]; unmerged: string[] } => {
+    let all: string[] = [];
+    try {
+      all = execSync(`git branch --list 'worktree-agent-*'`, {
+        cwd: repo,
+        encoding: 'utf-8',
+        timeout: 10000,
+      })
+        .split('\n')
+        .map((s) => s.trim().replace(/^[*+]\s*/, ''))
+        .filter(Boolean);
+    } catch {
+      // non-fatal — no branches found
+    }
+    const merged: string[] = [];
+    const unmerged: string[] = [];
+    for (const b of all) {
+      (isMerged(repo, b, lane) ? merged : unmerged).push(b);
+    }
+    return { merged, unmerged };
+  };
+
+  // Return worktree cleanliness so cleanup can refuse removal when git status
+  // cannot prove the tree is clean.
+  const getWorktreeCleanliness = (
+    repo: string,
+    wtPath: string
+  ): 'clean' | 'dirty' | 'unknown' => {
+    try {
+      const out = execSync(`git -C "${wtPath}" status --short`, {
+        cwd: repo,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      return out.trim().length > 0 ? 'dirty' : 'clean';
+    } catch {
+      return 'unknown';
+    }
+  };
+
+  const laneCmd = cmd
+    .command('lane')
+    .description(
+      'Inspect or clean up worktree-agent-* branches against a lane'
+    );
+
+  laneCmd
+    .command('status')
+    .description(
+      'List worktree-agent-* branches and their merge state vs the lane'
+    )
+    .option(
+      '--lane <branch>',
+      'Lane branch to compare against (default: current branch)'
+    )
+    .option('--repo <path>', 'Git repo root', process.cwd())
+    .action((options) => {
+      const repo: string = options.repo;
+      const lane: string =
+        options.lane ||
+        execSync('git branch --show-current', {
+          cwd: repo,
+          encoding: 'utf-8',
+        }).trim();
+
+      if (!lane) {
+        console.error(
+          `${c.red}Could not resolve lane branch.${c.r} Pass --lane.`
+        );
+        process.exit(1);
+      }
+
+      const { merged, unmerged } = bucketLaneBranches(repo, lane);
+
+      console.log(`\n  ${c.b}Lane:${c.r} ${c.cyan}${lane}${c.r}\n`);
+      if (merged.length) {
+        console.log(`  ${c.green}merged (${merged.length}):${c.r}`);
+        for (const b of merged) console.log(`    ${c.gray}✓${c.r} ${b}`);
+      }
+      if (unmerged.length) {
+        console.log(`\n  ${c.orange}unmerged (${unmerged.length}):${c.r}`);
+        for (const b of unmerged) console.log(`    ${c.orange}•${c.r} ${b}`);
+      }
+      if (!merged.length && !unmerged.length) {
+        console.log(`  ${c.gray}No worktree-agent-* branches found.${c.r}`);
+      }
+    });
+
+  laneCmd
+    .command('cleanup')
+    .description(
+      'Remove worktree-agent-* branches and worktrees already merged into the lane'
+    )
+    .option(
+      '--lane <branch>',
+      'Lane branch to compare against (default: current branch)'
+    )
+    .option('--repo <path>', 'Git repo root', process.cwd())
+    .option('--dry-run', 'Show what would be removed without doing it', false)
+    .option(
+      '--force',
+      'Remove worktrees even if they have uncommitted changes',
+      false
+    )
+    .action((options) => {
+      const repo: string = options.repo;
+      const lane: string =
+        options.lane ||
+        execSync('git branch --show-current', {
+          cwd: repo,
+          encoding: 'utf-8',
+        }).trim();
+
+      if (!lane) {
+        console.error(
+          `${c.red}Could not resolve lane branch.${c.r} Pass --lane.`
+        );
+        process.exit(1);
+      }
+
+      const { merged } = bucketLaneBranches(repo, lane);
+
+      if (merged.length === 0) {
+        console.log(
+          `${c.green}Nothing to clean up for lane ${c.cyan}${lane}${c.r}.`
+        );
+        return;
+      }
+
+      // Build map of branch → worktree path (if any)
+      const worktreeMap = new Map<string, string>();
+      try {
+        const wt = execSync('git worktree list --porcelain', {
+          cwd: repo,
+          encoding: 'utf-8',
+          timeout: 10000,
+        });
+        let currentPath = '';
+        for (const line of wt.split('\n')) {
+          if (line.startsWith('worktree ')) {
+            currentPath = line.slice('worktree '.length).trim();
+          } else if (line.startsWith('branch ')) {
+            const ref = line.slice('branch '.length).trim();
+            const b = ref.replace(/^refs\/heads\//, '');
+            if (currentPath) worktreeMap.set(b, currentPath);
+          }
+        }
+      } catch {
+        // non-fatal — fall back to branch-only cleanup
+      }
+
+      console.log(
+        `\n  ${c.b}Lane:${c.r} ${c.cyan}${lane}${c.r}  ${c.d}(${merged.length} merged branches)${c.r}\n`
+      );
+
+      let skippedDirty = 0;
+      let skippedUnknown = 0;
+      for (const branch of merged) {
+        const wtPath = worktreeMap.get(branch);
+        const cleanliness = wtPath
+          ? getWorktreeCleanliness(repo, wtPath)
+          : 'unknown';
+        const dirty = cleanliness === 'dirty';
+
+        // Refuse to destroy dirty worktrees without --force — prevents
+        // racing with a still-working agent and losing uncommitted work.
+        if (dirty && !options.force) {
+          skippedDirty++;
+          console.log(
+            `  ${c.orange}⚠${c.r}  ${c.orange}dirty${c.r} ${wtPath} ${c.d}(skipping ${branch} — pass --force to remove)${c.r}`
+          );
+          continue;
+        }
+
+        // If git status could not prove the worktree is clean, refuse cleanup
+        // unless the operator explicitly opts into forceful removal.
+        if (wtPath && cleanliness === 'unknown' && !options.force) {
+          skippedUnknown++;
+          console.log(
+            `  ${c.orange}⚠${c.r}  ${c.orange}unknown${c.r} ${wtPath} ${c.d}(skipping ${branch} — could not verify clean state; pass --force to remove)${c.r}`
+          );
+          continue;
+        }
+
+        const dirtyTag = dirty ? ` ${c.orange}[dirty]${c.r}` : '';
+        const unknownTag =
+          cleanliness === 'unknown' ? ` ${c.orange}[unknown]${c.r}` : '';
+        const action = wtPath
+          ? `${c.gray}worktree remove${c.r} ${wtPath}${dirtyTag}${unknownTag} + ${c.gray}branch -D${c.r} ${branch}`
+          : `${c.gray}branch -D${c.r} ${branch}`;
+        console.log(`  ${c.green}✓${c.r} ${action}`);
+
+        if (options.dryRun) continue;
+
+        if (wtPath) {
+          // --force on `git worktree remove` is always passed because we
+          // already decided above whether dirty state is tolerable.
+          try {
+            execSync(`git worktree remove "${wtPath}" --force`, {
+              cwd: repo,
+              stdio: 'pipe',
+              timeout: 15000,
+            });
+          } catch (err) {
+            console.log(
+              `     ${c.red}worktree remove failed:${c.r} ${(err as Error).message}`
+            );
+          }
+        }
+        try {
+          execSync(`git branch -D "${branch}"`, {
+            cwd: repo,
+            stdio: 'pipe',
+            timeout: 5000,
+          });
+        } catch (err) {
+          console.log(
+            `     ${c.red}branch -D failed:${c.r} ${(err as Error).message}`
+          );
+        }
+      }
+
+      if (!options.dryRun) {
+        try {
+          execSync('git worktree prune', {
+            cwd: repo,
+            stdio: 'pipe',
+            timeout: 10000,
+          });
+        } catch {
+          // non-fatal
+        }
+        const skipNote = skippedDirty
+          ? ` ${c.orange}(${skippedDirty} dirty skipped — pass --force)${c.r}`
+          : '';
+        const unknownNote = skippedUnknown
+          ? ` ${c.orange}(${skippedUnknown} unknown skipped — pass --force)${c.r}`
+          : '';
+        console.log(`\n  ${c.green}Done.${c.r}${skipNote}${unknownNote}`);
+      } else {
+        const skipNote = skippedDirty
+          ? ` ${c.orange}(${skippedDirty} dirty would be skipped — pass --force to include)${c.r}`
+          : '';
+        const unknownNote = skippedUnknown
+          ? ` ${c.orange}(${skippedUnknown} unknown would be skipped — pass --force to include)${c.r}`
+          : '';
+        console.log(
+          `\n  ${c.d}Dry run — no changes made. Remove --dry-run to execute.${c.r}${skipNote}${unknownNote}`
+        );
+      }
+    });
+
   // --- logs ---
   cmd
     .command('logs')
@@ -2045,6 +2339,15 @@ export function createConductorCommands(): Command {
       '--no-pr',
       'Disable automatic GitHub PR creation after agent success'
     )
+    .option(
+      '--workspace-mode <mode>',
+      'Workspace mode: "auto" (detect GitButler), "gitbutler", or "worktree"',
+      'auto'
+    )
+    .option(
+      '--lane <branch>',
+      'Optional lane branch. When set, conductor uses git worktrees rooted at the lane as worktree-agent-<id> and suppresses PRs (lane is human-curated).'
+    )
     .action(async (options) => {
       // Ensure default prompt template exists on first start
       ensureDefaultPromptTemplate();
@@ -2064,7 +2367,9 @@ export function createConductorCommands(): Command {
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
         agentMode: options.mode === 'adapter' ? 'adapter' : 'cli',
         model: options.model,
-        autoPR: options.pr,
+        autoPR: options.lane ? false : options.pr,
+        workspaceMode: options.workspaceMode,
+        laneBranch: options.lane,
       });
 
       await conductor.start();

@@ -7,6 +7,12 @@
 // Set environment flag for CLI usage to skip async context bridge
 process.env['STACKMEMORY_CLI'] = 'true';
 
+// Machine-readable CLI output should not be prefixed by INFO banners unless
+// the caller explicitly opted into a log level.
+if (!process.env['STACKMEMORY_LOG_LEVEL'] && process.argv.includes('--json')) {
+  process.env['STACKMEMORY_LOG_LEVEL'] = 'ERROR';
+}
+
 // Load environment variables (quiet mode to suppress logging)
 import { config as loadDotenv } from 'dotenv';
 loadDotenv({ quiet: true });
@@ -61,6 +67,7 @@ import { createPingCommand } from './commands/ping.js';
 import { createAuditCommand } from './commands/audit.js';
 import { createStatsCommand } from './commands/stats.js';
 import { createBenchCommand } from './commands/bench.js';
+import { createStateCommand } from './commands/state.js';
 import { createDigestCommands } from './commands/digest.js';
 import { createTeamCommands } from './commands/team.js';
 import { createDesiresCommands } from './commands/desires.js';
@@ -75,7 +82,12 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import { filterPending } from '../integrations/mcp/pending-utils.js';
+import {
+  getCurrentRepoGitHubInfo,
+  refreshCurrentRepoPullRequestState,
+} from '../integrations/github/pr-state.js';
 import { ProjectManager } from '../core/projects/project-manager.js';
+import { canonicalStateStore } from '../core/shared-state/canonical-store.js';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import type {
@@ -272,6 +284,28 @@ program
           projectPath: projectRoot,
           sessionId: options.session,
         });
+        const sharedProjectState = await canonicalStateStore.getProjectSummary({
+          projectId: session.projectId,
+          projectPath: projectRoot,
+          eventLimit: 5,
+        });
+        const githubInfo = getCurrentRepoGitHubInfo(projectRoot);
+        let githubProjection =
+          githubInfo &&
+          (await canonicalStateStore.getGitHubPullRequest({
+            repo: githubInfo.repo,
+            branch: githubInfo.branch,
+          }));
+
+        if (
+          githubInfo &&
+          (!githubProjection ||
+            Date.now() - githubProjection.lastSyncedAt > 2 * 60 * 1000)
+        ) {
+          githubProjection =
+            (await refreshCurrentRepoPullRequestState(projectRoot)) ||
+            githubProjection;
+        }
 
         // Auto-discover shared context on startup
         const contextDiscovery = await sharedContextLayer.autoDiscoverContext();
@@ -372,6 +406,24 @@ program
         console.log(
           `     Cached contexts: ${contextCount.count || 0} (global)`
         );
+        console.log(
+          `     Shared sessions: ${sharedProjectState.activeSessions.length}`
+        );
+        console.log(
+          `     Shared instances: ${sharedProjectState.activeInstances.length}`
+        );
+        console.log(
+          `     Shared claims: ${sharedProjectState.activeClaims.length}`
+        );
+
+        const branchClaim = sharedProjectState.activeClaims.find(
+          (claim) => claim.branch && claim.branch === session.branch
+        );
+        if (branchClaim) {
+          console.log(
+            `     Branch owner: ${branchClaim.tool} ${branchClaim.instanceId || branchClaim.sessionId || branchClaim.claimId.slice(0, 8)}`
+          );
+        }
 
         // Show recent activity
         const recentFrames = db
@@ -399,6 +451,22 @@ program
               `     ${stateIcon} ${f.name} [${f.type}] - ${f.created}`
             );
           });
+        }
+
+        if (githubProjection) {
+          console.log(`\n   GitHub PR:`);
+          console.log(
+            `     #${githubProjection.prNumber} ${githubProjection.state} ${githubProjection.title}`
+          );
+          console.log(
+            `     ${githubProjection.headRefName} -> ${githubProjection.baseRefName}`
+          );
+          if (githubProjection.reviewDecision) {
+            console.log(`     Review: ${githubProjection.reviewDecision}`);
+          }
+          if (githubProjection.statusCheckRollup) {
+            console.log(`     Checks: ${githubProjection.statusCheckRollup}`);
+          }
         }
 
         console.log(`\n   Current Session:`);
@@ -770,6 +838,7 @@ program.addCommand(createModelCommand());
 program.addCommand(createAuditCommand());
 program.addCommand(createStatsCommand());
 program.addCommand(createBenchCommand());
+program.addCommand(createStateCommand());
 program.addCommand(createDigestCommands());
 program.addCommand(createTeamCommands());
 program.addCommand(createDesiresCommands());
@@ -815,6 +884,11 @@ program
   .option('--audit-dir <path>', 'Persist spike results to directory')
   .option('--record-frame', 'Record as real frame with anchors', false)
   .option('--record', 'Record plan & critique into StackMemory context', false)
+  .option(
+    '--deterministic-fixture',
+    'Use deterministic fixture planner/critic for replayable smoke runs',
+    false
+  )
   .option('--json', 'Emit single JSON result (UI-friendly)', false)
   .option('--quiet', 'Minimal output (default)', true)
   .option('--verbose', 'Verbose sectioned output', false)
@@ -841,6 +915,7 @@ program
           auditDir: opts.auditDir,
           recordFrame: Boolean(opts.recordFrame),
           record: Boolean(opts.record),
+          deterministicFixture: Boolean(opts.deterministicFixture),
         }
       );
 
@@ -915,6 +990,10 @@ program
   .option('--audit-dir <path>', 'Persist spike results to directory')
   .option('--record-frame', 'Record as real frame with anchors')
   .option('--record', 'Record plan & critique into StackMemory context')
+  .option(
+    '--deterministic-fixture',
+    'Use deterministic fixture planner/critic for replayable smoke runs'
+  )
   .option('--json', 'Emit single JSON result (UI-friendly)')
   .option('--quiet', 'Minimal output')
   .option('--verbose', 'Verbose sectioned output')
@@ -969,6 +1048,7 @@ program
           auditDir: opts.auditDir,
           recordFrame: Boolean(opts.recordFrame),
           record: Boolean(opts.record),
+          deterministicFixture: Boolean(opts.deterministicFixture),
         }
       );
 

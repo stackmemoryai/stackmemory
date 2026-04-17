@@ -86,6 +86,15 @@ export interface ConductorConfig {
   model?: string;
   /** Auto-create GitHub PRs after successful agent runs (default: true) */
   autoPR?: boolean;
+  /** Workspace mode: 'auto' (detect GitButler), 'gitbutler', or 'worktree' (default: 'auto') */
+  workspaceMode?: 'auto' | 'gitbutler' | 'worktree';
+  /**
+   * Optional lane branch (e.g. "feature/STA-500-retrieval"). When set:
+   * - agent worktrees branch from laneBranch (not baseBranch)
+   * - branch naming uses "worktree-agent-<id>" (not "conductor/<id>")
+   * - autoPR is suppressed; merge target is the lane, curated by a human
+   */
+  laneBranch?: string;
 }
 
 export interface RunningIssue {
@@ -205,7 +214,7 @@ function logAgentOutcome(entry: AgentOutcomeEntry): void {
   appendFileSync(getOutcomesLogPath(), JSON.stringify(entry) + '\n');
 }
 
-/** Best-effort PR creation via GitHub CLI after successful agent run */
+/** Best-effort PR creation via GitHub CLI (or GitButler) after successful agent run */
 function createPullRequest(opts: {
   branch: string;
   baseBranch: string;
@@ -214,15 +223,9 @@ function createPullRequest(opts: {
   filesModified: number;
   toolCalls: number;
   workspacePath: string;
+  useGitButler?: boolean;
 }): string | null {
   try {
-    // Push the branch first
-    execSync(`git push -u origin "${opts.branch}"`, {
-      cwd: opts.workspacePath,
-      stdio: 'pipe',
-      timeout: 60000,
-    });
-
     const prTitle = `feat(conductor): ${opts.issueId} — ${opts.title}`;
     const prBody = [
       '## Summary',
@@ -234,6 +237,38 @@ function createPullRequest(opts: {
       '',
       '_This PR was auto-created by StackMemory Conductor._',
     ].join('\n');
+
+    if (opts.useGitButler) {
+      // GitButler: push branch then create PR via but cli
+      execSync(`but push --branch "${opts.branch}"`, {
+        cwd: opts.workspacePath,
+        stdio: 'pipe',
+        timeout: 60000,
+      });
+
+      const result = execSync(
+        `but pr create --branch "${opts.branch}" --title "${prTitle.replace(/"/g, '\\"')}" --body "${prBody.replace(/"/g, '\\"')}"`,
+        {
+          cwd: opts.workspacePath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000,
+        }
+      );
+      const prUrl = result.trim();
+      logger.info('Created PR via GitButler', {
+        issueId: opts.issueId,
+        prUrl,
+      });
+      return prUrl;
+    }
+
+    // Standard git + gh CLI
+    execSync(`git push -u origin "${opts.branch}"`, {
+      cwd: opts.workspacePath,
+      stdio: 'pipe',
+      timeout: 60000,
+    });
 
     const result = execSync(
       `gh pr create --base "${opts.baseBranch}" --head "${opts.branch}" --title "${prTitle.replace(/"/g, '\\"')}" --body "${prBody.replace(/"/g, '\\"')}"`,
@@ -664,6 +699,8 @@ export class Conductor {
   private stateCache: Map<string, { id: string; name: string }> = new Map();
   private activeStatesLower: string[];
   private terminalStatesLower: string[];
+  /** Whether to use GitButler virtual branches instead of git worktrees */
+  private useGitButler = false;
 
   /** Global rate limit backoff state */
   private rateLimit: RateLimitState = {
@@ -728,8 +765,50 @@ export class Conductor {
       }
     }
 
-    // Ensure workspace root exists
-    if (!existsSync(this.config.workspaceRoot)) {
+    const wsMode = this.config.workspaceMode || 'auto';
+    const laneMode = Boolean(this.config.laneBranch);
+    if (laneMode && wsMode === 'gitbutler') {
+      throw new Error(
+        '--lane is only supported with git worktrees. Use --workspace-mode worktree or omit --workspace-mode.'
+      );
+    }
+
+    // Detect workspace mode: GitButler virtual branches or git worktrees.
+    // Lane mode always uses worktrees because branches are created from the
+    // lane itself and later inspected/cleaned via `conductor lane`.
+    if (!laneMode && (wsMode === 'gitbutler' || wsMode === 'auto')) {
+      try {
+        const butVersion = execSync('but --version', {
+          cwd: this.config.repoRoot,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000,
+        }).trim();
+        // Check if repo is in GitButler mode (gitbutler/workspace branch exists)
+        const gbDir = join(this.config.repoRoot, '.git', 'gitbutler');
+        if (wsMode === 'gitbutler' || existsSync(gbDir)) {
+          this.useGitButler = true;
+          logger.info('Using GitButler virtual branches', {
+            version: butVersion,
+          });
+          console.log(`[conductor] GitButler mode (${butVersion})`);
+        }
+      } catch {
+        if (wsMode === 'gitbutler') {
+          throw new Error(
+            'GitButler CLI (but) not found. Install: brew install --cask gitbutler'
+          );
+        }
+        // auto mode: fall through to worktrees
+      }
+    } else if (laneMode) {
+      logger.info('Lane mode enabled; using git worktrees', {
+        laneBranch: this.config.laneBranch,
+      });
+    }
+
+    // Ensure workspace root exists (only needed for worktree mode)
+    if (!this.useGitButler && !existsSync(this.config.workspaceRoot)) {
       mkdirSync(this.config.workspaceRoot, { recursive: true });
     }
 
@@ -1126,15 +1205,14 @@ export class Conductor {
 
     const allCandidates: LinearIssue[] = [];
 
-    // Fetch issues for each active state
-    // Linear API filters by state type, but we need state name matching
-    // Use 'unstarted' type which covers Todo-like states
+    // Fetch issues with unstarted state type (covers Todo-like states)
+    // Then filter by exact state name match
     const issues = await this.client.getIssues({
       teamId: this.config.teamId,
+      stateType: 'unstarted',
       limit: 50,
     });
 
-    // Filter by active state names (case-insensitive, pre-computed)
     for (const issue of issues) {
       const stateName = issue.state.name.trim().toLowerCase();
       if (this.activeStatesLower.includes(stateName)) {
@@ -1309,6 +1387,7 @@ export class Conductor {
             filesModified: run.filesModified,
             toolCalls: run.toolCalls,
             workspacePath: run.workspacePath,
+            useGitButler: this.useGitButler,
           });
           if (url) {
             prUrl = url;
@@ -1680,6 +1759,58 @@ export class Conductor {
 
   private async createWorkspace(issue: LinearIssue): Promise<string> {
     const wsKey = this.sanitizeIdentifier(issue.identifier);
+
+    if (this.useGitButler) {
+      return this.createGitButlerBranch(issue, wsKey);
+    }
+    return this.createWorktree(issue, wsKey);
+  }
+
+  private createGitButlerBranch(issue: LinearIssue, wsKey: string): string {
+    if (this.config.laneBranch) {
+      throw new Error(
+        'Lane mode requires git worktrees; GitButler virtual branches are not supported.'
+      );
+    }
+
+    const branchName = `conductor/${wsKey}`;
+
+    try {
+      // Pull latest changes
+      execSync('but pull', {
+        cwd: this.config.repoRoot,
+        stdio: 'pipe',
+        timeout: 30000,
+      });
+    } catch {
+      // Non-fatal — may be offline
+    }
+
+    try {
+      // Create virtual branch
+      execSync(`but branch new "${branchName}"`, {
+        cwd: this.config.repoRoot,
+        stdio: 'pipe',
+        timeout: 10000,
+      });
+
+      logger.info('Created GitButler virtual branch', {
+        identifier: issue.identifier,
+        branch: branchName,
+      });
+    } catch {
+      // Branch may already exist — that's fine
+      logger.info('GitButler branch may already exist, reusing', {
+        identifier: issue.identifier,
+        branch: branchName,
+      });
+    }
+
+    // GitButler: agents work in repo root, not a separate dir
+    return this.config.repoRoot;
+  }
+
+  private createWorktree(issue: LinearIssue, wsKey: string): string {
     const wsPath = join(this.config.workspaceRoot, wsKey);
 
     if (existsSync(wsPath)) {
@@ -1690,20 +1821,21 @@ export class Conductor {
       return wsPath;
     }
 
-    // Create git worktree
-    const branchName = `conductor/${wsKey}`;
+    // Lane mode: subagents get disposable worktree-agent-<id> branches
+    // rooted at the lane branch. Base mode: conductor/<id> off baseBranch.
+    const lane = this.config.laneBranch;
+    const branchName = lane ? `worktree-agent-${wsKey}` : `conductor/${wsKey}`;
+    const startPoint = lane ? lane : `origin/${this.config.baseBranch}`;
 
     try {
-      // Fetch latest
       execSync('git fetch origin', {
         cwd: this.config.repoRoot,
         stdio: 'pipe',
         timeout: 30000,
       });
 
-      // Create worktree with new branch from base
       execSync(
-        `git worktree add "${wsPath}" -b "${branchName}" "origin/${this.config.baseBranch}"`,
+        `git worktree add "${wsPath}" -b "${branchName}" "${startPoint}"`,
         {
           cwd: this.config.repoRoot,
           stdio: 'pipe',
@@ -1715,9 +1847,9 @@ export class Conductor {
         identifier: issue.identifier,
         path: wsPath,
         branch: branchName,
+        lane: lane || null,
       });
     } catch (err) {
-      // Branch may already exist — try checking it out
       try {
         execSync(`git worktree add "${wsPath}" "${branchName}"`, {
           cwd: this.config.repoRoot,
@@ -1736,14 +1868,34 @@ export class Conductor {
 
   private async removeWorkspace(issue: LinearIssue): Promise<void> {
     const wsKey = this.sanitizeIdentifier(issue.identifier);
-    const wsPath = join(this.config.workspaceRoot, wsKey);
+    const branchName = `conductor/${wsKey}`;
 
+    if (this.useGitButler) {
+      // Unapply virtual branch (keeps it in history, just removes from workspace)
+      await this.runHook('before-remove', this.config.repoRoot, issue).catch(
+        () => {}
+      );
+      try {
+        execSync(`but unapply "${branchName}"`, {
+          cwd: this.config.repoRoot,
+          stdio: 'pipe',
+          timeout: 10000,
+        });
+      } catch {
+        // May already be unapplied
+        logger.debug('GitButler branch already unapplied', {
+          identifier: issue.identifier,
+        });
+      }
+      return;
+    }
+
+    // Worktree mode
+    const wsPath = join(this.config.workspaceRoot, wsKey);
     if (!existsSync(wsPath)) return;
 
-    // Run before_remove hook
     await this.runHook('before-remove', wsPath, issue).catch(() => {});
 
-    // Remove git worktree
     try {
       execSync(`git worktree remove "${wsPath}" --force`, {
         cwd: this.config.repoRoot,
@@ -1751,7 +1903,6 @@ export class Conductor {
         timeout: 30000,
       });
     } catch {
-      // Fallback: manual cleanup
       try {
         rmSync(wsPath, { recursive: true, force: true });
         execSync('git worktree prune', {
@@ -2679,6 +2830,7 @@ export class Conductor {
         filesModified: run.filesModified,
         toolCalls: run.toolCalls,
         workspacePath: wsPath,
+        useGitButler: this.useGitButler,
       });
       if (url) {
         prUrl = url;

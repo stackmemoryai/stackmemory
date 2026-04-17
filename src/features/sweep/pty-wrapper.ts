@@ -33,6 +33,8 @@ export interface PtyWrapperConfig {
   claudeArgs?: string[];
   stateFile?: string;
   initialInput?: string;
+  onExit?: (exitCode: number) => Promise<void> | void;
+  onSignal?: (signal: 'SIGINT' | 'SIGTERM') => Promise<void> | void;
 }
 
 // Minimal interface for node-pty process to avoid compile-time dep
@@ -59,6 +61,8 @@ export class PtyWrapper {
       claudeArgs: config.claudeArgs || [],
       stateFile: config.stateFile || getSweepPath('sweep-state.json'),
       initialInput: config.initialInput || '',
+      onExit: config.onExit || (() => undefined),
+      onSignal: config.onSignal || (() => undefined),
     };
 
     this.stateWatcher = new SweepStateWatcher(this.config.stateFile);
@@ -174,8 +178,9 @@ export class PtyWrapper {
     });
 
     // Handle PTY exit
-    this.ptyProcess.onExit(({ exitCode }) => {
+    this.ptyProcess.onExit(async ({ exitCode }) => {
       this.cleanup();
+      await this.config.onExit(exitCode);
       // Sync Linear on exit if configured
       if (process.env['LINEAR_API_KEY']) {
         try {
@@ -191,12 +196,17 @@ export class PtyWrapper {
     });
 
     // Handle signals
-    const onSignal = () => {
+    const onSignal = async (signal: 'SIGINT' | 'SIGTERM') => {
       this.cleanup();
+      await this.config.onSignal(signal);
       process.exit(0);
     };
-    process.on('SIGINT', onSignal);
-    process.on('SIGTERM', onSignal);
+    process.on('SIGINT', () => {
+      void onSignal('SIGINT');
+    });
+    process.on('SIGTERM', () => {
+      void onSignal('SIGTERM');
+    });
   }
 
   private acceptPrediction(): void {

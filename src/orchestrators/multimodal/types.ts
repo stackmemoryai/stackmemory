@@ -30,8 +30,10 @@ export interface HarnessOptions {
   implementer?: 'codex' | 'claude';
   maxIters?: number; // retry loop for critique → fix cycles
   auditDir?: string; // where to persist spike results
+  persistAudit?: boolean; // if false, skip writing audit artifacts/metrics
   record?: boolean; // store plan/critique in local context DB
   recordFrame?: boolean; // create a real frame and anchors
+  deterministicFixture?: boolean; // force deterministic fixture mode for smoke/replay checks
 }
 
 export interface ImplementationResult {

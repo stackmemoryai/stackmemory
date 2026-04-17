@@ -16,6 +16,7 @@ import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
+import { resolveRealCliBin } from './utils/real-cli-bin.js';
 
 interface GeminiSMConfig {
   defaultWorktree: boolean;
@@ -167,40 +168,24 @@ class GeminiSM {
   }
 
   private resolveGeminiBin(): string | null {
-    if (this.config.geminiBin && this.config.geminiBin.trim()) {
-      return this.config.geminiBin.trim();
-    }
-    const envBin = process.env['GEMINI_BIN'];
-    if (envBin && envBin.trim()) return envBin.trim();
-
-    const possiblePaths = [
-      path.join(
-        os.homedir(),
-        '.nvm',
-        'versions',
-        'node',
-        'v22.22.0',
-        'bin',
-        'gemini'
-      ),
-      '/usr/local/bin/gemini',
-      '/opt/homebrew/bin/gemini',
-    ];
-
-    for (const binPath of possiblePaths) {
-      if (fs.existsSync(binPath)) {
-        return binPath;
-      }
-    }
-
-    // Try PATH
-    try {
-      execSync('which gemini', { stdio: 'ignore' });
-      return 'gemini';
-    } catch {
-      // Not found
-    }
-    return null;
+    return resolveRealCliBin({
+      explicitBin: this.config.geminiBin,
+      envBin: process.env['GEMINI_BIN'],
+      preferredPaths: [
+        path.join(
+          os.homedir(),
+          '.nvm',
+          'versions',
+          'node',
+          'v22.22.0',
+          'bin',
+          'gemini'
+        ),
+        '/usr/local/bin/gemini',
+        '/opt/homebrew/bin/gemini',
+      ],
+      pathCommands: ['gemini'],
+    });
   }
 
   private setupWorktree(): string | null {

@@ -719,7 +719,17 @@ export class LinearClient {
       first: options?.limit || 50,
     });
 
-    return result.issues.nodes;
+    // Flatten labels from { nodes: [...] } to plain array
+    return result.issues.nodes.map((issue) => ({
+      ...issue,
+      labels: Array.isArray(issue.labels)
+        ? issue.labels
+        : (
+            issue.labels as unknown as {
+              nodes: Array<{ id: string; name: string }>;
+            }
+          )?.nodes || [],
+    }));
   }
 
   /**

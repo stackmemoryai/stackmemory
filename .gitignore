@@ -135,3 +135,22 @@ scripts/gepa/results/scores.jsonl
 scripts/gepa/state.json
 scripts/gepa/results/
 scripts/gepa/generations/
+
+# Agent tool working dirs (untracked, per-tool scratch)
+.ralph/
+.swarm/
+.bjarne/
+.entire/
+.opencode/
+
+# Local backups and lint artifacts
+.git.backup/
+.lint-errors.log
+.lint-fix-log.json
+.lint-fix-log.*.json
+
+# Local scratch / generated trees
+archive/
+site/
+voyager/
+plugins/

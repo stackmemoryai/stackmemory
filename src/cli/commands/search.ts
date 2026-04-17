@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { z } from 'zod';
+import { CrossProjectSearch } from '../../core/cross-search/cross-project-search.js';
 
 /** Raw task row from task_cache table */
 interface TaskRow {
@@ -58,6 +59,10 @@ export function createSearchCommand(): Command {
     .argument('<query>', 'Search query')
     .option('-t, --tasks', 'Search only tasks')
     .option('-c, --context', 'Search only context')
+    .option(
+      '-a, --all-projects',
+      'Search across all registered project databases'
+    )
     .option('-l, --limit <n>', 'Limit results', '20')
     .action(async (rawQuery, options) => {
       const projectRoot = process.cwd();
@@ -83,6 +88,40 @@ export function createSearchCommand(): Command {
         } else {
           console.error('❌ Invalid input');
         }
+        return;
+      }
+
+      // Cross-project search mode
+      if (options.allProjects) {
+        console.log(
+          `\n🔍 Searching across all projects for "${rawQuery}"...\n`
+        );
+        const crossSearch = new CrossProjectSearch();
+        const results = await crossSearch.search({
+          query: rawQuery,
+          limit,
+        });
+
+        if (results.length === 0) {
+          console.log('No results found across project databases.\n');
+          console.log(
+            'Tip: Run "stackmemory search --all-projects" after "stackmemory projects scan" to discover databases.'
+          );
+          return;
+        }
+
+        console.log(`📁 Cross-Project Results (${results.length})\n`);
+        for (const r of results) {
+          const date = new Date(r.createdAt).toLocaleDateString();
+          console.log(
+            `  [${r.projectName}] ${r.name} (${r.type}, score: ${r.score.toFixed(3)})`
+          );
+          if (r.digestText) {
+            console.log(`    ${r.digestText.slice(0, 100)}`);
+          }
+          console.log(`    ${date} | ${r.projectPath}`);
+        }
+        console.log(`\nFound ${results.length} results.\n`);
         return;
       }
 

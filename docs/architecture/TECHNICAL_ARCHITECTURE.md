@@ -47,6 +47,8 @@ The outer system that:
 
 > **Harness = runtime. Frames = call stack. Tools = syscalls. Digests = return values.**
 
+**Design principle**: Push intelligence UP into skills. Push execution DOWN into deterministic tooling. Keep the harness THIN. See `DESIGN_PRINCIPLES.md` for the full three-layer architecture and cross-agent memory strategy hierarchy.
+
 ---
 
 ## Database Design

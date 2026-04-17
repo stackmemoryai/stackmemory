@@ -10,4 +10,5 @@ elif [ -d "$HOME/.nvm/versions/node" ]; then
 fi
 
 npx lint-staged
+bash scripts/determinism-pre-commit.sh
 npm run build

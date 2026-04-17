@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as _crypto from 'crypto';
 import { logger } from '../monitoring/logger.js';
 import { SystemError, ErrorCode } from '../errors/index.js';
+import { canonicalStateStore } from '../shared-state/canonical-store.js';
 // Type-safe environment variable access
 function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
@@ -169,6 +170,16 @@ export class SessionManager {
 
     await this.saveSession(session);
     await this.setProjectActiveSession(params.projectId, session.sessionId);
+    await canonicalStateStore.appendEvent({
+      type: 'session_created',
+      tool: 'stackmemory',
+      sessionId: session.sessionId,
+      projectId: session.projectId,
+      branch: session.branch,
+      payload: {
+        state: session.state,
+      },
+    });
 
     // Set as current session
     this.currentSession = session;
@@ -209,6 +220,14 @@ export class SessionManager {
       `${session.sessionId}.json`
     );
     await fs.writeFile(sessionPath, JSON.stringify(session, null, 2));
+    await canonicalStateStore.upsertSession({
+      sessionId: session.sessionId,
+      tool: 'stackmemory',
+      projectId: session.projectId,
+      branch: session.branch,
+      status: session.state,
+      metadata: session.metadata,
+    });
   }
 
   async suspendSession(sessionId?: string): Promise<void> {
@@ -260,6 +279,15 @@ export class SessionManager {
       );
 
       await fs.rename(sessionPath, historyPath);
+      await canonicalStateStore.endSession(session.sessionId, 'closed');
+      await canonicalStateStore.appendEvent({
+        type: 'session_closed',
+        tool: 'stackmemory',
+        sessionId: session.sessionId,
+        projectId: session.projectId,
+        branch: session.branch,
+        payload: {},
+      });
     }
   }
 

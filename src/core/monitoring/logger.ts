@@ -105,6 +105,7 @@ export class Logger {
   private constructor() {
     // Set log level from environment
     const envLevel = process.env['STACKMEMORY_LOG_LEVEL']?.toUpperCase();
+    const jsonCliMode = !envLevel && process.argv.includes('--json');
     switch (envLevel) {
       case 'ERROR':
         this.logLevel = LogLevel.ERROR;
@@ -116,7 +117,7 @@ export class Logger {
         this.logLevel = LogLevel.DEBUG;
         break;
       default:
-        this.logLevel = LogLevel.INFO;
+        this.logLevel = jsonCliMode ? LogLevel.ERROR : LogLevel.INFO;
     }
 
     // Set up log file if in debug mode or if specified

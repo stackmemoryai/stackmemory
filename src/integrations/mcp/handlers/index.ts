@@ -30,6 +30,10 @@ export {
   ProvenantHandlers,
   type ProvenantHandlerDependencies,
 } from './provenant-handlers.js';
+export {
+  CrossSearchHandlers,
+  type CrossSearchHandlerDependencies,
+} from './cross-search-handlers.js';
 
 import {
   ContextHandlers,
@@ -45,6 +49,11 @@ import { ProviderHandlers } from './provider-handlers.js';
 import { TeamHandlers, TeamHandlerDependencies } from './team-handlers.js';
 import { CordHandlers } from './cord-handlers.js';
 import { ProvenantHandlers } from './provenant-handlers.js';
+import { CrossSearchHandlers } from './cross-search-handlers.js';
+import {
+  resolveToolAlias,
+  resolveParamAliases,
+} from '../tool-alias-registry.js';
 
 // Combined dependencies interface
 export interface MCPHandlerDependencies
@@ -69,6 +78,7 @@ export class MCPHandlerFactory {
   private teamHandlers?: TeamHandlers;
   private cordHandlers?: CordHandlers;
   private provenantHandlers?: ProvenantHandlers;
+  private crossSearchHandlers: CrossSearchHandlers;
 
   constructor(deps: MCPHandlerDependencies) {
     this.contextHandlers = new ContextHandlers({
@@ -109,13 +119,17 @@ export class MCPHandlerFactory {
         projectDir: deps.projectDir,
       });
     }
+
+    this.crossSearchHandlers = new CrossSearchHandlers({});
   }
 
   /**
-   * Get handler for a specific tool
+   * Get handler for a specific tool.
+   * Resolves tool name aliases before lookup.
    */
   getHandler(toolName: string): (args: any) => Promise<any> {
-    switch (toolName) {
+    const { canonicalName } = resolveToolAlias(toolName);
+    switch (canonicalName) {
       // Context handlers
       case 'get_context':
         return this.contextHandlers.handleGetContext.bind(this.contextHandlers);
@@ -241,6 +255,24 @@ export class MCPHandlerFactory {
           this.provenantHandlers
         );
 
+      // Cross-project search handlers
+      case 'sm_cross_search':
+        return this.crossSearchHandlers.handleCrossSearch.bind(
+          this.crossSearchHandlers
+        );
+      case 'sm_cross_discover':
+        return this.crossSearchHandlers.handleCrossDiscover.bind(
+          this.crossSearchHandlers
+        );
+      case 'sm_cross_register':
+        return this.crossSearchHandlers.handleCrossRegister.bind(
+          this.crossSearchHandlers
+        );
+      case 'sm_cross_list':
+        return this.crossSearchHandlers.handleCrossList.bind(
+          this.crossSearchHandlers
+        );
+
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -301,13 +333,20 @@ export class MCPHandlerFactory {
       'provenant_status',
       'provenant_contradictions',
       'provenant_resolve',
+
+      // Cross-project search tools
+      'sm_cross_search',
+      'sm_cross_discover',
+      'sm_cross_register',
+      'sm_cross_list',
     ];
   }
 
   /**
-   * Check if a tool exists
+   * Check if a tool exists (resolves aliases)
    */
   hasHandler(toolName: string): boolean {
-    return this.getAvailableTools().includes(toolName);
+    const { canonicalName } = resolveToolAlias(toolName);
+    return this.getAvailableTools().includes(canonicalName);
   }
 }

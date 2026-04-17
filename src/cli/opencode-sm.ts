@@ -16,6 +16,12 @@ import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
+import { resolveRealCliBin } from './utils/real-cli-bin.js';
+import {
+  type DeterminismWatcherHandle,
+  startDeterminismWatcher,
+  stopDeterminismWatcher,
+} from './utils/determinism-watcher.js';
 
 interface OpencodeSMConfig {
   defaultWorktree: boolean;
@@ -70,6 +76,7 @@ class OpencodeSM {
   private config: OpencodeConfig;
   private stackmemoryPath: string;
   private smConfig: OpencodeSMConfig;
+  private determinismWatcher: DeterminismWatcherHandle | null;
 
   constructor() {
     this.smConfig = loadSMConfig();
@@ -84,6 +91,7 @@ class OpencodeSM {
     };
 
     this.stackmemoryPath = this.findStackMemory();
+    this.determinismWatcher = null;
   }
 
   private getRepoRoot(): string | null {
@@ -169,33 +177,16 @@ class OpencodeSM {
   }
 
   private resolveOpencodeBin(): string | null {
-    if (this.config.opencodeBin && this.config.opencodeBin.trim()) {
-      return this.config.opencodeBin.trim();
-    }
-    const envBin = process.env['OPENCODE_BIN'];
-    if (envBin && envBin.trim()) return envBin.trim();
-
-    // Check common OpenCode locations
-    const possiblePaths = [
-      path.join(os.homedir(), '.opencode', 'bin', 'opencode'),
-      '/usr/local/bin/opencode',
-      '/opt/homebrew/bin/opencode',
-    ];
-
-    for (const binPath of possiblePaths) {
-      if (fs.existsSync(binPath)) {
-        return binPath;
-      }
-    }
-
-    // Try PATH
-    try {
-      execSync('which opencode', { stdio: 'ignore' });
-      return 'opencode';
-    } catch {
-      // Not found
-    }
-    return null;
+    return resolveRealCliBin({
+      explicitBin: this.config.opencodeBin,
+      envBin: process.env['OPENCODE_BIN'],
+      preferredPaths: [
+        path.join(os.homedir(), '.opencode', 'bin', 'opencode'),
+        '/usr/local/bin/opencode',
+        '/opt/homebrew/bin/opencode',
+      ],
+      pathCommands: ['opencode'],
+    });
   }
 
   private setupWorktree(): string | null {
@@ -333,6 +324,29 @@ class OpencodeSM {
     }
   }
 
+  private startDeterminismWatcher(): void {
+    this.determinismWatcher = startDeterminismWatcher({
+      stackmemoryBin: this.stackmemoryPath,
+      cwd: process.cwd(),
+      task: this.config.task,
+      instanceId: this.config.instanceId,
+      tool: 'opencode',
+    });
+
+    if (this.determinismWatcher) {
+      const modeLabel =
+        this.determinismWatcher.mode === 'targeted'
+          ? 'targeted'
+          : 'repo-root fallback';
+      console.log(chalk.gray(`Determinism: ${modeLabel}`));
+    }
+  }
+
+  private stopDeterminismWatcher(): void {
+    stopDeterminismWatcher(this.determinismWatcher);
+    this.determinismWatcher = null;
+  }
+
   public async run(args: string[]): Promise<void> {
     const opencodeArgs: string[] = [];
     let i = 0;
@@ -455,6 +469,7 @@ class OpencodeSM {
     if (this.config.worktreePath) {
       process.env['OPENCODE_WORKTREE_PATH'] = this.config.worktreePath;
     }
+    this.startDeterminismWatcher();
 
     console.log(chalk.gray(`Instance: ${this.config.instanceId}`));
     console.log(chalk.gray(`Working in: ${process.cwd()}`));
@@ -501,6 +516,7 @@ class OpencodeSM {
     });
 
     opencode.on('exit', async (code) => {
+      this.stopDeterminismWatcher();
       this.saveContext('OpenCode session ended', {
         action: 'session_end',
         exitCode: code,
@@ -525,6 +541,7 @@ class OpencodeSM {
     });
 
     process.on('SIGINT', () => {
+      this.stopDeterminismWatcher();
       this.saveContext('OpenCode session interrupted', {
         action: 'session_interrupt',
       });
@@ -532,6 +549,7 @@ class OpencodeSM {
     });
 
     process.on('SIGTERM', () => {
+      this.stopDeterminismWatcher();
       this.saveContext('OpenCode session terminated', {
         action: 'session_terminate',
       });

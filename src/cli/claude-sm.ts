@@ -12,10 +12,22 @@ import { spawn, execSync, execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
 import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
+import { resolveRealCliBin } from './utils/real-cli-bin.js';
+import {
+  type DeterminismWatcherHandle,
+  startDeterminismWatcher,
+  stopDeterminismWatcher,
+} from './utils/determinism-watcher.js';
+import {
+  canonicalStateStore,
+  projectIdFromIdentifier,
+} from '../core/shared-state/canonical-store.js';
+import { loadProjectHandoff } from '../core/session/project-handoff.js';
 import {
   getModelRouter,
   loadModelRouterConfig,
@@ -50,7 +62,7 @@ import {
   getSettingsPath,
 } from '../utils/hook-installer.js';
 
-// __filename and __dirname are provided by esbuild banner for ESM compatibility
+const runtimeDirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface ClaudeSMConfig {
   defaultWorktree: boolean;
@@ -128,6 +140,11 @@ class ClaudeSM {
   private worktreeScriptPath: string;
   private claudeConfigDir: string;
   private smConfig: ClaudeSMConfig;
+  private sessionId: string;
+  private ownsSession: boolean;
+  private sessionEnded: boolean;
+  private determinismWatcher: DeterminismWatcherHandle | null;
+  private skippedHandoffReason: string | null;
 
   constructor() {
     // Load persistent defaults
@@ -151,10 +168,15 @@ class ClaudeSM {
 
     this.stackmemoryPath = this.findStackMemory();
     this.worktreeScriptPath = path.join(
-      __dirname,
+      runtimeDirname,
       '../../scripts/claude-worktree-manager.sh'
     );
     this.claudeConfigDir = path.join(os.homedir(), '.claude');
+    this.sessionId = process.env['STACKMEMORY_SESSION'] || uuidv4();
+    this.ownsSession = !process.env['STACKMEMORY_SESSION'];
+    this.sessionEnded = false;
+    this.determinismWatcher = null;
+    this.skippedHandoffReason = null;
 
     // Ensure config directory exists
     if (!fs.existsSync(this.claudeConfigDir)) {
@@ -236,6 +258,24 @@ class ClaudeSM {
     }
   }
 
+  private getProjectId(): string | undefined {
+    const root = this.getRepoRoot() || process.cwd();
+
+    try {
+      const remote = execSync('git config --get remote.origin.url', {
+        cwd: root,
+        encoding: 'utf8',
+      }).trim();
+      if (remote) {
+        return projectIdFromIdentifier(remote);
+      }
+    } catch {
+      // Fall back to the current path below.
+    }
+
+    return projectIdFromIdentifier(root);
+  }
+
   private hasUncommittedChanges(): boolean {
     try {
       const status = execSync('git status --porcelain', { encoding: 'utf8' });
@@ -246,19 +286,16 @@ class ClaudeSM {
   }
 
   private resolveClaudeBin(): string | null {
-    // 1) CLI-specified
-    if (this.config.claudeBin && this.config.claudeBin.trim()) {
-      return this.config.claudeBin.trim();
-    }
-    // 2) Env override
-    const envBin = process.env['CLAUDE_BIN'];
-    if (envBin && envBin.trim()) return envBin.trim();
-    // 3) PATH detection
-    try {
-      execSync('which claude', { stdio: 'ignore' });
-      return 'claude';
-    } catch {}
-    return null;
+    return resolveRealCliBin({
+      explicitBin: this.config.claudeBin,
+      envBin: process.env['CLAUDE_BIN'],
+      preferredPaths: [
+        path.join(os.homedir(), '.local', 'bin', 'claude'),
+        '/usr/local/bin/claude',
+        '/opt/homebrew/bin/claude',
+      ],
+      pathCommands: ['claude'],
+    });
   }
 
   private gepaProcesses: ReturnType<typeof spawn>[] = [];
@@ -281,9 +318,9 @@ class ClaudeSM {
     // Find GEPA scripts directory (check multiple locations)
     const gepaPaths = [
       // From dist/src/cli -> scripts/gepa (3 levels up)
-      path.join(__dirname, '../../../scripts/gepa/hooks/auto-optimize.js'),
+      path.join(runtimeDirname, '../../../scripts/gepa/hooks/auto-optimize.js'),
       // From src/cli -> scripts/gepa (2 levels up, for dev mode)
-      path.join(__dirname, '../../scripts/gepa/hooks/auto-optimize.js'),
+      path.join(runtimeDirname, '../../scripts/gepa/hooks/auto-optimize.js'),
       // Global install location
       path.join(
         os.homedir(),
@@ -295,7 +332,7 @@ class ClaudeSM {
       ),
       // npm global install
       path.join(
-        __dirname,
+        runtimeDirname,
         '..',
         '..',
         'scripts',
@@ -342,6 +379,30 @@ class ClaudeSM {
       proc.kill('SIGTERM');
     }
     this.gepaProcesses = [];
+  }
+
+  private startDeterminismWatcher(): void {
+    this.determinismWatcher = startDeterminismWatcher({
+      stackmemoryBin: this.stackmemoryPath,
+      cwd: process.cwd(),
+      task: this.config.task,
+      instanceId: this.config.instanceId,
+      sessionId: this.sessionId,
+      tool: 'claude',
+    });
+
+    if (this.determinismWatcher) {
+      const modeLabel =
+        this.determinismWatcher.mode === 'targeted'
+          ? 'targeted'
+          : 'repo-root fallback';
+      console.log(chalk.gray(`   Determinism: ${modeLabel}`));
+    }
+  }
+
+  private stopDeterminismWatcher(): void {
+    stopDeterminismWatcher(this.determinismWatcher);
+    this.determinismWatcher = null;
   }
 
   private setupWorktree(): string | null {
@@ -460,19 +521,25 @@ class ClaudeSM {
     if (!this.config.contextEnabled) return null;
 
     try {
-      const handoffPath = path.join(
+      const handoff = loadProjectHandoff(
         process.cwd(),
-        '.stackmemory',
-        'last-handoff.md'
+        this.isGitRepo() ? this.getCurrentBranch() : undefined
       );
-      if (fs.existsSync(handoffPath)) {
-        const content = fs.readFileSync(handoffPath, 'utf8').trim();
-        if (content.length > 0) {
-          // Cap at 8000 chars to avoid excessively long system prompts
-          return content.length > 8000
-            ? content.substring(0, 8000) + '\n\n[...truncated]'
-            : content;
-        }
+      if (!handoff) {
+        this.skippedHandoffReason = null;
+        return null;
+      }
+      if (!handoff.compatible) {
+        this.skippedHandoffReason = handoff.mismatchReason || 'stale handoff';
+        return null;
+      }
+      this.skippedHandoffReason = null;
+      const content = handoff.content.trim();
+      if (content.length > 0) {
+        // Cap at 8000 chars to avoid excessively long system prompts
+        return content.length > 8000
+          ? content.substring(0, 8000) + '\n\n[...truncated]'
+          : content;
       }
     } catch {
       // Silently continue - handoff loading is optional
@@ -495,10 +562,10 @@ class ClaudeSM {
 
       // 2. Find templates dir (dev → dist → global npm)
       const candidateDirs = [
-        path.join(__dirname, '../../templates/claude-hooks'),
-        path.join(__dirname, '../../../templates/claude-hooks'),
+        path.join(runtimeDirname, '../../templates/claude-hooks'),
+        path.join(runtimeDirname, '../../../templates/claude-hooks'),
         path.join(
-          __dirname,
+          runtimeDirname,
           '..',
           '..',
           '..',
@@ -611,6 +678,177 @@ class ClaudeSM {
     // Terminal bell to signal session completion
     process.stdout.write('\x07');
     console.log(chalk.gray(`\nSession ended (exit ${exitCode ?? 0})`));
+  }
+
+  private async publishSessionStart(): Promise<void> {
+    const projectPath = process.cwd();
+    const projectId = this.getProjectId();
+    const branch = this.isGitRepo() ? this.getCurrentBranch() : undefined;
+
+    await canonicalStateStore.upsertSession({
+      sessionId: this.sessionId,
+      tool: 'claude',
+      projectId,
+      projectPath,
+      branch,
+      instanceId: this.config.instanceId,
+      metadata: {
+        task: this.config.task,
+        sandbox: this.config.useSandbox,
+        chrome: this.config.useChrome,
+      },
+    });
+
+    await canonicalStateStore.upsertInstance({
+      instanceId: this.config.instanceId,
+      tool: 'claude',
+      sessionId: this.sessionId,
+      projectId,
+      projectPath,
+      branch,
+      worktreePath: this.config.worktreePath,
+      pid: process.pid,
+      status: 'active',
+      metadata: {
+        task: this.config.task,
+        sandbox: this.config.useSandbox,
+        chrome: this.config.useChrome,
+      },
+    });
+
+    await canonicalStateStore.appendEvent({
+      type: 'session_start',
+      tool: 'claude',
+      sessionId: this.sessionId,
+      instanceId: this.config.instanceId,
+      projectId,
+      projectPath,
+      branch,
+      payload: {
+        task: this.config.task,
+        worktreePath: this.config.worktreePath,
+        sandbox: this.config.useSandbox,
+        chrome: this.config.useChrome,
+      },
+    });
+
+    const claimResult = await canonicalStateStore.claimPaths({
+      tool: 'claude',
+      sessionId: this.sessionId,
+      instanceId: this.config.instanceId,
+      projectId,
+      projectPath,
+      branch,
+      paths: [],
+      metadata: {
+        task: this.config.task,
+        scope: 'branch',
+      },
+    });
+
+    if (claimResult.conflicts.length > 0) {
+      console.log(chalk.yellow('⚠️  Shared state conflict detected'));
+      for (const conflict of claimResult.conflicts.slice(0, 3)) {
+        console.log(
+          chalk.gray(
+            `   Claim ${conflict.claimId.slice(0, 8)} already owns ${conflict.branch || 'overlapping work'}`
+          )
+        );
+      }
+    }
+  }
+
+  private async publishSessionEnd(
+    eventType: 'session_end' | 'session_interrupt' | 'session_terminate',
+    payload: Record<string, unknown> = {}
+  ): Promise<void> {
+    if (this.sessionEnded) {
+      return;
+    }
+    this.sessionEnded = true;
+
+    const projectPath = process.cwd();
+    const projectId = this.getProjectId();
+    const branch = this.isGitRepo() ? this.getCurrentBranch() : undefined;
+
+    await canonicalStateStore.appendEvent({
+      type: eventType,
+      tool: 'claude',
+      sessionId: this.sessionId,
+      instanceId: this.config.instanceId,
+      projectId,
+      projectPath,
+      branch,
+      payload,
+    });
+    await canonicalStateStore.releaseClaims({
+      instanceId: this.config.instanceId,
+      reason: eventType,
+    });
+    await canonicalStateStore.endInstance(this.config.instanceId);
+    if (this.ownsSession) {
+      await canonicalStateStore.endSession(this.sessionId);
+    }
+  }
+
+  private async finalizeSession(
+    eventType: 'session_end' | 'session_interrupt' | 'session_terminate',
+    exitCode: number | null,
+    payload: Record<string, unknown> = {}
+  ): Promise<void> {
+    this.stopGEPAWatcher();
+    this.stopDeterminismWatcher();
+
+    this.saveContext(
+      eventType === 'session_end'
+        ? 'Claude session ended'
+        : eventType === 'session_interrupt'
+          ? 'Claude session interrupted'
+          : 'Claude session terminated',
+      {
+        action: eventType,
+        exitCode,
+        ...payload,
+      }
+    );
+
+    await this.publishSessionEnd(eventType, {
+      exitCode,
+      ...payload,
+    });
+
+    if (eventType === 'session_end' && process.env['LINEAR_API_KEY']) {
+      try {
+        execSync('stackmemory linear sync', {
+          stdio: 'ignore',
+          timeout: 10000,
+        });
+      } catch {
+        // Non-fatal: don't block exit
+      }
+    }
+
+    if (this.config.tracingEnabled) {
+      const summary = trace.getExecutionSummary();
+      console.log();
+      console.log(chalk.gray('─'.repeat(42)));
+      console.log(chalk.blue('Debug Trace Summary:'));
+      console.log(chalk.gray(summary));
+    }
+
+    if (eventType === 'session_end' && this.config.notifyOnDone) {
+      this.notifyDone(exitCode);
+    }
+
+    if (this.config.worktreePath) {
+      console.log();
+      console.log(chalk.gray('─'.repeat(42)));
+      console.log(chalk.blue('Session ended in worktree:'));
+      console.log(chalk.gray(`  ${this.config.worktreePath}`));
+      console.log();
+      console.log(chalk.gray('To remove worktree: gd_claude'));
+      console.log(chalk.gray('To merge to main: cwm'));
+    }
   }
 
   public async run(args: string[]): Promise<void> {
@@ -826,10 +1064,29 @@ class ClaudeSM {
 
     // Setup environment
     process.env['CLAUDE_INSTANCE_ID'] = this.config.instanceId;
+    process.env['STACKMEMORY_SESSION'] = this.sessionId;
     if (this.config.worktreePath) {
       process.env['CLAUDE_WORKTREE_PATH'] = this.config.worktreePath;
     }
+    const claudeBin = this.resolveClaudeBin();
+    if (!claudeBin) {
+      console.error(chalk.red('❌ Claude CLI not found.'));
+      console.log(
+        chalk.gray(
+          '   Install Claude CLI or set an override:\n' +
+            '     export CLAUDE_BIN=/path/to/claude\n' +
+            '     claude-sm --help\n\n' +
+            '   Ensure PATH includes npm global bin (npm bin -g).'
+        )
+      );
+      process.exit(1);
+      return;
+    }
+
+    await this.publishSessionStart();
+    this.startDeterminismWatcher();
     console.log(chalk.gray(`🤖 Instance ID: ${this.config.instanceId}`));
+    console.log(chalk.gray(`🧠 Session ID: ${this.sessionId.slice(0, 8)}`));
     console.log(chalk.gray(`📁 Working in: ${process.cwd()}`));
 
     if (this.config.useSandbox) {
@@ -916,6 +1173,10 @@ class ClaudeSM {
       if (handoffContent) {
         initialInput = handoffContent;
         console.log(chalk.gray('   Handoff context ready'));
+      } else if (this.skippedHandoffReason) {
+        console.log(
+          chalk.gray(`   Handoff skipped: ${this.skippedHandoffReason}`)
+        );
       }
 
       const theoryContent = this.getTheoryContent();
@@ -932,12 +1193,6 @@ class ClaudeSM {
     // ── Launch ────────────────────────────────────────────────────
     // Sweep PTY wrapper: next-edit predictions (falls back to direct launch)
     if (this.config.useSweep) {
-      const claudeBin = this.resolveClaudeBin();
-      if (!claudeBin) {
-        console.error(chalk.red('Claude CLI not found.'));
-        process.exit(1);
-        return;
-      }
       console.log(
         chalk.cyan('[Sweep] Launching Claude with prediction bar...')
       );
@@ -947,6 +1202,16 @@ class ClaudeSM {
           claudeBin,
           claudeArgs,
           initialInput: initialInput || undefined,
+          onExit: async (exitCode) => {
+            await this.finalizeSession('session_end', exitCode);
+          },
+          onSignal: async (signal) => {
+            await this.finalizeSession(
+              signal === 'SIGINT' ? 'session_interrupt' : 'session_terminate',
+              null,
+              { signal }
+            );
+          },
         });
         // PTY wrapper is now running — it calls process.exit() on child exit.
         // Return to prevent falling through to the fallback-monitor path,
@@ -973,21 +1238,6 @@ class ClaudeSM {
 
     console.log(chalk.gray('Starting Claude...'));
     console.log(chalk.gray('─'.repeat(42)));
-
-    const claudeBin = this.resolveClaudeBin();
-    if (!claudeBin) {
-      console.error(chalk.red('❌ Claude CLI not found.'));
-      console.log(
-        chalk.gray(
-          '   Install Claude CLI or set an override:\n' +
-            '     export CLAUDE_BIN=/path/to/claude\n' +
-            '     claude-sm --help\n\n' +
-            '   Ensure PATH includes npm global bin (npm bin -g).'
-        )
-      );
-      process.exit(1);
-      return;
-    }
 
     // Setup fallback monitor for automatic Qwen switching on Claude failures
     const fallbackMonitor = new FallbackMonitor({
@@ -1037,9 +1287,6 @@ class ClaudeSM {
 
     // Handle exit
     claude.on('exit', async (code) => {
-      // Stop GEPA watcher if running
-      this.stopGEPAWatcher();
-
       // Check if we were in fallback mode
       const status = fallbackMonitor.getStatus();
       if (status.inFallback) {
@@ -1049,63 +1296,21 @@ class ClaudeSM {
           )
         );
       }
-      // Save final context
-      this.saveContext('Claude session ended', {
-        action: 'session_end',
-        exitCode: code,
-      });
-
-      // Sync Linear on exit if configured
-      if (process.env['LINEAR_API_KEY']) {
-        try {
-          execSync('stackmemory linear sync', {
-            stdio: 'ignore',
-            timeout: 10000,
-          });
-        } catch {
-          // Non-fatal: don't block exit
-        }
-      }
-
-      // End tracing and show summary if enabled
-      if (this.config.tracingEnabled) {
-        const summary = trace.getExecutionSummary();
-        console.log();
-        console.log(chalk.gray('─'.repeat(42)));
-        console.log(chalk.blue('Debug Trace Summary:'));
-        console.log(chalk.gray(summary));
-      }
-
-      // Bell notification when done
-      if (this.config.notifyOnDone) {
-        this.notifyDone(code);
-      }
-
-      // Offer to clean up worktree
-      if (this.config.worktreePath) {
-        console.log();
-        console.log(chalk.gray('─'.repeat(42)));
-        console.log(chalk.blue('Session ended in worktree:'));
-        console.log(chalk.gray(`  ${this.config.worktreePath}`));
-        console.log();
-        console.log(chalk.gray('To remove worktree: gd_claude'));
-        console.log(chalk.gray('To merge to main: cwm'));
-      }
-
+      await this.finalizeSession('session_end', code);
       process.exit(code || 0);
     });
 
     // Handle signals
-    process.on('SIGINT', () => {
-      this.saveContext('Claude session interrupted', {
-        action: 'session_interrupt',
+    process.on('SIGINT', async () => {
+      await this.finalizeSession('session_interrupt', null, {
+        signal: 'SIGINT',
       });
       claude.kill('SIGINT');
     });
 
-    process.on('SIGTERM', () => {
-      this.saveContext('Claude session terminated', {
-        action: 'session_terminate',
+    process.on('SIGTERM', async () => {
+      await this.finalizeSession('session_terminate', null, {
+        signal: 'SIGTERM',
       });
       claude.kill('SIGTERM');
     });

@@ -58,6 +58,48 @@ function heuristicPlan(input: PlanningInput): ImplementationPlan {
   };
 }
 
+function deterministicCritique(args: {
+  plan: ImplementationPlan;
+  ok: boolean;
+  diff: string;
+  checks: ReturnType<typeof runPostImplChecks> | null;
+}): CritiqueResult {
+  const issues: string[] = [];
+  const suggestions: string[] = [];
+
+  if (!args.ok) {
+    issues.push('Implementer command failed');
+    suggestions.push('Fix the command invocation before retrying');
+  }
+
+  if (args.diff.includes('<<<<<<<') || args.diff.includes('>>>>>>>')) {
+    issues.push('Merge conflict markers detected in diff');
+    suggestions.push('Resolve conflict markers before approval');
+  }
+
+  if (args.checks && !args.checks.lintOk) {
+    issues.push('Lint checks failed');
+    suggestions.push('Address lint failures before approval');
+  }
+
+  if (args.checks && !args.checks.testsOk) {
+    issues.push('Tests failed');
+    suggestions.push('Fix failing tests before approval');
+  }
+
+  if (!args.diff || args.diff.startsWith('(no changes detected)')) {
+    suggestions.push(
+      'No code changes detected; verify the task can be satisfied without edits'
+    );
+  }
+
+  return {
+    approved: issues.length === 0,
+    issues,
+    suggestions,
+  };
+}
+
 export async function runSpike(
   input: PlanningInput,
   options: HarnessOptions = {}
@@ -71,24 +113,28 @@ export async function runSpike(
   const t0 = Date.now();
 
   let plan: ImplementationPlan;
-  try {
-    const raw = await callClaude(plannerPrompt, {
-      model: options.plannerModel,
-      system: plannerSystem,
-    });
+  if (options.deterministicFixture) {
+    plan = heuristicPlan(input);
+  } else {
     try {
-      // Strip markdown code fences if present
-      const cleaned = raw
-        .replace(/^```(?:json)?\s*\n?/i, '')
-        .replace(/\n?```\s*$/i, '')
-        .trim();
-      plan = JSON.parse(cleaned);
+      const raw = await callClaude(plannerPrompt, {
+        model: options.plannerModel,
+        system: plannerSystem,
+      });
+      try {
+        // Strip markdown code fences if present
+        const cleaned = raw
+          .replace(/^```(?:json)?\s*\n?/i, '')
+          .replace(/\n?```\s*$/i, '')
+          .trim();
+        plan = JSON.parse(cleaned);
+      } catch {
+        // Fall back to heuristic if model returned text
+        plan = heuristicPlan(input);
+      }
     } catch {
-      // Fall back to heuristic if model returned text
       plan = heuristicPlan(input);
     }
-  } catch {
-    plan = heuristicPlan(input);
   }
 
   const planLatencyMs = Date.now() - t0;
@@ -155,23 +201,32 @@ export async function runSpike(
     // Critic reviews the diff, not the CLI log
     const criticSystem = `You are a strict code reviewer. Review the git diff against the plan. Check for: correctness, missing steps, unrelated changes, bugs, security issues. Also review lint and test results if provided. Return raw JSON only (no markdown fences): { "approved": boolean, "issues": ["string"], "suggestions": ["string"] }`;
     const criticPrompt = `Plan: ${plan.summary}\nAcceptance criteria:\n${plan.steps.map((s) => s.acceptanceCriteria?.join(', ') || s.title).join('\n')}\n\nAttempt ${i + 1}/${maxIters}\nImplementer exit: ${ok ? 'success' : 'failed'}\n\nGit diff:\n${diff}${checksSection}`;
-    try {
-      const raw = await callClaude(criticPrompt, {
-        model: options.reviewerModel,
-        system: criticSystem,
+    if (options.deterministicFixture) {
+      lastCritique = deterministicCritique({
+        plan,
+        ok,
+        diff,
+        checks,
       });
-      // Strip markdown code fences if present
-      const cleaned = raw
-        .replace(/^```(?:json)?\s*\n?/i, '')
-        .replace(/\n?```\s*$/i, '')
-        .trim();
-      lastCritique = JSON.parse(cleaned);
-    } catch {
-      lastCritique = {
-        approved: ok,
-        issues: ok ? [] : ['Critique failed'],
-        suggestions: [],
-      };
+    } else {
+      try {
+        const raw = await callClaude(criticPrompt, {
+          model: options.reviewerModel,
+          system: criticSystem,
+        });
+        // Strip markdown code fences if present
+        const cleaned = raw
+          .replace(/^```(?:json)?\s*\n?/i, '')
+          .replace(/\n?```\s*$/i, '')
+          .trim();
+        lastCritique = JSON.parse(cleaned);
+      } catch {
+        lastCritique = {
+          approved: ok,
+          issues: ok ? [] : ['Critique failed'],
+          suggestions: [],
+        };
+      }
     }
 
     iterations.push({
@@ -213,75 +268,77 @@ export async function runSpike(
     contextTokens: Math.ceil(finalDiff.length / 4),
   };
 
-  // Persist audit + metrics
-  try {
-    const dir =
-      options.auditDir || path.join(input.repoPath, '.stackmemory', 'build');
-    fs.mkdirSync(dir, { recursive: true });
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const file = path.join(dir, `spike-${stamp}.json`);
-    fs.writeFileSync(
-      file,
-      JSON.stringify(
-        {
-          input,
-          options: { ...options, auditDir: undefined },
-          plan,
-          iterations,
-          metrics: runMetrics,
-        },
-        null,
-        2
-      )
-    );
-
-    // Append to metrics JSONL for time-series analysis
-    const metricsFile = path.join(dir, 'harness-metrics.jsonl');
-    fs.appendFileSync(metricsFile, JSON.stringify(runMetrics) + '\n');
-
-    // LOOP 5: Harness Regression — check rolling window against targets
+  // Persist audit + metrics unless explicitly disabled for replay/smoke runs.
+  if (options.persistAudit !== false) {
     try {
-      const lines = fs
-        .readFileSync(metricsFile, 'utf-8')
-        .split('\n')
-        .filter((l) => l.trim());
-      const recent = lines
-        .slice(-10)
-        .map((l) => JSON.parse(l) as HarnessRunMetrics);
-      if (recent.length >= 3) {
-        const summary = summarizeRuns(recent);
-        if (summary.approvalRate < HARNESS_TARGETS.firstPassApprovalRate) {
-          feedbackLoops.fire(
-            'harnessRegression',
-            'metrics_append',
-            {
-              metric: 'approvalRate',
-              current: summary.approvalRate,
-              target: HARNESS_TARGETS.firstPassApprovalRate,
-              window: recent.length,
-            },
-            'regression_alert'
-          );
+      const dir =
+        options.auditDir || path.join(input.repoPath, '.stackmemory', 'build');
+      fs.mkdirSync(dir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const file = path.join(dir, `spike-${stamp}.json`);
+      fs.writeFileSync(
+        file,
+        JSON.stringify(
+          {
+            input,
+            options: { ...options, auditDir: undefined },
+            plan,
+            iterations,
+            metrics: runMetrics,
+          },
+          null,
+          2
+        )
+      );
+
+      // Append to metrics JSONL for time-series analysis
+      const metricsFile = path.join(dir, 'harness-metrics.jsonl');
+      fs.appendFileSync(metricsFile, JSON.stringify(runMetrics) + '\n');
+
+      // LOOP 5: Harness Regression — check rolling window against targets
+      try {
+        const lines = fs
+          .readFileSync(metricsFile, 'utf-8')
+          .split('\n')
+          .filter((l) => l.trim());
+        const recent = lines
+          .slice(-10)
+          .map((l) => JSON.parse(l) as HarnessRunMetrics);
+        if (recent.length >= 3) {
+          const summary = summarizeRuns(recent);
+          if (summary.approvalRate < HARNESS_TARGETS.firstPassApprovalRate) {
+            feedbackLoops.fire(
+              'harnessRegression',
+              'metrics_append',
+              {
+                metric: 'approvalRate',
+                current: summary.approvalRate,
+                target: HARNESS_TARGETS.firstPassApprovalRate,
+                window: recent.length,
+              },
+              'regression_alert'
+            );
+          }
+          if (summary.p95TotalLatencyMs > HARNESS_TARGETS.totalLatencyP95Ms) {
+            feedbackLoops.fire(
+              'harnessRegression',
+              'metrics_append',
+              {
+                metric: 'totalLatencyP95',
+                current: summary.p95TotalLatencyMs,
+                target: HARNESS_TARGETS.totalLatencyP95Ms,
+                window: recent.length,
+              },
+              'regression_alert'
+            );
+          }
         }
-        if (summary.p95TotalLatencyMs > HARNESS_TARGETS.totalLatencyP95Ms) {
-          feedbackLoops.fire(
-            'harnessRegression',
-            'metrics_append',
-            {
-              metric: 'totalLatencyP95',
-              current: summary.p95TotalLatencyMs,
-              target: HARNESS_TARGETS.totalLatencyP95Ms,
-              window: recent.length,
-            },
-            'regression_alert'
-          );
-        }
+      } catch {
+        // best-effort
       }
     } catch {
-      // best-effort
+      // best-effort only
     }
-  } catch {
-    // best-effort only
   }
 
   // Optionally record to local context DB
@@ -418,12 +475,15 @@ async function recordAsFrame(
 // Lightweight planner: returns only the plan without implementation/critique
 export async function runPlanOnly(
   input: PlanningInput,
-  options: { plannerModel?: string } = {}
+  options: { plannerModel?: string; deterministicFixture?: boolean } = {}
 ): Promise<ImplementationPlan> {
   const plannerSystem = `You write concise, actionable implementation plans. Output raw JSON only (no markdown code fences). Schema: { "summary": "string", "steps": [{ "id": "step-1", "title": "string", "rationale": "string", "acceptanceCriteria": ["string"] }], "risks": ["string"] }`;
   const contextSummary = getLocalContextSummary(input.repoPath);
   const plannerPrompt = `Task: ${input.task}\nRepo: ${input.repoPath}\nNotes: ${input.contextNotes || '(none)'}\n${contextSummary}\nConstraints: Keep the plan minimal and implementable in a single PR.`;
 
+  if (options.deterministicFixture) {
+    return heuristicPlan(input);
+  }
   try {
     const raw = await callClaude(plannerPrompt, {
       model: options.plannerModel,

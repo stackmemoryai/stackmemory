@@ -423,7 +423,7 @@ Options: `--until`, `--until-not`, `--until-empty`, `--until-non-empty`, `--unti
 - [Development Guide](./docs/DEVELOPMENT.md) — Contributing and development
 - [Architecture](./docs/architecture.md) — System design
 - [API Reference](./docs/API_REFERENCE.md) — API documentation
-- [Vision](./vision.md) — Product vision and principles
+- [Vision](./docs/vision.md) — Product vision and principles
 - [Status](./docs/status.md) — Current project status
 - [Roadmap](./docs/roadmap.md) — Future plans
 

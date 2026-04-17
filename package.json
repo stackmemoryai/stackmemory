@@ -1,6 +1,6 @@
 {
   "name": "@stackmemoryai/stackmemory",
-  "version": "1.10.5",
+  "version": "1.10.6",
   "description": "Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, pre-flight overlap checks, Claude/Codex/OpenCode wrappers, Linear sync, and automatic hooks.",
   "engines": {
     "node": ">=20.0.0",
@@ -114,6 +114,11 @@
     "test:run": "vitest run",
     "test:pre-publish": "./scripts/test-pre-publish-quick.sh",
     "test:pre-commit": "vitest related --run --reporter=dot --silent --bail=1",
+    "determinism:smoke": "node --import tsx src/cli/index.ts bench determinism --task \"Determinism probe\" --runs 5",
+    "determinism:watch": "node --import tsx src/cli/index.ts bench determinism --task \"Determinism probe\" --runs 3 --watch",
+    "determinism:latest": "node --import tsx src/cli/index.ts bench determinism --latest --json",
+    "determinism:test": "npx vitest run src/orchestrators/multimodal/__tests__/determinism.test.ts --reporter=dot",
+    "determinism:pre-commit": "bash scripts/determinism-pre-commit.sh",
     "prepublishOnly": "npm run build && npm run verify:dist && npm run test:pre-publish",
     "quality": "npm run lint && npm run test:run && npm run build",
     "dev": "tsx watch src/integrations/mcp/server.ts",

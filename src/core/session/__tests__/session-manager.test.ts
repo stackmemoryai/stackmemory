@@ -21,6 +21,15 @@ vi.mock('child_process', () => ({
   execSync: vi.fn().mockReturnValue('main\n'),
 }));
 
+vi.mock('../../shared-state/canonical-store.js', () => ({
+  canonicalStateStore: {
+    upsertSession: vi.fn().mockResolvedValue({}),
+    appendEvent: vi.fn().mockResolvedValue(undefined),
+    endSession: vi.fn().mockResolvedValue(undefined),
+    initialize: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe('SessionManager', () => {
   let manager: SessionManager;
 
