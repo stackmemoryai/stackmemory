@@ -52,6 +52,16 @@
             "command": "entire hooks claude-code stop"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/gepa/hooks/gepa-session-hook.js",
+            "async": true
+          }
+        ]
       }
     ],
     "PreToolUse": [

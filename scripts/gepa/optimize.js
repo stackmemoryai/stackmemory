@@ -91,6 +91,103 @@ const GENERATIONS_DIR = path.join(GEPA_DIR, 'generations');
 const RESULTS_DIR = path.join(GEPA_DIR, 'results');
 const EVALS_DIR = path.join(GEPA_DIR, 'evals');
 
+// --phase <name> scopes optimization to a single conductor phase file
+const phaseIdx = process.argv.indexOf('--phase');
+const phaseName = phaseIdx !== -1 ? process.argv[phaseIdx + 1] : null;
+if (phaseIdx !== -1) process.argv.splice(phaseIdx, 2);
+
+const CONDUCTOR_PROMPTS_DIR = path.join(
+  process.env.HOME || '',
+  '.stackmemory',
+  'conductor',
+  'prompts'
+);
+
+/**
+ * Phase-aware optimization: read failure data from outcomes.jsonl
+ * and build context for phase-scoped mutations.
+ */
+function getPhaseFailureContext(phase) {
+  const outcomesPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'conductor',
+    'outcomes.jsonl'
+  );
+  if (!fs.existsSync(outcomesPath)) return '';
+
+  try {
+    const lines = fs
+      .readFileSync(outcomesPath, 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    const recent = lines.slice(-100).map((l) => JSON.parse(l));
+    const phaseFailures = recent.filter(
+      (o) => o.outcome === 'failure' && o.phase === phase
+    );
+
+    if (phaseFailures.length === 0) return '';
+
+    const examples = phaseFailures.slice(-10).map((f) => {
+      const err = f.errorTail || 'unknown error';
+      return `- ${f.issue} (attempt ${f.attempt}): ${err.slice(0, 200)}`;
+    });
+
+    return `\n## Recent failures in "${phase}" phase (${phaseFailures.length} of last ${recent.length} runs):\n${examples.join('\n')}\n`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Auto-detect worst phase from outcomes for targeted optimization
+ */
+function detectWorstPhase() {
+  const outcomesPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'conductor',
+    'outcomes.jsonl'
+  );
+  if (!fs.existsSync(outcomesPath)) return null;
+
+  try {
+    const lines = fs
+      .readFileSync(outcomesPath, 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    const recent = lines.slice(-50).map((l) => JSON.parse(l));
+    const failures = recent.filter((o) => o.outcome === 'failure');
+    if (failures.length === 0) return null;
+
+    // Group by phase, find worst
+    const byPhase = {};
+    for (const f of failures) {
+      const p = mapAgentPhaseToPromptPhase(f.phase);
+      byPhase[p] = (byPhase[p] || 0) + 1;
+    }
+
+    const sorted = Object.entries(byPhase).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Map conductor AgentPhase names to prompt phase file names */
+function mapAgentPhaseToPromptPhase(agentPhase) {
+  const map = {
+    reading: 'understand',
+    planning: 'understand',
+    implementing: 'implement',
+    testing: 'validate',
+    linting: 'validate',
+    building: 'validate',
+    committing: 'deliver',
+  };
+  return map[agentPhase] || 'implement';
+}
+
 // Ensure directories
 [GENERATIONS_DIR, RESULTS_DIR, EVALS_DIR].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -214,6 +311,72 @@ async function mutate() {
 
   console.log(
     `\nGenerated ${variants.length} variants in gen-${String(nextGen).padStart(3, '0')}/`
+  );
+  return variants;
+}
+
+/**
+ * Phase-scoped mutation: optimize a single conductor phase file
+ * using failure data from outcomes.jsonl.
+ */
+async function mutatePhase(phase) {
+  const phasePath = path.join(CONDUCTOR_PROMPTS_DIR, `${phase}.md`);
+  if (!fs.existsSync(phasePath)) {
+    console.error(`[GEPA] Phase file not found: ${phasePath}`);
+    return;
+  }
+
+  const current = fs.readFileSync(phasePath, 'utf8');
+  const failureContext = getPhaseFailureContext(phase);
+  const state = getState();
+  const nextGen = state.currentGeneration + 1;
+
+  console.log(`[GEPA] Phase-scoped optimization: ${phase}`);
+  if (failureContext) {
+    console.log(`[GEPA] Including failure context from outcomes.jsonl`);
+  }
+
+  const genDir = getGenPath(nextGen);
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  // Generate 2 variants (smaller population for phase-level)
+  const mutations = config.evolution.mutationStrategies;
+  const variants = [];
+
+  for (let i = 0; i < 2; i++) {
+    const strategy =
+      mutations[(state.currentGeneration + i) % mutations.length];
+    const variantName = `phase-${phase}-${String.fromCharCode(97 + i)}`;
+
+    console.log(`  Creating ${variantName} using strategy: ${strategy}`);
+
+    // Inject phase-specific context into mutation prompt
+    const phaseAugmented = `${current}\n${failureContext}`;
+    const mutatedContent = await generateMutation(
+      phaseAugmented,
+      strategy,
+      state
+    );
+
+    const variantPath = path.join(genDir, `${variantName}.md`);
+    fs.writeFileSync(variantPath, mutatedContent);
+    variants.push({ name: variantName, strategy, path: variantPath, phase });
+  }
+
+  // Save baseline
+  fs.writeFileSync(path.join(genDir, `phase-${phase}-baseline.md`), current);
+
+  state.history.push({
+    generation: nextGen,
+    action: 'mutate-phase',
+    phase,
+    variants: variants.map((v) => v.name),
+    timestamp: new Date().toISOString(),
+  });
+  saveState(state);
+
+  console.log(
+    `\n[GEPA] Generated ${variants.length} phase variants for ${phase}`
   );
   return variants;
 }
@@ -1352,7 +1515,19 @@ switch (command) {
     init(arg1);
     break;
   case 'mutate':
-    mutate();
+    if (phaseName || hasFlag('--auto-phase')) {
+      const phase = phaseName || detectWorstPhase();
+      if (phase) {
+        mutatePhase(phase);
+      } else {
+        console.log(
+          '[GEPA] No phase failures detected — skipping phase mutation'
+        );
+        mutate();
+      }
+    } else {
+      mutate();
+    }
     break;
   case 'eval':
     runEval(arg1 || 'baseline');
