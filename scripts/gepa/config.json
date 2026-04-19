@@ -32,6 +32,36 @@
       "file": "CLAUDE.md",
       "evals": ["stackmemory-tasks.jsonl"],
       "description": "StackMemory project prompt"
+    },
+    {
+      "name": "skill:start",
+      "file": "~/.claude/commands/start.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session boot skill"
+    },
+    {
+      "name": "skill:stop",
+      "file": "~/.claude/commands/stop.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session close skill"
+    },
+    {
+      "name": "skill:learn",
+      "file": "~/.claude/commands/learn.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session review + artifact update skill"
+    },
+    {
+      "name": "skill:next",
+      "file": "~/.claude/commands/next.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Next action recommendation skill"
+    },
+    {
+      "name": "skill:summary",
+      "file": "~/.claude/commands/summary.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session summary skill"
     }
   ],
 
@@ -143,6 +173,26 @@
       },
       "evals": {
         "files": ["conductor-tasks.jsonl"]
+      }
+    },
+    "skills": {
+      "target": {
+        "file": "~/.claude/commands/start.md",
+        "scope": "user",
+        "backup": true
+      },
+      "evolution": {
+        "mutationStrategies": [
+          "simplify",
+          "add_examples",
+          "rephrase",
+          "add_constraints",
+          "reduce_overengineering",
+          "add_self_check"
+        ]
+      },
+      "evals": {
+        "files": ["skill-tasks.jsonl"]
       }
     }
   }

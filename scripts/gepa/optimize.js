@@ -104,6 +104,64 @@ const CONDUCTOR_PROMPTS_DIR = path.join(
 );
 
 /**
+ * Skill-aware optimization: read usage data from skill-audit.jsonl
+ * and build context for skill-scoped mutations.
+ */
+function getSkillAuditContext(skillName) {
+  const auditPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'skill-audit.jsonl'
+  );
+  if (!fs.existsSync(auditPath)) return '';
+
+  try {
+    const lines = fs
+      .readFileSync(auditPath, 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    const entries = lines.map((l) => JSON.parse(l));
+
+    // Filter to this skill
+    const skillEntries = entries.filter((e) => e.skill === skillName);
+    if (skillEntries.length === 0) return '';
+
+    const total = skillEntries.length;
+    const errors = skillEntries.filter((e) => e.error).length;
+    const errorRate = ((errors / total) * 100).toFixed(1);
+
+    // Common args patterns
+    const argCounts = {};
+    for (const e of skillEntries) {
+      const arg = e.args || '(none)';
+      argCounts[arg] = (argCounts[arg] || 0) + 1;
+    }
+    const topArgs = Object.entries(argCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([arg, count]) => `  - "${arg}": ${count}x`)
+      .join('\n');
+
+    // Recent errors
+    const recentErrors = skillEntries
+      .filter((e) => e.error)
+      .slice(-5)
+      .map((e) => `  - ${e.ts}: args="${e.args}"`)
+      .join('\n');
+
+    let ctx = `\n## Skill usage data for "${skillName}" (${total} invocations, ${errorRate}% error rate):\n`;
+    ctx += `\nMost common args:\n${topArgs}\n`;
+    if (recentErrors) {
+      ctx += `\nRecent errors:\n${recentErrors}\n`;
+    }
+
+    return ctx;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Phase-aware optimization: read failure data from outcomes.jsonl
  * and build context for phase-scoped mutations.
  */
@@ -538,7 +596,17 @@ async function generateMutation(content, strategy, state) {
     return generateMutation(content, 'rephrase', state);
   }
 
-  const prompt = `You are an expert prompt engineer optimizing a CLAUDE.md system prompt for an AI coding agent (Claude Opus 4.6).
+  // Detect if optimizing a skill .md file
+  const isSkillTarget = targetName && targetName.startsWith('skill:');
+  const skillAuditCtx = isSkillTarget
+    ? getSkillAuditContext(targetName.replace('skill:', ''))
+    : '';
+
+  const targetDescription = isSkillTarget
+    ? 'a Claude Code slash command (skill) .md file that instructs an AI coding agent what to do when the user invokes the command'
+    : 'a CLAUDE.md system prompt for an AI coding agent (Claude Opus 4.6)';
+
+  const prompt = `You are an expert prompt engineer optimizing ${targetDescription}.
 
 <current_prompt>
 ${content}
@@ -565,6 +633,7 @@ ${getRecentFeedback(state)}
 
 REFLECTION INSIGHTS (from failure pattern analysis):
 ${getReflectionInsights()}
+${skillAuditCtx}
 </context>
 
 <requirements>
@@ -1504,6 +1573,110 @@ async function runAll(generations = 3) {
   console.log('═'.repeat(60));
 }
 
+/**
+ * Show skill audit statistics from skill-audit.jsonl
+ */
+function showSkillStats() {
+  const auditPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'skill-audit.jsonl'
+  );
+
+  if (!fs.existsSync(auditPath)) {
+    console.log('No skill audit data yet. Use skills to generate data.');
+    return;
+  }
+
+  const lines = fs.readFileSync(auditPath, 'utf8').split('\n').filter(Boolean);
+  const entries = lines.map((l) => JSON.parse(l));
+
+  // Group by skill
+  const bySkill = {};
+  for (const e of entries) {
+    if (!bySkill[e.skill]) bySkill[e.skill] = { total: 0, errors: 0, args: {} };
+    bySkill[e.skill].total++;
+    if (e.error) bySkill[e.skill].errors++;
+    const arg = e.args || '(none)';
+    bySkill[e.skill].args[arg] = (bySkill[e.skill].args[arg] || 0) + 1;
+  }
+
+  console.log(`Skill Audit Stats (${entries.length} total invocations)\n`);
+  console.log(
+    `${'Skill'.padEnd(20)} ${'Count'.padStart(6)} ${'Errors'.padStart(7)} ${'Rate'.padStart(6)}`
+  );
+  console.log('-'.repeat(42));
+
+  const sorted = Object.entries(bySkill).sort(
+    (a, b) => b[1].total - a[1].total
+  );
+  for (const [skill, stats] of sorted) {
+    const rate = ((stats.errors / stats.total) * 100).toFixed(0);
+    console.log(
+      `${skill.padEnd(20)} ${String(stats.total).padStart(6)} ${String(stats.errors).padStart(7)} ${(rate + '%').padStart(6)}`
+    );
+  }
+
+  // Show skill targets available for optimization
+  const skillTargets = (config.targets || []).filter((t) =>
+    t.name.startsWith('skill:')
+  );
+  if (skillTargets.length) {
+    console.log(`\nConfigured skill targets:`);
+    for (const t of skillTargets) {
+      const hasData = bySkill[t.name.replace('skill:', '')];
+      const marker = hasData ? '✓' : '○';
+      console.log(`  ${marker} ${t.name.padEnd(20)} ${t.file}`);
+    }
+  }
+}
+
+/**
+ * Run optimization on all skill targets
+ */
+async function runSkills(generations = 3) {
+  const skillTargets = (config.targets || []).filter((t) =>
+    t.name.startsWith('skill:')
+  );
+
+  if (!skillTargets.length) {
+    console.log('No skill targets configured in config.json.');
+    return;
+  }
+
+  console.log(
+    `Running GEPA on ${skillTargets.length} skill targets (${generations} generations each)\n`
+  );
+
+  for (const target of skillTargets) {
+    const resolved = target.file.startsWith('~')
+      ? path.join(process.env.HOME, target.file.slice(1))
+      : path.resolve(target.file);
+
+    if (!fs.existsSync(resolved)) {
+      console.log(`Skipping ${target.name}: ${resolved} not found\n`);
+      continue;
+    }
+
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`SKILL: ${target.name} (${target.file})`);
+    console.log(`${'═'.repeat(60)}\n`);
+
+    // Override config for this target
+    config.target.file = target.file;
+    if (target.evals) config.evals.files = target.evals;
+
+    await init(resolved);
+    await run(generations);
+
+    console.log(`\nCompleted ${target.name}\n`);
+  }
+
+  console.log('\n' + '═'.repeat(60));
+  console.log('ALL SKILL TARGETS COMPLETE');
+  console.log('═'.repeat(60));
+}
+
 // CLI
 const command = process.argv[2];
 const arg1 = process.argv[3];
@@ -1554,6 +1727,12 @@ switch (command) {
   case 'run-all':
     runAll(parseInt(arg1) || 3);
     break;
+  case 'skill-stats':
+    showSkillStats();
+    break;
+  case 'run-skills':
+    runSkills(parseInt(arg1) || 3);
+    break;
   default:
     console.log(`
 GEPA - Genetic Eval-driven Prompt Algorithm
@@ -1571,6 +1750,11 @@ Usage:
 
   node optimize.js targets                List available targets
   node optimize.js run-all [generations]  Run optimization on ALL targets
+
+Skill optimization:
+  node optimize.js skill-stats            Show skill audit statistics
+  node optimize.js run-skills [gens]      Run optimization on all skill targets
+  node optimize.js run --target skill:start   Optimize a specific skill
 
 Options:
   --target <name>                        Select target from targets[] config

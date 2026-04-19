@@ -258,12 +258,18 @@ For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor
 - Prioritizes: unfinished work > flagged issues > queued tasks > continuations
 - Trigger: session start, "what's next", "whats next", between tasks
 
+**`/learn`** — Run at session end to capture learnings:
+- Reviews session work, then audits memory, CLAUDE.md, skills, scripts, and wiki
+- Proposes creates/updates/deletes with confirmation before applying
+- Trigger: end of session, after significant work, "what should I update"
+
 **When to use which:**
 - Starting a session or between tasks → `/next` (pick what to work on)
 - Session producing wrong results → `/recover` (diagnose + fix now)
 - Routine maintenance, nothing broken → `/update-docs` (proactive gardening)
 - After publishing a new version → `/update-docs` (catch version/path drift)
 - After conductor failures → `/recover last` (learn from agent traces)
+- End of session → `/learn` (capture what changed, update artifacts)
 
 ## Workflow
 
