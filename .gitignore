@@ -135,6 +135,7 @@ scripts/gepa/results/scores.jsonl
 scripts/gepa/state.json
 scripts/gepa/results/
 scripts/gepa/generations/
+scripts/gepa/cache/
 
 # Agent tool working dirs (untracked, per-tool scratch)
 .ralph/

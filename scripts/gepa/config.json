@@ -66,7 +66,9 @@
   ],
 
   "evolution": {
-    "populationSize": 4,
+    "populationSize": 8,
+    "crossoverCount": 2,
+    "elitism": true,
     "generations": 10,
     "selectionRate": 0.5,
     "selfReview": true,
@@ -88,8 +90,9 @@
 
   "evals": {
     "directory": "./evals",
-    "minSamplesPerVariant": 8,
+    "minSamplesPerVariant": 25,
     "timeout": 120000,
+    "heldOutPartition": true,
     "metrics": [
       "task_completion",
       "code_quality",
@@ -103,7 +106,8 @@
   "judge": {
     "model": "claude-haiku-4-5-20251001",
     "maxOutputTokens": 2000,
-    "timeoutMs": 30000
+    "timeoutMs": 120000,
+    "feedbackEnabled": true
   },
 
   "mutation": {
