@@ -1053,27 +1053,31 @@ Respond with ONLY this JSON (no markdown fences):
 async function callJudge(prompt, model) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
+  // Try API first
   if (apiKey) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Judge API error: ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.content[0].text;
+      }
+      // API failed, fall through to CLI
+    } catch {
+      // API error, fall through to CLI
     }
-
-    const data = await response.json();
-    return data.content[0].text;
   }
 
   // Fallback to CLI
@@ -1175,10 +1179,16 @@ async function scoreAndSelect() {
     return;
   }
 
-  const variants = fs
+  let variants = fs
     .readdirSync(genDir)
     .filter((f) => f.endsWith('.md'))
     .map((f) => f.replace('.md', ''));
+
+  // When targeting a skill, exclude conductor phase variants (and vice versa)
+  const isSkill = targetName && targetName.startsWith('skill:');
+  if (isSkill) {
+    variants = variants.filter((v) => !v.startsWith('phase-'));
+  }
 
   console.log(`Scoring ${variants.length} variants in generation ${gen}...`);
 
