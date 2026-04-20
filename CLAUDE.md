@@ -87,6 +87,13 @@ stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrat
 stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
 stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
 stackmemory conductor status   # Live agent status dashboard
+
+# GEPA Optimizer (scripts/gepa/optimize.js)
+node scripts/gepa/optimize.js run [gens] [--auto-apply]  # Full optimization loop
+node scripts/gepa/optimize.js score [--auto-apply]        # Score variants, select best
+node scripts/gepa/optimize.js run --target skill:start     # Optimize specific target
+node scripts/gepa/optimize.js mutate --auto-phase          # Auto-detect worst phase
+# Flags: --auto-apply (deploy winner), --no-cache (fresh eval), --target <name>, --phase <name>
 stackmemory conductor monitor  # Real-time TUI with phase tracking
 stackmemory conductor finalize # Clean up dead/stale agents
 stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
