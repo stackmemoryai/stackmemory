@@ -8,11 +8,18 @@
  *   node optimize.js init                    # Initialize with current CLAUDE.md
  *   node optimize.js mutate                  # Generate new variants
  *   node optimize.js eval [variant]          # Run evals on variant(s)
- *   node optimize.js score                   # Score all variants in generation
+ *   node optimize.js score [--auto-apply]    # Score all variants in generation
  *   node optimize.js select                  # Select best, advance generation
- *   node optimize.js run [generations]       # Full optimization loop
+ *   node optimize.js run [gens] [--auto-apply] # Full optimization loop
  *   node optimize.js status                  # Show current status
  *   node optimize.js diff [a] [b]            # Compare two variants
+ *
+ * Flags:
+ *   --auto-apply    Apply winning variant to target file automatically
+ *   --no-cache      Bypass eval response cache (force fresh eval)
+ *   --target <name> Optimize a specific target from config.targets[]
+ *   --phase <name>  Phase-scoped mutation for conductor prompts
+ *   --auto-phase    Auto-detect worst phase from outcomes.jsonl
  */
 
 import fs from 'fs';
@@ -95,6 +102,10 @@ const EVALS_DIR = path.join(GEPA_DIR, 'evals');
 const phaseIdx = process.argv.indexOf('--phase');
 const phaseName = phaseIdx !== -1 ? process.argv[phaseIdx + 1] : null;
 if (phaseIdx !== -1) process.argv.splice(phaseIdx, 2);
+
+// --auto-apply: automatically apply winning variant when threshold is reached
+const autoApply = process.argv.includes('--auto-apply');
+if (autoApply) process.argv.splice(process.argv.indexOf('--auto-apply'), 1);
 
 const CONDUCTOR_PROMPTS_DIR = path.join(
   process.env.HOME || '',
@@ -1630,7 +1641,14 @@ async function run(generations = config.evolution.generations) {
   console.log(`Best variant: ${state.bestVariant}`);
   console.log(`Best score: ${(state.bestScore * 100).toFixed(1)}%`);
   console.log(`Generations: ${state.currentGeneration}`);
-  console.log(`\nTo apply: node optimize.js apply`);
+
+  // Auto-apply winning variant if flag set and improvement found
+  if (autoApply && state.bestVariant !== 'baseline') {
+    console.log(`\n[auto-apply] Deploying ${state.bestVariant} to target...`);
+    await apply();
+  } else {
+    console.log(`\nTo apply: node optimize.js apply`);
+  }
 }
 
 /**
@@ -2031,7 +2049,12 @@ switch (command) {
     break;
   case 'select':
   case 'score':
-    scoreAndSelect();
+    scoreAndSelect().then((best) => {
+      if (autoApply && best && best.variant !== 'baseline') {
+        console.log(`\n[auto-apply] Deploying ${best.variant}...`);
+        return apply();
+      }
+    });
     break;
   case 'run':
     run(parseInt(arg1) || config.evolution.generations);

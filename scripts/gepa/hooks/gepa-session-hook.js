@@ -117,7 +117,7 @@ function triggerOptimization(hookState) {
     const { execSync } = await import('child_process');
     try {
       execSync('node ${optimizePath} mutate --auto-phase', { stdio: 'pipe', timeout: 300000 });
-      execSync('node ${optimizePath} score', { stdio: 'pipe', timeout: 300000 });
+      execSync('node ${optimizePath} score --auto-apply', { stdio: 'pipe', timeout: 300000 });
 
       // Read result and notify
       const fs = await import('fs');
