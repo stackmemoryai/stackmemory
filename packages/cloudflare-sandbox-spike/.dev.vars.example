@@ -1,0 +1,5 @@
+R2_ENDPOINT=https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
+AWS_ACCESS_KEY_ID=replace-me
+AWS_SECRET_ACCESS_KEY=replace-me
+CLOUDFLARE_ACCOUNT_ID=replace-me
+BACKUP_BUCKET_NAME=stackmemory-spike-backups
