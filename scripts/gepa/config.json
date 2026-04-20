@@ -32,11 +32,43 @@
       "file": "CLAUDE.md",
       "evals": ["stackmemory-tasks.jsonl"],
       "description": "StackMemory project prompt"
+    },
+    {
+      "name": "skill:start",
+      "file": "~/.claude/commands/start.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session boot skill"
+    },
+    {
+      "name": "skill:stop",
+      "file": "~/.claude/commands/stop.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session close skill"
+    },
+    {
+      "name": "skill:learn",
+      "file": "~/.claude/commands/learn.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session review + artifact update skill"
+    },
+    {
+      "name": "skill:next",
+      "file": "~/.claude/commands/next.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Next action recommendation skill"
+    },
+    {
+      "name": "skill:summary",
+      "file": "~/.claude/commands/summary.md",
+      "evals": ["skill-tasks.jsonl"],
+      "description": "Session summary skill"
     }
   ],
 
   "evolution": {
-    "populationSize": 4,
+    "populationSize": 8,
+    "crossoverCount": 2,
+    "elitism": true,
     "generations": 10,
     "selectionRate": 0.5,
     "selfReview": true,
@@ -58,8 +90,9 @@
 
   "evals": {
     "directory": "./evals",
-    "minSamplesPerVariant": 8,
+    "minSamplesPerVariant": 25,
     "timeout": 120000,
+    "heldOutPartition": true,
     "metrics": [
       "task_completion",
       "code_quality",
@@ -73,7 +106,8 @@
   "judge": {
     "model": "claude-haiku-4-5-20251001",
     "maxOutputTokens": 2000,
-    "timeoutMs": 30000
+    "timeoutMs": 120000,
+    "feedbackEnabled": true
   },
 
   "mutation": {
@@ -143,6 +177,26 @@
       },
       "evals": {
         "files": ["conductor-tasks.jsonl"]
+      }
+    },
+    "skills": {
+      "target": {
+        "file": "~/.claude/commands/start.md",
+        "scope": "user",
+        "backup": true
+      },
+      "evolution": {
+        "mutationStrategies": [
+          "simplify",
+          "add_examples",
+          "rephrase",
+          "add_constraints",
+          "reduce_overengineering",
+          "add_self_check"
+        ]
+      },
+      "evals": {
+        "files": ["skill-tasks.jsonl"]
       }
     }
   }

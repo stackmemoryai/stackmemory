@@ -26,6 +26,7 @@ import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { Transform, type TransformCallback } from 'stream';
+import { createHash } from 'crypto';
 import { logger } from '../../core/monitoring/logger.js';
 import { isProcessAlive } from '../../utils/process-cleanup.js';
 import {
@@ -199,7 +200,90 @@ export interface AgentOutcomeEntry {
   labels?: string[]; // issue labels for difficulty prediction
   errorTail?: string; // last 5 lines of output.log on failure
   promptHash?: string; // hash of the prompt template used
+  promptVersions?: Record<string, string>; // per-phase content hashes
   prUrl?: string; // GitHub PR URL if auto-created
+}
+
+/** Phase prompt file names for decomposed template */
+const PROMPT_PHASES = [
+  'system',
+  'understand',
+  'implement',
+  'validate',
+  'deliver',
+] as const;
+type PromptPhase = (typeof PROMPT_PHASES)[number];
+
+/**
+ * Build agent prompt from decomposed phase files if they exist,
+ * otherwise fall back to the monolith prompt-template.md.
+ *
+ * Returns { prompt, versions } where versions maps each phase
+ * to a short content hash for outcome attribution.
+ */
+function buildPromptFromPhases(
+  variables: Record<string, string>
+): { prompt: string; versions: Record<string, string> } | null {
+  const promptsDir = join(homedir(), '.stackmemory', 'conductor', 'prompts');
+
+  // Check if phase files exist
+  const systemPath = join(promptsDir, 'system.md');
+  if (!existsSync(systemPath)) return null;
+
+  const versions: Record<string, string> = {};
+  const parts: string[] = [];
+
+  for (const phase of PROMPT_PHASES) {
+    const phasePath = join(promptsDir, `${phase}.md`);
+    if (!existsSync(phasePath)) continue;
+
+    let content = readFileSync(phasePath, 'utf-8');
+    // Apply variable substitution
+    for (const [key, value] of Object.entries(variables)) {
+      content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+
+    parts.push(content);
+
+    // Short hash for outcome attribution (first 8 chars of hex digest)
+    const hash = createHash('sha256')
+      .update(readFileSync(phasePath, 'utf-8'))
+      .digest('hex')
+      .slice(0, 8);
+    versions[phase] = hash;
+  }
+
+  if (parts.length === 0) return null;
+
+  // Load DSPy-optimized examples if available
+  const dspyPath = join(
+    homedir(),
+    '.stackmemory',
+    'dspy',
+    'optimized_state.json'
+  );
+  if (existsSync(dspyPath)) {
+    try {
+      const state = JSON.parse(readFileSync(dspyPath, 'utf-8'));
+      for (const phase of PROMPT_PHASES) {
+        const sig = state[phase];
+        if (sig?.fewShotExamples?.length) {
+          const examples = sig.fewShotExamples
+            .slice(0, 3)
+            .map(
+              (ex: { input: unknown; output: unknown }) =>
+                `<example>\nInput: ${JSON.stringify(ex.input)}\nOutput: ${JSON.stringify(ex.output)}\n</example>`
+            )
+            .join('\n');
+          parts.push(`\n## Optimized Examples (${phase}):\n${examples}`);
+        }
+      }
+    } catch {
+      // Non-fatal — DSPy state is optional
+    }
+  }
+
+  return { prompt: parts.join('\n\n'), versions };
 }
 
 /** Get the conductor failures/outcomes log path */
@@ -416,7 +500,86 @@ export function getRetryStrategy(
     }
   }
 
+  // Add phase-specific assertion if phase files are active
+  const promptsDir = join(homedir(), '.stackmemory', 'conductor', 'prompts');
+  if (lastFailure?.phase && existsSync(join(promptsDir, 'system.md'))) {
+    const phaseAssertions = getPhaseAssertions(
+      lastFailure.phase,
+      lastFailure.errorTail || ''
+    );
+    adjustments.push(...phaseAssertions);
+  }
+
   return { shouldRetry: true, adjustments };
+}
+
+/**
+ * Generate phase-specific assertions for retry based on failure phase and error.
+ * These are injected into the retry prompt so the agent focuses on the exact
+ * failure point with targeted guidance.
+ */
+function getPhaseAssertions(phase: AgentPhase, error: string): string[] {
+  const assertions: string[] = [];
+
+  switch (phase) {
+    case 'reading':
+    case 'planning':
+      assertions.push(
+        'ASSERTION: Re-read the issue description completely before planning.',
+        'ASSERTION: List ALL files you plan to modify before starting implementation.'
+      );
+      break;
+
+    case 'implementing':
+      if (/scope|unrelated|refactor/i.test(error)) {
+        assertions.push(
+          'ASSERTION: Only modify files directly required by the issue. Do NOT refactor surrounding code.'
+        );
+      }
+      if (/import|module|ESM/i.test(error)) {
+        assertions.push(
+          'ASSERTION: Every relative import MUST end with .js extension. Check ALL new imports.'
+        );
+      }
+      assertions.push(
+        'ASSERTION: After implementing, review your diff — if any change is not required by the issue, revert it.'
+      );
+      break;
+
+    case 'testing':
+    case 'linting':
+    case 'building':
+      if (/lint|eslint/i.test(error)) {
+        assertions.push(
+          'ASSERTION: Run `npm run lint` IMMEDIATELY. Fix every error. Do NOT proceed until lint passes.',
+          'ASSERTION: Common lint fixes — catch {} not catch (_err) {}, remove unused imports, add .js to relative imports.'
+        );
+      }
+      if (/test|vitest|jest|FAIL/i.test(error)) {
+        assertions.push(
+          'ASSERTION: Read the FULL test error output. Identify which assertion fails and why.',
+          'ASSERTION: If vi.clearAllMocks() is in beforeEach, re-set any mockReturnValue calls after it.'
+        );
+      }
+      if (/build|tsc|type/i.test(error)) {
+        assertions.push(
+          'ASSERTION: Run `npm run build` and fix ALL TypeScript errors before committing.'
+        );
+      }
+      assertions.push(
+        'ASSERTION: Do NOT use --no-verify to bypass pre-commit hooks. Fix the underlying issue.'
+      );
+      break;
+
+    case 'committing':
+      assertions.push(
+        'ASSERTION: Commit message must follow format: type(scope): description',
+        'ASSERTION: If pre-commit hook fails, fix the issue and create a NEW commit — do NOT amend.'
+      );
+      break;
+  }
+
+  return assertions;
 }
 
 // ── Helpers ──
@@ -1407,6 +1570,7 @@ export class Conductor {
           durationMs: Date.now() - run.startedAt,
           hasCommits: true,
           labels: issue.labels.map((l) => l.name),
+          promptVersions: this.lastPromptVersions,
           prUrl,
         });
         await this.runHook(
@@ -1446,6 +1610,7 @@ export class Conductor {
           durationMs: Date.now() - run.startedAt,
           hasCommits: false,
           labels: issue.labels.map((l) => l.name),
+          promptVersions: this.lastPromptVersions,
           errorTail: run.error?.slice(-500),
         });
 
@@ -2449,10 +2614,13 @@ export class Conductor {
     }
   }
 
+  /** Last prompt version hashes — set by buildPrompt, read by outcome logging */
+  private lastPromptVersions: Record<string, string> = {};
+
   /**
-   * Build the agent prompt. If a custom template exists at
-   * ~/.stackmemory/conductor/prompt-template.md, use it with variable
-   * substitution. Otherwise fall back to the default template.
+   * Build the agent prompt. Tries decomposed phase files first
+   * (~/.stackmemory/conductor/prompts/*.md), then typed templates,
+   * then custom prompt-template.md, then default.
    *
    * Template variables: {{ISSUE_ID}}, {{TITLE}}, {{DESCRIPTION}},
    * {{LABELS}}, {{PRIORITY}}, {{ATTEMPT}}, {{PRIOR_CONTEXT}}
@@ -2489,6 +2657,24 @@ export class Conductor {
       );
     }
     const priorContext = contextParts.join('\n');
+
+    // Try decomposed phase files first
+    const variables: Record<string, string> = {
+      ISSUE_ID: issue.identifier,
+      TITLE: issue.title,
+      DESCRIPTION: issue.description || '',
+      LABELS: labels,
+      PRIORITY: priority,
+      SCOPE: issue.identifier.toLowerCase().replace(/-\d+$/, ''),
+      ATTEMPT: String(attempt),
+      PRIOR_CONTEXT: priorContext,
+    };
+
+    const phaseResult = buildPromptFromPhases(variables);
+    if (phaseResult) {
+      this.lastPromptVersions = phaseResult.versions;
+      return phaseResult.prompt;
+    }
 
     // Select template by issue type (labels or title heuristics)
     const templateDir = join(
@@ -2852,6 +3038,7 @@ export class Conductor {
       durationMs,
       hasCommits,
       labels: run.issue.labels.map((l) => l.name),
+      promptVersions: this.lastPromptVersions,
       errorTail,
       prUrl,
     });

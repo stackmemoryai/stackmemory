@@ -1,0 +1,1 @@
+{"issue":"STA-574","attempt":1,"outcome":"failure","phase":"implementing","toolCalls":98,"filesModified":8,"durationMs":600000,"hasCommits":false,"errorTail":"Agent timed out after 600000ms during implementation. Last activity: editing src/integrations/mcp/tools/search.ts","expected":{"filesModified":8,"scopeKept":false}}

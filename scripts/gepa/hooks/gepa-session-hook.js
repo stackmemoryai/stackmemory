@@ -105,7 +105,7 @@ function triggerOptimization(hookState) {
   const optimizePath = path.join(GEPA_DIR, 'optimize.js');
   const reflectPath = path.join(GEPA_DIR, 'hooks', 'reflect.js');
 
-  // Run reflect → optimize as a background pipeline
+  // Run reflect → phase-targeted optimize as a background pipeline
   const script = `
     // Reflect first (generates insights for mutation context)
     try {
@@ -113,16 +113,18 @@ function triggerOptimization(hookState) {
       await generateReflection();
     } catch {}
 
-    // Then optimize (1 generation, quick)
+    // Then optimize — use --auto-phase to target worst phase from outcomes
     const { execSync } = await import('child_process');
     try {
-      execSync('node ${optimizePath} mutate', { stdio: 'pipe', timeout: 300000 });
+      execSync('node ${optimizePath} mutate --auto-phase', { stdio: 'pipe', timeout: 300000 });
       execSync('node ${optimizePath} score', { stdio: 'pipe', timeout: 300000 });
 
       // Read result and notify
       const fs = await import('fs');
       const state = JSON.parse(fs.readFileSync('${STATE_PATH}', 'utf8'));
-      const msg = \`[GEPA] Auto-optimized: gen \${state.currentGeneration}, best=\${state.bestVariant} (\${(state.bestScore * 100).toFixed(1)}%). Run 'node ${optimizePath} apply' to apply.\`;
+      const lastAction = state.history?.[state.history.length - 1];
+      const phaseInfo = lastAction?.phase ? \` (phase: \${lastAction.phase})\` : '';
+      const msg = \`[GEPA] Auto-optimized\${phaseInfo}: gen \${state.currentGeneration}, best=\${state.bestVariant} (\${(state.bestScore * 100).toFixed(1)}%). Run 'node ${optimizePath} apply' to apply.\`;
       process.stderr.write(msg + '\\n');
     } catch (e) {
       process.stderr.write('[GEPA] Auto-optimize failed: ' + e.message + '\\n');

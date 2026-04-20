@@ -91,6 +91,195 @@ const GENERATIONS_DIR = path.join(GEPA_DIR, 'generations');
 const RESULTS_DIR = path.join(GEPA_DIR, 'results');
 const EVALS_DIR = path.join(GEPA_DIR, 'evals');
 
+// --phase <name> scopes optimization to a single conductor phase file
+const phaseIdx = process.argv.indexOf('--phase');
+const phaseName = phaseIdx !== -1 ? process.argv[phaseIdx + 1] : null;
+if (phaseIdx !== -1) process.argv.splice(phaseIdx, 2);
+
+const CONDUCTOR_PROMPTS_DIR = path.join(
+  process.env.HOME || '',
+  '.stackmemory',
+  'conductor',
+  'prompts'
+);
+
+// Eval response cache — deterministic baselines via record/replay
+const EVAL_CACHE_DIR = path.join(GEPA_DIR, 'cache');
+if (!fs.existsSync(EVAL_CACHE_DIR))
+  fs.mkdirSync(EVAL_CACHE_DIR, { recursive: true });
+
+import { createHash } from 'crypto';
+
+function evalCacheKey(taskId, variantContent) {
+  return createHash('sha256')
+    .update(`${taskId}:${variantContent.slice(0, 500)}`)
+    .digest('hex')
+    .slice(0, 16);
+}
+
+function getCachedEvalResult(taskId, variantContent) {
+  if (process.argv.includes('--no-cache')) return null;
+  const key = evalCacheKey(taskId, variantContent);
+  const cachePath = path.join(EVAL_CACHE_DIR, `${key}.json`);
+  if (fs.existsSync(cachePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setCachedEvalResult(taskId, variantContent, result) {
+  const key = evalCacheKey(taskId, variantContent);
+  const cachePath = path.join(EVAL_CACHE_DIR, `${key}.json`);
+  fs.writeFileSync(cachePath, JSON.stringify(result));
+}
+
+/**
+ * Skill-aware optimization: read usage data from skill-audit.jsonl
+ * and build context for skill-scoped mutations.
+ */
+function getSkillAuditContext(skillName) {
+  const auditPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'skill-audit.jsonl'
+  );
+  if (!fs.existsSync(auditPath)) return '';
+
+  try {
+    const lines = fs
+      .readFileSync(auditPath, 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    const entries = lines.map((l) => JSON.parse(l));
+
+    // Filter to this skill
+    const skillEntries = entries.filter((e) => e.skill === skillName);
+    if (skillEntries.length === 0) return '';
+
+    const total = skillEntries.length;
+    const errors = skillEntries.filter((e) => e.error).length;
+    const errorRate = ((errors / total) * 100).toFixed(1);
+
+    // Common args patterns
+    const argCounts = {};
+    for (const e of skillEntries) {
+      const arg = e.args || '(none)';
+      argCounts[arg] = (argCounts[arg] || 0) + 1;
+    }
+    const topArgs = Object.entries(argCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([arg, count]) => `  - "${arg}": ${count}x`)
+      .join('\n');
+
+    // Recent errors
+    const recentErrors = skillEntries
+      .filter((e) => e.error)
+      .slice(-5)
+      .map((e) => `  - ${e.ts}: args="${e.args}"`)
+      .join('\n');
+
+    let ctx = `\n## Skill usage data for "${skillName}" (${total} invocations, ${errorRate}% error rate):\n`;
+    ctx += `\nMost common args:\n${topArgs}\n`;
+    if (recentErrors) {
+      ctx += `\nRecent errors:\n${recentErrors}\n`;
+    }
+
+    return ctx;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Phase-aware optimization: read failure data from outcomes.jsonl
+ * and build context for phase-scoped mutations.
+ */
+function getPhaseFailureContext(phase) {
+  const outcomesPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'conductor',
+    'outcomes.jsonl'
+  );
+  if (!fs.existsSync(outcomesPath)) return '';
+
+  try {
+    const lines = fs
+      .readFileSync(outcomesPath, 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    const recent = lines.slice(-100).map((l) => JSON.parse(l));
+    const phaseFailures = recent.filter(
+      (o) => o.outcome === 'failure' && o.phase === phase
+    );
+
+    if (phaseFailures.length === 0) return '';
+
+    const examples = phaseFailures.slice(-10).map((f) => {
+      const err = f.errorTail || 'unknown error';
+      return `- ${f.issue} (attempt ${f.attempt}): ${err.slice(0, 200)}`;
+    });
+
+    return `\n## Recent failures in "${phase}" phase (${phaseFailures.length} of last ${recent.length} runs):\n${examples.join('\n')}\n`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Auto-detect worst phase from outcomes for targeted optimization
+ */
+function detectWorstPhase() {
+  const outcomesPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'conductor',
+    'outcomes.jsonl'
+  );
+  if (!fs.existsSync(outcomesPath)) return null;
+
+  try {
+    const lines = fs
+      .readFileSync(outcomesPath, 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    const recent = lines.slice(-50).map((l) => JSON.parse(l));
+    const failures = recent.filter((o) => o.outcome === 'failure');
+    if (failures.length === 0) return null;
+
+    // Group by phase, find worst
+    const byPhase = {};
+    for (const f of failures) {
+      const p = mapAgentPhaseToPromptPhase(f.phase);
+      byPhase[p] = (byPhase[p] || 0) + 1;
+    }
+
+    const sorted = Object.entries(byPhase).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Map conductor AgentPhase names to prompt phase file names */
+function mapAgentPhaseToPromptPhase(agentPhase) {
+  const map = {
+    reading: 'understand',
+    planning: 'understand',
+    implementing: 'implement',
+    testing: 'validate',
+    linting: 'validate',
+    building: 'validate',
+    committing: 'deliver',
+  };
+  return map[agentPhase] || 'implement';
+}
+
 // Ensure directories
 [GENERATIONS_DIR, RESULTS_DIR, EVALS_DIR].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -214,6 +403,145 @@ async function mutate() {
 
   console.log(
     `\nGenerated ${variants.length} variants in gen-${String(nextGen).padStart(3, '0')}/`
+  );
+  // Generate crossover children from previous generation's top variants
+  const crossoverCount = config.evolution.crossoverCount || 0;
+  if (crossoverCount > 0 && state.history.length > 0) {
+    const lastSelect = [...state.history]
+      .reverse()
+      .find((h) => h.action === 'select' && h.scores?.length >= 2);
+    if (lastSelect) {
+      const topTwo = lastSelect.scores.slice(0, 2);
+      const parentAPath = getGenPath(
+        state.currentGeneration,
+        topTwo[0].variant
+      );
+      const parentBPath = getGenPath(
+        state.currentGeneration,
+        topTwo[1].variant
+      );
+      if (fs.existsSync(parentAPath) && fs.existsSync(parentBPath)) {
+        const parentA = fs.readFileSync(parentAPath, 'utf8');
+        const parentB = fs.readFileSync(parentBPath, 'utf8');
+        for (let c = 0; c < crossoverCount; c++) {
+          const child = crossover(parentA, parentB);
+          const childName = `crossover-${String.fromCharCode(97 + c)}`;
+          fs.writeFileSync(getGenPath(nextGen, childName), child);
+          variants.push({
+            name: childName,
+            strategy: 'crossover',
+            path: getGenPath(nextGen, childName),
+          });
+          console.log(`  Created ${childName} using strategy: crossover`);
+        }
+      }
+    }
+  }
+
+  return variants;
+}
+
+/**
+ * Crossover: combine sections from two parent variants.
+ * For each markdown section, randomly pick from parent A or B.
+ */
+function crossover(parentA, parentB) {
+  const sectionsA = parseSections(parentA.split('\n'));
+  const sectionsB = parseSections(parentB.split('\n'));
+  const allKeys = [
+    ...new Set([...Object.keys(sectionsA), ...Object.keys(sectionsB)]),
+  ];
+
+  const result = [];
+  for (const key of allKeys) {
+    const hasA = key in sectionsA && sectionsA[key].trim();
+    const hasB = key in sectionsB && sectionsB[key].trim();
+    // Randomly pick source, preferring the one that has content
+    let content;
+    if (hasA && hasB) {
+      content = Math.random() < 0.5 ? sectionsA[key] : sectionsB[key];
+    } else {
+      content = hasA ? sectionsA[key] : sectionsB[key];
+    }
+    if (key !== '__preamble__') {
+      // Reconstruct heading — find depth from original
+      const depthA = parentA.match(
+        new RegExp(
+          `^(#{1,4})\\s+${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+          'm'
+        )
+      );
+      const prefix = depthA ? depthA[1] : '##';
+      result.push(`${prefix} ${key}`);
+    }
+    if (content) result.push(content);
+    result.push('');
+  }
+  return result.join('\n').trim();
+}
+
+/**
+ * Phase-scoped mutation: optimize a single conductor phase file
+ * using failure data from outcomes.jsonl.
+ */
+async function mutatePhase(phase) {
+  const phasePath = path.join(CONDUCTOR_PROMPTS_DIR, `${phase}.md`);
+  if (!fs.existsSync(phasePath)) {
+    console.error(`[GEPA] Phase file not found: ${phasePath}`);
+    return;
+  }
+
+  const current = fs.readFileSync(phasePath, 'utf8');
+  const failureContext = getPhaseFailureContext(phase);
+  const state = getState();
+  const nextGen = state.currentGeneration + 1;
+
+  console.log(`[GEPA] Phase-scoped optimization: ${phase}`);
+  if (failureContext) {
+    console.log(`[GEPA] Including failure context from outcomes.jsonl`);
+  }
+
+  const genDir = getGenPath(nextGen);
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  // Generate 2 variants (smaller population for phase-level)
+  const mutations = config.evolution.mutationStrategies;
+  const variants = [];
+
+  for (let i = 0; i < 2; i++) {
+    const strategy =
+      mutations[(state.currentGeneration + i) % mutations.length];
+    const variantName = `phase-${phase}-${String.fromCharCode(97 + i)}`;
+
+    console.log(`  Creating ${variantName} using strategy: ${strategy}`);
+
+    // Inject phase-specific context into mutation prompt
+    const phaseAugmented = `${current}\n${failureContext}`;
+    const mutatedContent = await generateMutation(
+      phaseAugmented,
+      strategy,
+      state
+    );
+
+    const variantPath = path.join(genDir, `${variantName}.md`);
+    fs.writeFileSync(variantPath, mutatedContent);
+    variants.push({ name: variantName, strategy, path: variantPath, phase });
+  }
+
+  // Save baseline
+  fs.writeFileSync(path.join(genDir, `phase-${phase}-baseline.md`), current);
+
+  state.history.push({
+    generation: nextGen,
+    action: 'mutate-phase',
+    phase,
+    variants: variants.map((v) => v.name),
+    timestamp: new Date().toISOString(),
+  });
+  saveState(state);
+
+  console.log(
+    `\n[GEPA] Generated ${variants.length} phase variants for ${phase}`
   );
   return variants;
 }
@@ -375,7 +703,17 @@ async function generateMutation(content, strategy, state) {
     return generateMutation(content, 'rephrase', state);
   }
 
-  const prompt = `You are an expert prompt engineer optimizing a CLAUDE.md system prompt for an AI coding agent (Claude Opus 4.6).
+  // Detect if optimizing a skill .md file
+  const isSkillTarget = targetName && targetName.startsWith('skill:');
+  const skillAuditCtx = isSkillTarget
+    ? getSkillAuditContext(targetName.replace('skill:', ''))
+    : '';
+
+  const targetDescription = isSkillTarget
+    ? 'a Claude Code slash command (skill) .md file that instructs an AI coding agent what to do when the user invokes the command'
+    : 'a CLAUDE.md system prompt for an AI coding agent (Claude Opus 4.6)';
+
+  const prompt = `You are an expert prompt engineer optimizing ${targetDescription}.
 
 <current_prompt>
 ${content}
@@ -402,6 +740,7 @@ ${getRecentFeedback(state)}
 
 REFLECTION INSIGHTS (from failure pattern analysis):
 ${getReflectionInsights()}
+${skillAuditCtx}
 </context>
 
 <requirements>
@@ -464,33 +803,72 @@ Output ONLY the final prompt content — no commentary, no review notes, no fenc
 }
 
 /**
- * Get recent evaluation feedback for context
+ * Get recent evaluation feedback for context (session scores + ASI judge feedback)
  */
 function getRecentFeedback(state) {
+  const parts = [];
+
+  // Session scores
   const scoresPath = path.join(RESULTS_DIR, 'scores.jsonl');
-  if (!fs.existsSync(scoresPath)) return 'No previous evaluations.';
+  if (fs.existsSync(scoresPath)) {
+    const lines = fs
+      .readFileSync(scoresPath, 'utf8')
+      .trim()
+      .split('\n')
+      .slice(-20);
+    const scores = lines.map((l) => JSON.parse(l));
 
-  const lines = fs
-    .readFileSync(scoresPath, 'utf8')
-    .trim()
-    .split('\n')
-    .slice(-20);
-  const scores = lines.map((l) => JSON.parse(l));
+    const summary = scores.reduce((acc, s) => {
+      if (!acc[s.variant]) acc[s.variant] = { total: 0, count: 0, errors: 0 };
+      acc[s.variant].total += s.metrics?.successfulToolCalls || 0;
+      acc[s.variant].count++;
+      acc[s.variant].errors += s.metrics?.errorCount || 0;
+      return acc;
+    }, {});
 
-  const summary = scores.reduce((acc, s) => {
-    if (!acc[s.variant]) acc[s.variant] = { total: 0, count: 0, errors: 0 };
-    acc[s.variant].total += s.metrics?.successfulToolCalls || 0;
-    acc[s.variant].count++;
-    acc[s.variant].errors += s.metrics?.errorCount || 0;
-    return acc;
-  }, {});
+    parts.push(
+      Object.entries(summary)
+        .map(
+          ([v, s]) =>
+            `${v}: ${s.count} sessions, ${s.errors} errors, avg success: ${(s.total / s.count).toFixed(1)}`
+        )
+        .join('\n')
+    );
+  }
 
-  return Object.entries(summary)
-    .map(
-      ([v, s]) =>
-        `${v}: ${s.count} sessions, ${s.errors} errors, avg success: ${(s.total / s.count).toFixed(1)}`
-    )
-    .join('\n');
+  // ASI feedback from most recent generation's judge
+  const feedbackFiles = fs.existsSync(RESULTS_DIR)
+    ? fs
+        .readdirSync(RESULTS_DIR)
+        .filter((f) => f.startsWith('feedback-') && f.endsWith('.json'))
+        .sort()
+        .reverse()
+    : [];
+
+  if (feedbackFiles.length > 0) {
+    try {
+      const feedback = JSON.parse(
+        fs.readFileSync(path.join(RESULTS_DIR, feedbackFiles[0]), 'utf8')
+      );
+      const feedbackLines = [];
+      for (const [criterion, entries] of Object.entries(feedback)) {
+        // Deduplicate feedback messages
+        const unique = [...new Set(entries.map((e) => e.feedback))].slice(0, 2);
+        for (const msg of unique) {
+          feedbackLines.push(`- ${criterion}: ${msg}`);
+        }
+      }
+      if (feedbackLines.length > 0) {
+        parts.push(
+          `\nJUDGE FEEDBACK (areas to improve):\n${feedbackLines.slice(0, 10).join('\n')}`
+        );
+      }
+    } catch {
+      // ignore malformed feedback files
+    }
+  }
+
+  return parts.length > 0 ? parts.join('\n') : 'No previous evaluations.';
 }
 
 /**
@@ -638,13 +1016,18 @@ async function runEval(variantName) {
   const evalFiles = config.evals.files
     ? config.evals.files.filter((f) => fs.existsSync(path.join(EVALS_DIR, f)))
     : fs.readdirSync(EVALS_DIR).filter((f) => f.endsWith('.jsonl'));
-  const tasks = evalFiles.flatMap((f) =>
+  let tasks = evalFiles.flatMap((f) =>
     fs
       .readFileSync(path.join(EVALS_DIR, f), 'utf8')
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l))
   );
+
+  // Respect held-out partition: only use "train" tasks during optimization
+  if (config.evals.heldOutPartition) {
+    tasks = tasks.filter((t) => !t.partition || t.partition === 'train');
+  }
 
   console.log(`  Found ${tasks.length} eval tasks`);
 
@@ -685,6 +1068,15 @@ async function runEval(variantName) {
  */
 async function runSingleEval(task, variantPath) {
   const startTime = Date.now();
+  const variantContent = fs.readFileSync(variantPath, 'utf8');
+
+  // Check eval response cache (deterministic baseline replay)
+  const cached = getCachedEvalResult(task.id, variantContent);
+  if (cached) {
+    console.log(`    [cached]`);
+    return cached;
+  }
+
   let tempDir;
 
   try {
@@ -712,7 +1104,7 @@ async function runSingleEval(task, variantPath) {
     // Evaluate result against expected outcomes (LLM judge with regex fallback)
     const evaluation = await evaluateExpectations(result, task.expected, task);
 
-    return {
+    const evalResult = {
       passed: evaluation.passed,
       passRate: evaluation.passRate,
       criteria: evaluation.criteria,
@@ -720,6 +1112,11 @@ async function runSingleEval(task, variantPath) {
       duration: Date.now() - startTime,
       output: result.slice(0, 2000),
     };
+
+    // Cache for deterministic replay on re-runs
+    setCachedEvalResult(task.id, variantContent, evalResult);
+
+    return evalResult;
   } catch (error) {
     return {
       passed: false,
@@ -761,7 +1158,7 @@ async function llmJudge(output, expected, task) {
     )
     .join('\n');
 
-  const judgePrompt = `You are a strict code evaluation judge. Evaluate whether the AI output satisfies each criterion.
+  const judgePrompt = `You are a strict code evaluation judge. Evaluate each criterion independently using chain-of-thought reasoning.
 
 <task_given>
 ${task.prompt}
@@ -776,7 +1173,11 @@ ${criteriaList}
 </criteria>
 
 <grounding_rules>
-Before judging each criterion, quote the specific line(s) from the AI output that satisfy or fail it. If you cannot find a relevant quote, the criterion fails.
+For EACH criterion independently:
+1. Quote the specific line(s) from the AI output relevant to this criterion
+2. Reason about whether the criterion is satisfied (think step by step)
+3. Make a binary pass/fail decision
+4. If it fails, write actionable feedback explaining what the output should have done differently
 
 Strictness guide:
 - "has_function" — a real, working function definition exists (not just mentioned in prose)
@@ -785,13 +1186,16 @@ Strictness guide:
 - "explains_fix" — a clear explanation of what was wrong and why the fix works
 - "no_overengineering" — solution is minimal; no unnecessary abstractions, extra files, or defensive code for impossible scenarios
 - "no_hallucination" — all claims about code are grounded in actual output; no references to files/functions that don't exist
+- "shows_branch" — output mentions the current git branch name
+- "suggests_next_action" — output recommends a concrete next step
+- "concise_output" — output is focused and not unnecessarily verbose
 </grounding_rules>
 
 Respond with ONLY this JSON (no markdown fences):
 {
   "criteria": {
-    "criterion_name": {"passed": true, "quote": "relevant line from output", "reason": "brief explanation"},
-    "criterion_name": {"passed": false, "quote": "", "reason": "brief explanation"}
+    "criterion_name": {"passed": true, "quote": "relevant line from output", "reason": "brief CoT reasoning", "feedback": ""},
+    "criterion_name": {"passed": false, "quote": "", "reason": "brief CoT reasoning", "feedback": "Actionable suggestion for improvement"}
   }
 }`;
 
@@ -816,12 +1220,17 @@ Respond with ONLY this JSON (no markdown fences):
 }
 
 /**
- * Call judge model via Anthropic API (fast, cheap model for evaluation)
+ * Validate API key at startup — fail fast before burning mutation budget.
  */
-async function callJudge(prompt, model) {
+let _apiKeyValidated = null; // null = untested, true/false = result
+async function validateApiKey() {
+  if (_apiKeyValidated !== null) return _apiKeyValidated;
   const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (apiKey) {
+  if (!apiKey) {
+    _apiKeyValidated = false;
+    return false;
+  }
+  try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -830,22 +1239,78 @@ async function callJudge(prompt, model) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model,
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'ping' }],
       }),
     });
-
+    _apiKeyValidated = response.ok;
     if (!response.ok) {
-      throw new Error(`Judge API error: ${response.status}`);
+      const body = await response.text().catch(() => '');
+      console.warn(
+        `  API key validation failed (${response.status}): ${body.slice(0, 200)}`
+      );
     }
+    return _apiKeyValidated;
+  } catch (e) {
+    console.warn(`  API key validation error: ${e.message}`);
+    _apiKeyValidated = false;
+    return false;
+  }
+}
 
-    const data = await response.json();
-    return data.content[0].text;
+/**
+ * Call judge model via Anthropic API (fast, cheap model for evaluation)
+ */
+async function callJudge(prompt, model) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  // Try API first (skip if key already known invalid)
+  if (apiKey && _apiKeyValidated !== false) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: config.judge?.maxOutputTokens || 2000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.content[0].text;
+      }
+      // Log failure reason for debugging
+      const errBody = await response.text().catch(() => '');
+      console.warn(
+        `    Judge API ${response.status}: ${errBody.slice(0, 150)}`
+      );
+      _apiKeyValidated = false; // Don't retry bad key
+    } catch (e) {
+      console.warn(`    Judge API error: ${e.message}`);
+    }
   }
 
-  // Fallback to CLI
-  return await spawnClaude(prompt, { timeoutMs: 30000 });
+  // Fallback to CLI with config-driven timeout
+  const timeoutMs = config.judge?.timeoutMs || 120000;
+  return await spawnClaude(prompt, { timeoutMs });
+}
+
+/**
+ * Extract code blocks from output (focus regex matching on actual code, not prose/errors)
+ */
+function extractCodeBlocks(output) {
+  const blocks = [];
+  const re = /```[\w]*\n([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(output)) !== null) blocks.push(m[1]);
+  return blocks.length > 0 ? blocks.join('\n') : output;
 }
 
 /**
@@ -853,26 +1318,33 @@ async function callJudge(prompt, model) {
  */
 function regexJudge(output, expected) {
   const criteria = {};
+  const code = extractCodeBlocks(output);
 
-  for (const [key] of Object.entries(expected)) {
+  for (const [key, value] of Object.entries(expected)) {
     let passed = false;
+
+    // Support custom regex from eval task definition
+    if (typeof value === 'object' && value !== null && value.regex) {
+      passed = new RegExp(value.regex).test(code);
+      criteria[key] = { passed, reason: 'custom regex' };
+      continue;
+    }
+
     switch (key) {
       case 'has_function':
         passed =
           /function\s+\w+|const\s+\w+\s*=\s*(\([^)]*\)|async)?\s*(=>|\{)/.test(
-            output
+            code
           );
         break;
       case 'handles_edge_cases':
-        passed = /if\s*\(|edge|empty|null|undefined|\.length/.test(output);
+        passed = /if\s*\(|edge|empty|null|undefined|\.length/.test(code);
         break;
       case 'uses_async':
-        passed = /async|await|Promise/.test(output);
+        passed = /async|await|Promise/.test(code);
         break;
       case 'no_nested_callbacks':
-        passed = !/callback\s*\(\s*function|\.then\s*\([^)]*\.then/.test(
-          output
-        );
+        passed = !/callback\s*\(\s*function|\.then\s*\([^)]*\.then/.test(code);
         break;
       case 'bug_fixed':
         passed = /fix|correct|change|update/i.test(output);
@@ -883,21 +1355,63 @@ function regexJudge(output, expected) {
           /because|since|the issue|the problem/i.test(output);
         break;
       case 'no_overengineering':
-        // Heuristic: fail if output creates multiple new files or adds abstract factory patterns
         passed = !(
-          /class\s+\w+Factory|abstract\s+class|createFactory/i.test(output) ||
-          (output.match(/\/\/ .*\.(?:ts|js|py)\b/g) || []).length > 3
+          /class\s+\w+Factory|abstract\s+class|createFactory/i.test(code) ||
+          (code.match(/\/\/ .*\.(?:ts|js|py)\b/g) || []).length > 3
         );
         break;
       case 'no_hallucination':
-        // Heuristic: pass if output doesn't reference non-standard fictional APIs
         passed =
           !/(?:import|require)\s*\(?\s*['"](?!\.|\/).*(?:magic|autofix|superhelper)/i.test(
-            output
+            code
           );
         break;
+      // Skill-specific criteria
+      case 'shows_branch':
+        passed = /branch|main|master|feature\/|git\s+branch/i.test(output);
+        break;
+      case 'shows_recent_commits':
+        passed = /commit|log|recent|history|git\s+log/i.test(output);
+        break;
+      case 'suggests_next_action':
+        passed = /next|should|recommend|suggest|action|todo/i.test(output);
+        break;
+      case 'concise_output':
+        passed = output.length < 3000;
+        break;
+      case 'is_tested':
+        passed = /test\(|describe\(|it\(|expect\(|vitest|jest/i.test(code);
+        break;
+      case 'preserves_behavior':
+        passed = /backward|compat|existing|maintain|preserve/i.test(output);
+        break;
+      case 'has_pagination':
+        passed = /offset|limit|page|cursor|skip|take/i.test(code);
+        break;
+      case 'identifies_security_issue':
+        passed = /security|vulnerab|inject|xss|csrf|sanitiz/i.test(output);
+        break;
+      case 'actionable_feedback':
+        passed =
+          output.length > 100 && /should|must|need|fix|change/i.test(output);
+        break;
+      case 'captures_handoff':
+        passed = /handoff|capture|snapshot|state|session/i.test(output);
+        break;
+      case 'runs_summary':
+        passed = /summary|review|session|completed|done/i.test(output);
+        break;
+      case 'updates_memory':
+        passed = /memory|learn|update|save|persist/i.test(output);
+        break;
+      case 'checks_uncommitted':
+        passed = /uncommit|dirty|changes|stash|commit/i.test(output);
+        break;
       default:
-        passed = output.toLowerCase().includes(key.toLowerCase());
+        // Substring match on the key name (loose fallback)
+        passed = output
+          .toLowerCase()
+          .includes(key.replace(/_/g, ' ').toLowerCase());
     }
     criteria[key] = { passed, reason: 'regex heuristic' };
   }
@@ -943,10 +1457,16 @@ async function scoreAndSelect() {
     return;
   }
 
-  const variants = fs
+  let variants = fs
     .readdirSync(genDir)
     .filter((f) => f.endsWith('.md'))
     .map((f) => f.replace('.md', ''));
+
+  // When targeting a skill, exclude conductor phase variants (and vice versa)
+  const isSkill = targetName && targetName.startsWith('skill:');
+  if (isSkill) {
+    variants = variants.filter((v) => !v.startsWith('phase-'));
+  }
 
   console.log(`Scoring ${variants.length} variants in generation ${gen}...`);
 
@@ -957,8 +1477,13 @@ async function scoreAndSelect() {
     if (result) scores.push(result);
   }
 
-  // Sort by score
-  scores.sort((a, b) => b.score - a.score);
+  // Sort by score with elitism tiebreaker (prefer baseline/incumbent on ties)
+  scores.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.variant === 'baseline') return -1;
+    if (b.variant === 'baseline') return 1;
+    return 0;
+  });
 
   // Show condensed delta for each variant
   const baselinePath = getGenPath(gen, 'baseline');
@@ -1007,6 +1532,29 @@ async function scoreAndSelect() {
     }
   }
 
+  // Persist ASI feedback from judge (for injection into next generation's mutations)
+  if (config.judge?.feedbackEnabled !== false) {
+    const feedback = {};
+    for (const s of scores) {
+      if (!s.results) continue;
+      for (const r of s.results) {
+        if (!r.criteria) continue;
+        for (const [key, val] of Object.entries(r.criteria)) {
+          if (val.feedback && !val.passed) {
+            if (!feedback[key]) feedback[key] = [];
+            feedback[key].push({
+              variant: s.variant,
+              task: r.taskName,
+              feedback: val.feedback,
+            });
+          }
+        }
+      }
+    }
+    const feedbackPath = path.join(RESULTS_DIR, `feedback-${gen}.json`);
+    fs.writeFileSync(feedbackPath, JSON.stringify(feedback, null, 2));
+  }
+
   // Select best
   const best = scores[0];
 
@@ -1049,6 +1597,14 @@ async function scoreAndSelect() {
  */
 async function run(generations = config.evolution.generations) {
   console.log(`Starting GEPA optimization for ${generations} generations...\n`);
+
+  // Validate API key upfront — fail fast
+  const apiOk = await validateApiKey();
+  if (!apiOk) {
+    console.warn(
+      'Warning: API key invalid or missing — judge will use CLI fallback (slower)\n'
+    );
+  }
 
   for (let i = 0; i < generations; i++) {
     console.log(`\n${'='.repeat(60)}`);
@@ -1341,6 +1897,110 @@ async function runAll(generations = 3) {
   console.log('═'.repeat(60));
 }
 
+/**
+ * Show skill audit statistics from skill-audit.jsonl
+ */
+function showSkillStats() {
+  const auditPath = path.join(
+    process.env.HOME || '',
+    '.stackmemory',
+    'skill-audit.jsonl'
+  );
+
+  if (!fs.existsSync(auditPath)) {
+    console.log('No skill audit data yet. Use skills to generate data.');
+    return;
+  }
+
+  const lines = fs.readFileSync(auditPath, 'utf8').split('\n').filter(Boolean);
+  const entries = lines.map((l) => JSON.parse(l));
+
+  // Group by skill
+  const bySkill = {};
+  for (const e of entries) {
+    if (!bySkill[e.skill]) bySkill[e.skill] = { total: 0, errors: 0, args: {} };
+    bySkill[e.skill].total++;
+    if (e.error) bySkill[e.skill].errors++;
+    const arg = e.args || '(none)';
+    bySkill[e.skill].args[arg] = (bySkill[e.skill].args[arg] || 0) + 1;
+  }
+
+  console.log(`Skill Audit Stats (${entries.length} total invocations)\n`);
+  console.log(
+    `${'Skill'.padEnd(20)} ${'Count'.padStart(6)} ${'Errors'.padStart(7)} ${'Rate'.padStart(6)}`
+  );
+  console.log('-'.repeat(42));
+
+  const sorted = Object.entries(bySkill).sort(
+    (a, b) => b[1].total - a[1].total
+  );
+  for (const [skill, stats] of sorted) {
+    const rate = ((stats.errors / stats.total) * 100).toFixed(0);
+    console.log(
+      `${skill.padEnd(20)} ${String(stats.total).padStart(6)} ${String(stats.errors).padStart(7)} ${(rate + '%').padStart(6)}`
+    );
+  }
+
+  // Show skill targets available for optimization
+  const skillTargets = (config.targets || []).filter((t) =>
+    t.name.startsWith('skill:')
+  );
+  if (skillTargets.length) {
+    console.log(`\nConfigured skill targets:`);
+    for (const t of skillTargets) {
+      const hasData = bySkill[t.name.replace('skill:', '')];
+      const marker = hasData ? '✓' : '○';
+      console.log(`  ${marker} ${t.name.padEnd(20)} ${t.file}`);
+    }
+  }
+}
+
+/**
+ * Run optimization on all skill targets
+ */
+async function runSkills(generations = 3) {
+  const skillTargets = (config.targets || []).filter((t) =>
+    t.name.startsWith('skill:')
+  );
+
+  if (!skillTargets.length) {
+    console.log('No skill targets configured in config.json.');
+    return;
+  }
+
+  console.log(
+    `Running GEPA on ${skillTargets.length} skill targets (${generations} generations each)\n`
+  );
+
+  for (const target of skillTargets) {
+    const resolved = target.file.startsWith('~')
+      ? path.join(process.env.HOME, target.file.slice(1))
+      : path.resolve(target.file);
+
+    if (!fs.existsSync(resolved)) {
+      console.log(`Skipping ${target.name}: ${resolved} not found\n`);
+      continue;
+    }
+
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`SKILL: ${target.name} (${target.file})`);
+    console.log(`${'═'.repeat(60)}\n`);
+
+    // Override config for this target
+    config.target.file = target.file;
+    if (target.evals) config.evals.files = target.evals;
+
+    await init(resolved);
+    await run(generations);
+
+    console.log(`\nCompleted ${target.name}\n`);
+  }
+
+  console.log('\n' + '═'.repeat(60));
+  console.log('ALL SKILL TARGETS COMPLETE');
+  console.log('═'.repeat(60));
+}
+
 // CLI
 const command = process.argv[2];
 const arg1 = process.argv[3];
@@ -1352,7 +2012,19 @@ switch (command) {
     init(arg1);
     break;
   case 'mutate':
-    mutate();
+    if (phaseName || hasFlag('--auto-phase')) {
+      const phase = phaseName || detectWorstPhase();
+      if (phase) {
+        mutatePhase(phase);
+      } else {
+        console.log(
+          '[GEPA] No phase failures detected — skipping phase mutation'
+        );
+        mutate();
+      }
+    } else {
+      mutate();
+    }
     break;
   case 'eval':
     runEval(arg1 || 'baseline');
@@ -1379,6 +2051,12 @@ switch (command) {
   case 'run-all':
     runAll(parseInt(arg1) || 3);
     break;
+  case 'skill-stats':
+    showSkillStats();
+    break;
+  case 'run-skills':
+    runSkills(parseInt(arg1) || 3);
+    break;
   default:
     console.log(`
 GEPA - Genetic Eval-driven Prompt Algorithm
@@ -1396,6 +2074,11 @@ Usage:
 
   node optimize.js targets                List available targets
   node optimize.js run-all [generations]  Run optimization on ALL targets
+
+Skill optimization:
+  node optimize.js skill-stats            Show skill audit statistics
+  node optimize.js run-skills [gens]      Run optimization on all skill targets
+  node optimize.js run --target skill:start   Optimize a specific skill
 
 Options:
   --target <name>                        Select target from targets[] config
