@@ -36,7 +36,7 @@ describe('Full Session Lifecycle', () => {
     const session = await env.startSession('dev-session-1');
     expect(session).toBeDefined();
     expect(session.frameManager).toBeDefined();
-    expect(session.sharedContext).toBeDefined();
+    // sharedContext was removed in v1.11.0
 
     // Step 3: Record development activities
     const activities: ActivityRecord[] = [
