@@ -1,6 +1,6 @@
 {
   "name": "@stackmemoryai/stackmemory",
-  "version": "1.10.6",
+  "version": "1.11.0",
   "description": "Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, pre-flight overlap checks, Claude/Codex/OpenCode wrappers, Linear sync, and automatic hooks.",
   "engines": {
     "node": ">=20.0.0",
@@ -45,6 +45,7 @@
     "scripts/verify-dist.cjs",
     "scripts/smoke-init-db.sh",
     "templates",
+    "packs",
     "README.md",
     "LICENSE"
   ],

@@ -25,7 +25,6 @@ import { program } from 'commander';
 import { logger } from '../core/monitoring/logger.js';
 import { FrameManager } from '../core/context/index.js';
 import { sessionManager, FrameQueryMode } from '../core/session/index.js';
-import { sharedContextLayer } from '../core/context/shared-context-layer.js';
 import { UpdateChecker } from '../core/utils/update-checker.js';
 import { ProgressTracker } from '../core/monitoring/progress-tracker.js';
 import { registerProjectCommands } from './commands/projects.js';
@@ -69,7 +68,6 @@ import { createStatsCommand } from './commands/stats.js';
 import { createBenchCommand } from './commands/bench.js';
 import { createStateCommand } from './commands/state.js';
 import { createDigestCommands } from './commands/digest.js';
-import { createTeamCommands } from './commands/team.js';
 import { createDesiresCommands } from './commands/desires.js';
 import { createConductorCommands } from './commands/orchestrate.js';
 import { createPreflightCommand } from './commands/preflight.js';
@@ -149,7 +147,7 @@ UpdateChecker.checkForUpdates(VERSION, true).catch(() => {
 program
   .name('stackmemory')
   .description(
-    'Lossless memory runtime for AI coding tools - organizes context as a call stack instead of linear chat logs, with team collaboration and infinite retention'
+    'Lossless memory runtime for AI coding tools - organizes context as a call stack instead of linear chat logs, with infinite retention'
   )
   .version(VERSION);
 
@@ -271,9 +269,8 @@ program
         // Check for updates and display if available
         await UpdateChecker.checkForUpdates(VERSION);
 
-        // Initialize session manager and shared context
+        // Initialize session manager
         await sessionManager.initialize();
-        await sharedContextLayer.initialize();
 
         // Auto-init Obsidian vault adapter if configured
         const { initObsidianVault } =
@@ -305,35 +302,6 @@ program
           githubProjection =
             (await refreshCurrentRepoPullRequestState(projectRoot)) ||
             githubProjection;
-        }
-
-        // Auto-discover shared context on startup
-        const contextDiscovery = await sharedContextLayer.autoDiscoverContext();
-
-        // Show context hints if available
-        if (
-          contextDiscovery.hasSharedContext &&
-          contextDiscovery.sessionCount > 1
-        ) {
-          console.log(`\n💡 Shared Context Available:`);
-          console.log(
-            `   ${contextDiscovery.sessionCount} sessions with shared context`
-          );
-
-          if (contextDiscovery.recentPatterns.length > 0) {
-            console.log(`   Recent patterns:`);
-            contextDiscovery.recentPatterns.slice(0, 3).forEach((p) => {
-              console.log(
-                `     • ${p.type}: ${p.pattern.slice(0, 50)} (${p.frequency}x)`
-              );
-            });
-          }
-
-          if (contextDiscovery.lastDecisions.length > 0) {
-            console.log(
-              `   Last decision: ${contextDiscovery.lastDecisions[0].decision.slice(0, 60)}`
-            );
-          }
         }
 
         const db = await openDatabase(dbPath);
@@ -840,7 +808,6 @@ program.addCommand(createStatsCommand());
 program.addCommand(createBenchCommand());
 program.addCommand(createStateCommand());
 program.addCommand(createDigestCommands());
-program.addCommand(createTeamCommands());
 program.addCommand(createDesiresCommands());
 program.addCommand(createConductorCommands());
 program.addCommand(createPreflightCommand());

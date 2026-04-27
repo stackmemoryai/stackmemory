@@ -5,7 +5,6 @@
 
 import { logger } from '../../../core/monitoring/logger.js';
 import { FrameManager } from '../../../core/context/index.js';
-import { sharedContextLayer } from '../../../core/context/shared-context-layer.js';
 import { sessionManager } from '../../../core/session/index.js';
 import {
   LearnedPattern,
@@ -42,7 +41,6 @@ export class PatternLearner {
   async initialize(): Promise<void> {
     try {
       await sessionManager.initialize();
-      await sharedContextLayer.initialize();
 
       const session = await sessionManager.getOrCreateSession({});
       if (session.database) {
@@ -439,32 +437,8 @@ export class PatternLearner {
    * Save learned patterns to shared context
    */
   private async saveLearnedPatterns(patterns: LearnedPattern[]): Promise<void> {
-    try {
-      const context = await sharedContextLayer.getSharedContext();
-      if (!context) return;
-
-      // Convert to shared context format
-      const contextPatterns = patterns.map((p) => ({
-        pattern: p.pattern,
-        type: this.mapPatternType(p.type),
-        frequency: p.frequency,
-        lastSeen: Date.now(),
-        resolution: p.strategy,
-      }));
-
-      // Add to global patterns
-      context.globalPatterns.push(...contextPatterns);
-
-      // Keep only the most relevant patterns
-      context.globalPatterns.sort((a, b) => b.frequency - a.frequency);
-      context.globalPatterns = context.globalPatterns.slice(0, 100);
-
-      await sharedContextLayer.updateSharedContext(context);
-
-      logger.info(`Saved ${patterns.length} patterns to shared context`);
-    } catch (error: unknown) {
-      logger.error('Failed to save patterns', error as Error);
-    }
+    // Shared context layer removed (local-only mode)
+    logger.debug(`Skipping shared pattern save (${patterns.length} patterns)`);
   }
 
   /**

@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StackMemory — Lossless memory for AI coding tools</title>
-  <meta name="description" content="Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, Linear sync, and automatic hooks.">
+  <meta name="description" content="Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 73 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, Linear sync, and automatic hooks.">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="StackMemory — Lossless memory for AI coding tools">
-  <meta property="og:description" content="Lossless memory runtime that preserves full context across sessions. 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, Linear sync, Claude/Codex/OpenCode wrappers.">
+  <meta property="og:description" content="Lossless memory runtime that preserves full context across sessions. 73 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, Linear sync, Claude/Codex/OpenCode wrappers.">
   <meta property="og:url" content="https://stackmemoryai.github.io/stackmemory/">
   <meta property="og:image" content="https://stackmemoryai.github.io/stackmemory/og-image.png">
   <meta property="og:site_name" content="StackMemory">
@@ -17,7 +17,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="StackMemory — Lossless memory for AI coding tools">
-  <meta name="twitter:description" content="Project-scoped memory runtime that preserves full context across sessions. 56 MCP tools, FTS5 search, Linear sync.">
+  <meta name="twitter:description" content="Project-scoped memory runtime that preserves full context across sessions. 73 MCP tools, FTS5 search, Linear sync.">
   <meta name="twitter:image" content="https://stackmemoryai.github.io/stackmemory/og-image.png">
 
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -115,7 +115,7 @@
       <h2 class="text-xl font-semibold tracking-tight">Features</h2>
       <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
-          <h3 class="font-semibold text-sm">56 MCP Tools</h3>
+          <h3 class="font-semibold text-sm">73 MCP Tools</h3>
           <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Context, tasks, Linear, traces, discovery, cord, team, planning, providers, DiffMem, Greptile, and more for Claude Code integration.</p>
         </div>
         <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
@@ -212,6 +212,63 @@ stackmemory doctor</code></pre>
       </div>
     </section>
 
+    <!-- RLM-Aware Harness -->
+    <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">RLM-Aware Harness</h2>
+      <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">Three layers that make agents self-harnessing. Inspired by <a href="https://github.com/Trampoline-AI/predict-rlm" class="underline underline-offset-2 hover:text-neutral-900 dark:hover:text-neutral-100">predict-rlm</a>.</p>
+      <div class="mt-8 grid gap-6 md:grid-cols-3">
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Context-as-REPL</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Agents call tool functions (<code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">search_knowledge</code>, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">read_context</code>, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">list_runs</code>) instead of reading prose handoffs.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Typed Dispatch</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">Signature contracts (<code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">ImplementFeature</code>, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">FixBug</code>, <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-xs">Investigate</code>) with validated I/O for parent→child dispatch.</p>
+        </div>
+        <div class="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <h3 class="font-semibold text-sm">Critic + Self-Decomposition</h3>
+          <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">LLM quality gate scores output 0-100. Pass, revise with feedback, or decompose into typed sub-runs. Max 3 revisions, depth 2.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Substrate Vision -->
+    <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
+      <h2 class="text-xl font-semibold tracking-tight">Substrate: The Three-Layer Vision</h2>
+      <div class="mt-6 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-neutral-200 dark:border-neutral-800">
+              <th class="text-left py-3 pr-6 font-semibold">Layer</th>
+              <th class="text-left py-3 pr-6 font-semibold">Product</th>
+              <th class="text-left py-3 pr-6 font-semibold">Status</th>
+              <th class="text-left py-3 font-semibold">Purpose</th>
+            </tr>
+          </thead>
+          <tbody class="text-neutral-600 dark:text-neutral-400">
+            <tr class="border-b border-neutral-100 dark:border-neutral-800/50">
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">L1</td>
+              <td class="py-3 pr-6">StackMemory</td>
+              <td class="py-3 pr-6"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Shipped</span></td>
+              <td class="py-3">Context persistence &mdash; lossless memory across sessions</td>
+            </tr>
+            <tr class="border-b border-neutral-100 dark:border-neutral-800/50">
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">L2</td>
+              <td class="py-3 pr-6">Substrate Desktop</td>
+              <td class="py-3 pr-6"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Shipping</span></td>
+              <td class="py-3">Agent orchestration &mdash; multi-agent coordination with worktree isolation</td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 font-medium text-neutral-900 dark:text-neutral-100">L3</td>
+              <td class="py-3 pr-6">Substrate Cloud</td>
+              <td class="py-3 pr-6"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">Design</span></td>
+              <td class="py-3">Multiplayer development &mdash; shared context across teams and agents</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Integrations -->
     <section class="py-16 border-t border-neutral-200 dark:border-neutral-800">
       <h2 class="text-xl font-semibold tracking-tight">Integrations</h2>
@@ -222,6 +279,7 @@ stackmemory doctor</code></pre>
         <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">Linear</span>
         <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">MCP Protocol</span>
         <span class="px-3 py-1.5 text-sm rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900">Browser MCP</span>
+        <a href="https://croissant.ai" class="px-3 py-1.5 text-sm rounded-full border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">croissant.ai</a>
       </div>
       <p class="mt-4 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
         Runs as an MCP server. Editors call StackMemory on each interaction to fetch a compiled context bundle — editors don't store memory themselves.

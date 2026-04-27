@@ -24,8 +24,6 @@ export {
   ProviderHandlers,
   type ProviderHandlerDependencies,
 } from './provider-handlers.js';
-export { TeamHandlers, type TeamHandlerDependencies } from './team-handlers.js';
-export { CordHandlers, type CordHandlerDependencies } from './cord-handlers.js';
 export {
   ProvenantHandlers,
   type ProvenantHandlerDependencies,
@@ -46,8 +44,6 @@ import {
 } from './linear-handlers.js';
 import { TraceHandlers, TraceHandlerDependencies } from './trace-handlers.js';
 import { ProviderHandlers } from './provider-handlers.js';
-import { TeamHandlers, TeamHandlerDependencies } from './team-handlers.js';
-import { CordHandlers } from './cord-handlers.js';
 import { ProvenantHandlers } from './provenant-handlers.js';
 import { CrossSearchHandlers } from './cross-search-handlers.js';
 import {
@@ -62,7 +58,6 @@ export interface MCPHandlerDependencies
     TaskHandlerDependencies,
     LinearHandlerDependencies,
     TraceHandlerDependencies {
-  dbAdapter?: TeamHandlerDependencies['dbAdapter'];
   projectDir?: string;
 }
 
@@ -75,8 +70,6 @@ export class MCPHandlerFactory {
   private linearHandlers: LinearHandlers;
   private traceHandlers: TraceHandlers;
   private providerHandlers: ProviderHandlers;
-  private teamHandlers?: TeamHandlers;
-  private cordHandlers?: CordHandlers;
   private provenantHandlers?: ProvenantHandlers;
   private crossSearchHandlers: CrossSearchHandlers;
 
@@ -102,17 +95,6 @@ export class MCPHandlerFactory {
     });
 
     this.providerHandlers = new ProviderHandlers();
-
-    if (deps.dbAdapter) {
-      this.teamHandlers = new TeamHandlers({
-        frameManager: deps.frameManager,
-        dbAdapter: deps.dbAdapter,
-      });
-      this.cordHandlers = new CordHandlers({
-        frameManager: deps.frameManager,
-        dbAdapter: deps.dbAdapter,
-      });
-    }
 
     if (deps.projectDir) {
       this.provenantHandlers = new ProvenantHandlers({
@@ -201,34 +183,6 @@ export class MCPHandlerFactory {
           this.providerHandlers
         );
 
-      // Team handlers
-      case 'team_context_get':
-        if (!this.teamHandlers) throw new Error('Team tools require dbAdapter');
-        return this.teamHandlers.handleTeamContextGet.bind(this.teamHandlers);
-      case 'team_context_share':
-        if (!this.teamHandlers) throw new Error('Team tools require dbAdapter');
-        return this.teamHandlers.handleTeamContextShare.bind(this.teamHandlers);
-      case 'team_search':
-        if (!this.teamHandlers) throw new Error('Team tools require dbAdapter');
-        return this.teamHandlers.handleTeamSearch.bind(this.teamHandlers);
-
-      // Cord orchestration handlers
-      case 'cord_spawn':
-        if (!this.cordHandlers) throw new Error('Cord tools require dbAdapter');
-        return this.cordHandlers.handleCordSpawn.bind(this.cordHandlers);
-      case 'cord_fork':
-        if (!this.cordHandlers) throw new Error('Cord tools require dbAdapter');
-        return this.cordHandlers.handleCordFork.bind(this.cordHandlers);
-      case 'cord_complete':
-        if (!this.cordHandlers) throw new Error('Cord tools require dbAdapter');
-        return this.cordHandlers.handleCordComplete.bind(this.cordHandlers);
-      case 'cord_ask':
-        if (!this.cordHandlers) throw new Error('Cord tools require dbAdapter');
-        return this.cordHandlers.handleCordAsk.bind(this.cordHandlers);
-      case 'cord_tree':
-        if (!this.cordHandlers) throw new Error('Cord tools require dbAdapter');
-        return this.cordHandlers.handleCordTree.bind(this.cordHandlers);
-
       // Provenant decision graph handlers
       case 'provenant_search':
         if (!this.provenantHandlers)
@@ -314,18 +268,6 @@ export class MCPHandlerFactory {
       'delegate_to_model',
       'batch_submit',
       'batch_check',
-
-      // Team tools
-      'team_context_get',
-      'team_context_share',
-      'team_search',
-
-      // Cord orchestration tools
-      'cord_spawn',
-      'cord_fork',
-      'cord_complete',
-      'cord_ask',
-      'cord_tree',
 
       // Provenant decision graph tools
       'provenant_search',

@@ -55,14 +55,6 @@ export const CANONICAL_HOOKS: HookEntry[] = [
     required: true,
   },
   {
-    scriptName: 'cord-trace.js',
-    eventType: 'PostToolUse',
-    matcher: 'mcp__.*__cord_(spawn|fork|complete|ask|tree)',
-    timeout: 2,
-    commandPrefix: 'node',
-    required: true,
-  },
-  {
     scriptName: 'theory-capture.js',
     eventType: 'PostToolUse',
     matcher: 'Edit|Write|MultiEdit',

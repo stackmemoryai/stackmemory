@@ -307,13 +307,7 @@ export function createDoctorCommand(): Command {
         const toolDefs = new MCPToolDefinitions();
         const allTools = toolDefs.getAllToolDefinitions();
         const toolNames = allTools.map((t: { name: string }) => t.name);
-        const expectedTools = [
-          'sm_digest',
-          'cord_spawn',
-          'team_search',
-          'get_context',
-          'create_task',
-        ];
+        const expectedTools = ['sm_digest', 'get_context', 'create_task'];
         const missing = expectedTools.filter((t) => !toolNames.includes(t));
 
         if (missing.length === 0) {
@@ -1245,6 +1239,232 @@ WantedBy=default.target`;
 }
 
 /**
+ * Create setup-commands command for installing command packs
+ */
+export function createSetupCommandsCommand(): Command {
+  const cmd = new Command('setup-commands');
+
+  cmd
+    .description('Install StackMemory command packs for Claude Code')
+    .argument('[pack]', 'Pack name to install (default: core)', 'core')
+    .option('--list', 'List available packs and their commands')
+    .option('--force', 'Overwrite existing command files')
+    .option('--uninstall', 'Remove installed commands')
+    .option('--dry-run', 'Show what would be installed without making changes')
+    .action(async (pack: string, options) => {
+      const commandsDir = join(CLAUDE_DIR, 'commands');
+
+      // Find packs source directory
+      const possiblePaths = [
+        join(process.cwd(), 'packs'),
+        join(__dirname, '..', '..', '..', 'packs'),
+      ];
+
+      // Try npm global path
+      try {
+        const globalRoot = execSync('npm root -g', {
+          encoding: 'utf-8',
+        }).trim();
+        possiblePaths.push(
+          join(globalRoot, '@stackmemoryai', 'stackmemory', 'packs')
+        );
+      } catch {
+        // npm not available
+      }
+
+      let packsDir: string | undefined;
+      for (const p of possiblePaths) {
+        if (existsSync(p)) {
+          packsDir = p;
+          break;
+        }
+      }
+
+      if (!packsDir) {
+        console.log(chalk.red('Could not find packs directory'));
+        process.exit(1);
+      }
+
+      // List mode
+      if (options.list) {
+        console.log(chalk.cyan('\nAvailable command packs:\n'));
+        const packs = readdirSync(packsDir).filter((d) =>
+          existsSync(join(packsDir!, d, 'manifest.json'))
+        );
+
+        for (const p of packs) {
+          const manifest = JSON.parse(
+            readFileSync(join(packsDir, p, 'manifest.json'), 'utf8')
+          );
+          console.log(
+            chalk.white(`  ${manifest.name}`) +
+              chalk.gray(` v${manifest.version} — ${manifest.description}`)
+          );
+
+          // Show public commands
+          if (manifest.commands?.public) {
+            for (const cmd of manifest.commands.public) {
+              console.log(
+                chalk.green(`    /${cmd.name}`) +
+                  chalk.gray(` — ${cmd.description}`)
+              );
+            }
+          }
+
+          // Show internal deps
+          if (manifest.commands?.internal) {
+            console.log(
+              chalk.gray(
+                `    + ${manifest.commands.internal.length} internal deps`
+              )
+            );
+          }
+          console.log('');
+        }
+        return;
+      }
+
+      // Validate pack exists
+      const packDir = join(packsDir, pack);
+      const manifestPath = join(packDir, 'manifest.json');
+
+      if (!existsSync(manifestPath)) {
+        console.log(chalk.red(`Pack "${pack}" not found`));
+        console.log(chalk.gray('Run: stackmemory setup-commands --list'));
+        process.exit(1);
+      }
+
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      const allCommands = [
+        ...(manifest.commands?.public || []),
+        ...(manifest.commands?.internal || []),
+      ];
+
+      // Uninstall mode
+      if (options.uninstall) {
+        console.log(
+          chalk.cyan(
+            `\nUninstalling pack: ${manifest.name} v${manifest.version}\n`
+          )
+        );
+
+        let removed = 0;
+        for (const cmd of allCommands) {
+          const targetPath = join(commandsDir, `${cmd.name}.md`);
+          if (existsSync(targetPath)) {
+            if (options.dryRun) {
+              console.log(chalk.gray(`  Would remove: /${cmd.name}`));
+            } else {
+              rmSync(targetPath, { force: true });
+              console.log(chalk.green(`  [OK]`) + ` Removed /${cmd.name}`);
+              removed++;
+            }
+          }
+        }
+
+        console.log(chalk.green(`\nRemoved ${removed} command(s)`));
+        return;
+      }
+
+      // Install mode
+      console.log(
+        chalk.cyan(`\nInstalling pack: ${manifest.name} v${manifest.version}\n`)
+      );
+      console.log(chalk.gray(`${manifest.description}\n`));
+
+      // Ensure commands directory exists
+      if (!existsSync(commandsDir)) {
+        if (options.dryRun) {
+          console.log(chalk.gray(`Would create: ${commandsDir}`));
+        } else {
+          mkdirSync(commandsDir, { recursive: true });
+        }
+      }
+
+      let installed = 0;
+      let skipped = 0;
+
+      for (const cmd of allCommands) {
+        const sourcePath = join(packDir, cmd.file);
+        const targetPath = join(commandsDir, `${cmd.name}.md`);
+        const isPublic = manifest.commands?.public?.some(
+          (c: { name: string }) => c.name === cmd.name
+        );
+
+        if (!existsSync(sourcePath)) {
+          console.log(
+            chalk.red(`  [MISS] /${cmd.name}`) +
+              chalk.gray(` — source not found: ${cmd.file}`)
+          );
+          continue;
+        }
+
+        if (existsSync(targetPath) && !options.force) {
+          console.log(
+            chalk.gray(`  [SKIP] /${cmd.name} — exists (use --force)`)
+          );
+          skipped++;
+          continue;
+        }
+
+        if (options.dryRun) {
+          const tag = isPublic ? chalk.green('PUBLIC') : chalk.gray('INTERNAL');
+          console.log(
+            chalk.gray(`  Would install: `) +
+              chalk.white(`/${cmd.name}`) +
+              ` [${tag}]`
+          );
+          installed++;
+          continue;
+        }
+
+        // Remove existing (symlink or file) before creating new symlink
+        if (existsSync(targetPath)) {
+          rmSync(targetPath, { force: true });
+        }
+
+        // Create symlink
+        try {
+          execSync(`ln -s "${sourcePath}" "${targetPath}"`, {
+            encoding: 'utf-8',
+          });
+          const tag = isPublic ? chalk.green('PUBLIC') : chalk.gray('INTERNAL');
+          console.log(
+            chalk.green(`  [OK]`) +
+              ` /${cmd.name} [${tag}]` +
+              chalk.gray(` — ${cmd.description}`)
+          );
+          installed++;
+        } catch (err) {
+          console.log(
+            chalk.red(`  [ERROR] /${cmd.name}`) +
+              chalk.gray(` — ${(err as Error).message}`)
+          );
+        }
+      }
+
+      console.log('');
+      if (installed > 0) {
+        console.log(chalk.green(`Installed ${installed} command(s)`));
+      }
+      if (skipped > 0) {
+        console.log(chalk.gray(`Skipped ${skipped} (already exist)`));
+      }
+
+      if (!options.dryRun && installed > 0) {
+        console.log(chalk.cyan('\nAvailable commands in Claude Code:'));
+        for (const cmd of manifest.commands?.public || []) {
+          console.log(
+            chalk.white(`  /${cmd.name}`) + chalk.gray(`  ${cmd.description}`)
+          );
+        }
+      }
+    });
+
+  return cmd;
+}
+
+/**
  * Register setup commands
  */
 export function registerSetupCommands(program: Command): void {
@@ -1252,4 +1472,5 @@ export function registerSetupCommands(program: Command): void {
   program.addCommand(createDoctorCommand());
   program.addCommand(createSetupPluginsCommand());
   program.addCommand(createSetupRemoteCommand());
+  program.addCommand(createSetupCommandsCommand());
 }

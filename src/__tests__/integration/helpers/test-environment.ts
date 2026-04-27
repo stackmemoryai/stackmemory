@@ -8,10 +8,6 @@ import {
   SQLiteConfig,
 } from '../../../core/database/sqlite-adapter.js';
 import { FrameManager } from '../../../core/context/index.js';
-import {
-  SharedContextLayer,
-  ContextBridge,
-} from '../../../core/context/shared-context-layer.js';
 import { ContextRetriever } from '../../../core/retrieval/context-retriever.js';
 import { QueryRouter } from '../../../core/database/query-router.js';
 import { execSync } from 'child_process';
@@ -21,8 +17,6 @@ import * as os from 'os';
 
 export interface TestSession {
   frameManager: FrameManager;
-  sharedContext: SharedContextLayer;
-  contextBridge?: ContextBridge;
   retriever: ContextRetriever;
 
   recordActivity(activities: ActivityRecord[]): Promise<string[]>;
@@ -167,17 +161,10 @@ export class TestEnvironment {
       },
     });
 
-    const sharedContext = new SharedContextLayer({
-      projectId: this.projectId,
-      maxSharedFrames: 100,
-      syncInterval: 1000,
-    });
-
     const retriever = new ContextRetriever(this.adapter);
 
     const session: TestSession = {
       frameManager,
-      sharedContext,
       retriever,
 
       recordActivity: async (activities: ActivityRecord[]) => {
@@ -270,8 +257,7 @@ export class TestEnvironment {
         (session.frameManager as any).frames.clear();
       }
 
-      // SharedContextLayer doesn't have a clear method, so we just reset the sessions
-      // The context is persisted in files/database anyway
+      // Context is persisted in database
     }
   }
 

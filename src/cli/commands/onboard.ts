@@ -461,6 +461,73 @@ async function applyConfiguration(config: OnboardingConfig): Promise<void> {
     }
   }
 
+  // Install command packs
+  {
+    const claudeCommandsDir = join(homedir(), '.claude', 'commands');
+    const packsDir = join(__dirname, '..', '..', '..', 'packs');
+    const coreManifest = join(packsDir, 'core', 'manifest.json');
+
+    if (existsSync(coreManifest)) {
+      const { installCommands } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'installCommands',
+          message:
+            'Install session commands for Claude Code? (/start, /stop, /restart, /next)',
+          default: true,
+        },
+      ]);
+
+      if (installCommands) {
+        console.log(chalk.gray('Installing command pack: core...'));
+        try {
+          execFileSync(
+            process.execPath,
+            [process.argv[1], 'setup-commands', '--force'],
+            { stdio: 'pipe' }
+          );
+          console.log(
+            chalk.green('  \u2713 Installed /start, /stop, /restart, /next')
+          );
+        } catch {
+          // Fallback: manual symlink
+          try {
+            if (!existsSync(claudeCommandsDir)) {
+              mkdirSync(claudeCommandsDir, { recursive: true });
+            }
+            const manifest = JSON.parse(
+              (await import('fs')).readFileSync(coreManifest, 'utf8')
+            );
+            const allCmds = [
+              ...(manifest.commands?.public || []),
+              ...(manifest.commands?.internal || []),
+            ];
+            let count = 0;
+            for (const cmd of allCmds) {
+              const src = join(packsDir, 'core', cmd.file);
+              const dst = join(claudeCommandsDir, `${cmd.name}.md`);
+              if (existsSync(src) && !existsSync(dst)) {
+                execFileSync('ln', ['-s', src, dst]);
+                count++;
+              }
+            }
+            if (count > 0) {
+              console.log(
+                chalk.green(`  \u2713 Installed ${count} command(s)`)
+              );
+            }
+          } catch {
+            console.log(
+              chalk.yellow(
+                '  \u26A0 Could not install commands. Run: stackmemory setup-commands'
+              )
+            );
+          }
+        }
+      }
+    }
+  }
+
   // Create claude-sm symlink for easy access
   const binPath = '/usr/local/bin/claude-sm';
   const sourcePath = join(configPath, 'bin', 'stackmemory');
@@ -626,14 +693,21 @@ function showNextSteps(config: OnboardingConfig): void {
     );
   }
 
-  console.log('3. Use with Claude:');
+  console.log('3. Install session commands for Claude Code:');
+  console.log(
+    chalk.gray(
+      '   stackmemory setup-commands  # Installs /start, /stop, /restart, /next\n'
+    )
+  );
+
+  console.log('4. Use with Claude:');
   console.log(chalk.gray('   claude-sm  # Or use stackmemory directly\n'));
 
-  console.log('4. Use with Codex:');
+  console.log('5. Use with Codex:');
   console.log(chalk.gray('   codex-sm   # Codex + StackMemory integration\n'));
 
   if (config.enableLinear) {
-    console.log('5. Sync with Linear:');
+    console.log('6. Sync with Linear:');
     console.log(chalk.gray('   stackmemory linear sync\n'));
   }
 

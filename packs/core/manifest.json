@@ -1,0 +1,24 @@
+{
+  "name": "core",
+  "version": "1.0.0",
+  "description": "Session lifecycle commands for Claude Code — start, stop, restart, and next",
+  "requires": "stackmemory >= 1.10.0",
+  "commands": {
+    "public": [
+      { "file": "commands/start.md", "name": "start", "description": "Boot a session with full context" },
+      { "file": "commands/stop.md", "name": "stop", "description": "End a session cleanly" },
+      { "file": "commands/restart.md", "name": "restart", "description": "Close session, clear context, and reboot" },
+      { "file": "commands/next.md", "name": "next", "description": "What should I do next?" }
+    ],
+    "internal": [
+      { "file": "commands/summary.md", "name": "summary", "description": "Summarize session work (used by /stop)" },
+      { "file": "commands/capture.md", "name": "capture", "description": "Save context via StackMemory (used by /stop)" },
+      { "file": "commands/learn.md", "name": "learn", "description": "Review session and update memory (used by /stop)" },
+      { "file": "commands/restore.md", "name": "restore", "description": "Restore from last handoff (used by /start)" }
+    ]
+  },
+  "install": {
+    "target": "~/.claude/commands",
+    "method": "symlink"
+  }
+}

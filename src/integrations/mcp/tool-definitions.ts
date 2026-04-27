@@ -32,8 +32,6 @@ export class MCPToolDefinitions {
       ...this.getDiffMemTools(),
       ...this.getGreptileTools(),
       ...this.getProviderTools(),
-      ...this.getTeamTools(),
-      ...this.getCordTools(),
       ...this.getDigestTools(),
       ...this.getDesirePathTools(),
       ...this.getProvenantTools(),
@@ -1332,226 +1330,6 @@ export class MCPToolDefinitions {
   }
 
   /**
-   * Multi-agent team collaboration tools
-   */
-  private getTeamTools(): MCPToolDefinition[] {
-    return [
-      {
-        name: 'team_context_get',
-        description:
-          'Get context from other agents working on the same project. Returns recent frames and shared anchors from other sessions.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            limit: {
-              type: 'number',
-              default: 10,
-              description: 'Max frames to return',
-            },
-            types: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Filter by frame types',
-            },
-            since: {
-              type: 'number',
-              description:
-                'Only frames created after this timestamp (epoch ms)',
-            },
-          },
-        },
-      },
-      {
-        name: 'team_context_share',
-        description:
-          'Share a piece of context with other agents working on the same project. Creates a high-priority anchor visible to team_context_get.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            content: {
-              type: 'string',
-              description: 'The context to share',
-            },
-            type: {
-              type: 'string',
-              enum: [
-                'FACT',
-                'DECISION',
-                'CONSTRAINT',
-                'INTERFACE_CONTRACT',
-                'TODO',
-                'RISK',
-              ],
-              default: 'FACT',
-              description: 'Type of context',
-            },
-            priority: {
-              type: 'number',
-              minimum: 1,
-              maximum: 10,
-              default: 8,
-              description: 'Priority level (1-10)',
-            },
-          },
-          required: ['content'],
-        },
-      },
-      {
-        name: 'team_search',
-        description:
-          "Search across all agents' context in the project. Uses full-text search across all sessions.",
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: 'Search query',
-            },
-            limit: {
-              type: 'number',
-              default: 20,
-              description: 'Maximum results to return',
-            },
-            include_events: {
-              type: 'boolean',
-              default: false,
-              description: 'Include events in results',
-            },
-          },
-          required: ['query'],
-        },
-      },
-    ];
-  }
-
-  /**
-   * Cord task orchestration tools
-   */
-  getCordTools(): MCPToolDefinition[] {
-    return [
-      {
-        name: 'cord_spawn',
-        description:
-          'Create a subtask with clean context (spawn). Child sees only its prompt and completed blocker results. Aliases: spawn, subtask',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            goal: {
-              type: 'string',
-              description: 'What this task should accomplish',
-            },
-            prompt: {
-              type: 'string',
-              description: 'Detailed instructions for the task',
-            },
-            blocked_by: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Task IDs that must complete before this can start',
-            },
-            parent_id: {
-              type: 'string',
-              description: 'Parent task ID',
-            },
-          },
-          required: ['goal'],
-        },
-      },
-      {
-        name: 'cord_fork',
-        description:
-          'Create a subtask with full sibling context (fork). Child sees its prompt, blocker results, AND completed sibling results.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            goal: {
-              type: 'string',
-              description: 'What this task should accomplish',
-            },
-            prompt: {
-              type: 'string',
-              description: 'Detailed instructions for the task',
-            },
-            blocked_by: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Task IDs that must complete before this can start',
-            },
-            parent_id: {
-              type: 'string',
-              description: 'Parent task ID',
-            },
-          },
-          required: ['goal'],
-        },
-      },
-      {
-        name: 'cord_complete',
-        description:
-          'Mark a cord task as completed with a result. Automatically unblocks dependent tasks.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            task_id: {
-              type: 'string',
-              description: 'Task ID to complete',
-            },
-            result: {
-              type: 'string',
-              description: 'The result/output of this task',
-            },
-          },
-          required: ['task_id', 'result'],
-        },
-      },
-      {
-        name: 'cord_ask',
-        description:
-          'Create an ask task — a question that needs an answer before dependent tasks can proceed.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            question: {
-              type: 'string',
-              description: 'The question to ask',
-            },
-            options: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Optional list of answer choices',
-            },
-            parent_id: {
-              type: 'string',
-              description: 'Parent task ID',
-            },
-          },
-          required: ['question'],
-        },
-      },
-      {
-        name: 'cord_tree',
-        description:
-          'View the cord task tree with context scoping. Shows which tasks are active, blocked, or completed.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            task_id: {
-              type: 'string',
-              description:
-                'Root task ID to show subtree (omit for full project tree)',
-            },
-            include_results: {
-              type: 'boolean',
-              default: false,
-              description: 'Include task results in output',
-            },
-          },
-        },
-      },
-    ];
-  }
-
-  /**
    * Provenant decision graph tools
    */
   private getProvenantTools(): MCPToolDefinition[] {
@@ -1763,8 +1541,6 @@ export class MCPToolDefinitions {
       | 'diffmem'
       | 'greptile'
       | 'provider'
-      | 'team'
-      | 'cord'
       | 'digest'
       | 'provenant'
       | 'cross_search'
@@ -1796,10 +1572,6 @@ export class MCPToolDefinitions {
         return this.getGreptileTools();
       case 'provider':
         return this.getProviderTools();
-      case 'team':
-        return this.getTeamTools();
-      case 'cord':
-        return this.getCordTools();
       case 'digest':
         return this.getDigestTools();
       case 'desire_paths':

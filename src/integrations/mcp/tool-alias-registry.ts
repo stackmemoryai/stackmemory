@@ -203,32 +203,6 @@ const TOOL_ALIASES: Record<string, string> = {
   check_batch: 'batch_check',
   batch_status: 'batch_check',
 
-  // --- Team tools ---
-  team_get: 'team_context_get',
-  team_context: 'team_context_get',
-  get_team_context: 'team_context_get',
-
-  team_share: 'team_context_share',
-  share_context: 'team_context_share',
-  share: 'team_context_share',
-
-  // --- Cord tools ---
-  spawn: 'cord_spawn',
-  subtask: 'cord_spawn',
-
-  fork: 'cord_fork',
-  fork_task: 'cord_fork',
-
-  complete: 'cord_complete',
-  done: 'cord_complete',
-  finish: 'cord_complete',
-
-  ask: 'cord_ask',
-  question: 'cord_ask',
-
-  tree: 'cord_tree',
-  task_tree: 'cord_tree',
-
   // --- Greptile tools ---
   pr_comments: 'greptile_pr_comments',
   review_comments: 'greptile_pr_comments',
@@ -428,39 +402,6 @@ const PARAM_ALIASES: Record<string, Record<string, string>> = {
     search: 'old_string',
     replace: 'new_string',
     replacement: 'new_string',
-  },
-  cord_spawn: {
-    task: 'goal',
-    title: 'goal',
-    name: 'goal',
-    instructions: 'prompt',
-    description: 'prompt',
-    depends_on: 'blocked_by',
-    blockers: 'blocked_by',
-    parent: 'parent_id',
-  },
-  cord_fork: {
-    task: 'goal',
-    title: 'goal',
-    name: 'goal',
-    instructions: 'prompt',
-    description: 'prompt',
-    depends_on: 'blocked_by',
-    blockers: 'blocked_by',
-    parent: 'parent_id',
-  },
-  cord_complete: {
-    id: 'task_id',
-    output: 'result',
-    response: 'result',
-    answer: 'result',
-  },
-  team_search: {
-    text: 'query',
-    search: 'query',
-    q: 'query',
-    max: 'limit',
-    max_results: 'limit',
   },
   sm_digest: {
     time: 'period',

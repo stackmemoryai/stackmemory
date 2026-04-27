@@ -25,7 +25,6 @@ describe('Tool Alias Registry', () => {
         ['discover', 'sm_discover'],
         ['fuzzy_edit', 'sm_edit'],
         ['desires', 'sm_desire_paths'],
-        ['spawn', 'cord_spawn'],
         ['delegate', 'delegate_to_model'],
         ['plan', 'plan_only'],
         ['linear_issues', 'linear_get_tasks'],
@@ -56,7 +55,6 @@ describe('Tool Alias Registry', () => {
         'linear_get_tasks',
         'delegate_to_model',
         'provenant_search',
-        'cord_spawn',
         'sm_digest',
       ];
 
@@ -165,21 +163,6 @@ describe('Tool Alias Registry', () => {
       });
     });
 
-    it('resolves cord_spawn aliases', () => {
-      const result = resolveParamAliases('cord_spawn', {
-        task: 'Build feature',
-        instructions: 'Implement the new API',
-        depends_on: ['task-1'],
-        parent: 'root-task',
-      });
-      expect(result.resolvedParams).toEqual({
-        goal: 'Build feature',
-        prompt: 'Implement the new API',
-        blocked_by: ['task-1'],
-        parent_id: 'root-task',
-      });
-    });
-
     it('resolves sm_edit file path aliases', () => {
       const result = resolveParamAliases('sm_edit', {
         file: '/path/to/file.ts',
@@ -271,14 +254,6 @@ describe('Tool Alias Registry', () => {
         'delegate_to_model',
         'batch_submit',
         'batch_check',
-        'cord_spawn',
-        'cord_fork',
-        'cord_complete',
-        'cord_ask',
-        'cord_tree',
-        'team_context_get',
-        'team_context_share',
-        'team_search',
         'provenant_search',
         'provenant_log',
         'provenant_status',

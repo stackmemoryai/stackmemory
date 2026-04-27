@@ -50,10 +50,7 @@ import { LLMContextRetrieval } from '../../core/retrieval/index.js';
 import { DiscoveryHandlers } from './handlers/discovery-handlers.js';
 import { DiffMemHandlers } from './handlers/diffmem-handlers.js';
 import { GreptileHandlers } from './handlers/greptile-handlers.js';
-import { CordHandlers } from './handlers/cord-handlers.js';
-import { TeamHandlers } from './handlers/team-handlers.js';
 import { CrossSearchHandlers } from './handlers/cross-search-handlers.js';
-import { SQLiteAdapter } from '../../core/database/sqlite-adapter.js';
 import {
   generateChronologicalDigest,
   type DigestPeriod,
@@ -106,8 +103,6 @@ class LocalStackMemoryMCP {
   private providerHandlers:
     | import('./handlers/provider-handlers.js').ProviderHandlers
     | null = null;
-  private cordHandlers: CordHandlers | null = null;
-  private teamHandlers: TeamHandlers | null = null;
   private crossSearchHandlers: CrossSearchHandlers;
   private pendingPlans: Map<string, any> = new Map();
 
@@ -211,9 +206,6 @@ class LocalStackMemoryMCP {
 
     // Initialize Cross-Project Search Handlers
     this.crossSearchHandlers = new CrossSearchHandlers({});
-
-    // Initialize Cord and Team Handlers (async - best effort)
-    this.initCordTeamHandlers();
 
     // Initialize Provider Handlers (lazy, only when multiProvider enabled)
     this.initProviderHandlers();
@@ -390,28 +382,6 @@ class LocalStackMemoryMCP {
     stored.forEach((ctx) => {
       this.contexts.set(ctx.id, ctx);
     });
-  }
-
-  private async initCordTeamHandlers(): Promise<void> {
-    try {
-      const dbPath = join(this.projectRoot, '.stackmemory', 'context.db');
-      const adapter = new SQLiteAdapter(this.projectId, {
-        dbPath,
-        walMode: true,
-      });
-      await adapter.connect();
-      this.cordHandlers = new CordHandlers({
-        frameManager: this.frameManager,
-        dbAdapter: adapter,
-      });
-      this.teamHandlers = new TeamHandlers({
-        frameManager: this.frameManager,
-        dbAdapter: adapter,
-      });
-      logger.info('Cord and Team handlers initialized');
-    } catch (error) {
-      logger.warn('Failed to initialize Cord/Team handlers', { error });
-    }
   }
 
   private async initProviderHandlers(): Promise<void> {
@@ -1114,200 +1084,6 @@ class LocalStackMemoryMCP {
             process.env.DIFFMEM_ENABLED === 'true'
               ? this.diffMemHandlers.getToolDefinitions()
               : []),
-            // Cord task orchestration tools
-            {
-              name: 'cord_spawn',
-              description:
-                'Create a subtask with clean context (spawn). Child sees only its prompt and completed blocker results.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  goal: {
-                    type: 'string',
-                    description: 'What this task should accomplish',
-                  },
-                  prompt: {
-                    type: 'string',
-                    description: 'Detailed instructions for the task',
-                  },
-                  blocked_by: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Task IDs that must complete first',
-                  },
-                  parent_id: { type: 'string', description: 'Parent task ID' },
-                },
-                required: ['goal'],
-              },
-            },
-            {
-              name: 'cord_fork',
-              description:
-                'Create a subtask with full sibling context (fork). Child sees prompt, blocker results, AND completed sibling results.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  goal: {
-                    type: 'string',
-                    description: 'What this task should accomplish',
-                  },
-                  prompt: {
-                    type: 'string',
-                    description: 'Detailed instructions for the task',
-                  },
-                  blocked_by: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Task IDs that must complete first',
-                  },
-                  parent_id: { type: 'string', description: 'Parent task ID' },
-                },
-                required: ['goal'],
-              },
-            },
-            {
-              name: 'cord_complete',
-              description:
-                'Mark a cord task as completed with a result. Automatically unblocks dependent tasks.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  task_id: {
-                    type: 'string',
-                    description: 'Task ID to complete',
-                  },
-                  result: {
-                    type: 'string',
-                    description: 'The result/output of this task',
-                  },
-                },
-                required: ['task_id', 'result'],
-              },
-            },
-            {
-              name: 'cord_ask',
-              description:
-                'Create an ask task — a question that needs an answer before dependent tasks can proceed.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  question: {
-                    type: 'string',
-                    description: 'The question to ask',
-                  },
-                  options: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Optional list of answer choices',
-                  },
-                  parent_id: { type: 'string', description: 'Parent task ID' },
-                },
-                required: ['question'],
-              },
-            },
-            {
-              name: 'cord_tree',
-              description:
-                'View the cord task tree with context scoping. Shows active, blocked, or completed tasks.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  task_id: {
-                    type: 'string',
-                    description:
-                      'Root task ID to show subtree (omit for full tree)',
-                  },
-                  include_results: {
-                    type: 'boolean',
-                    default: false,
-                    description: 'Include task results in output',
-                  },
-                },
-              },
-            },
-            // Team collaboration tools
-            {
-              name: 'team_context_get',
-              description:
-                'Get context from other agents working on the same project. Returns recent frames and shared anchors.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  limit: {
-                    type: 'number',
-                    default: 10,
-                    description: 'Max frames to return',
-                  },
-                  types: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Filter by frame types',
-                  },
-                  since: {
-                    type: 'number',
-                    description:
-                      'Only frames created after this timestamp (epoch ms)',
-                  },
-                },
-              },
-            },
-            {
-              name: 'team_context_share',
-              description:
-                'Share a piece of context with other agents. Creates a high-priority anchor visible to team_context_get.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  content: {
-                    type: 'string',
-                    description: 'The context to share',
-                  },
-                  type: {
-                    type: 'string',
-                    enum: [
-                      'FACT',
-                      'DECISION',
-                      'CONSTRAINT',
-                      'INTERFACE_CONTRACT',
-                      'TODO',
-                      'RISK',
-                    ],
-                    default: 'FACT',
-                    description: 'Type of context',
-                  },
-                  priority: {
-                    type: 'number',
-                    minimum: 1,
-                    maximum: 10,
-                    default: 8,
-                    description: 'Priority level (1-10)',
-                  },
-                },
-                required: ['content'],
-              },
-            },
-            {
-              name: 'team_search',
-              description:
-                "Search across all agents' context in the project. Uses full-text search across all sessions.",
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  query: { type: 'string', description: 'Search query' },
-                  limit: {
-                    type: 'number',
-                    default: 20,
-                    description: 'Maximum results to return',
-                  },
-                  include_events: {
-                    type: 'boolean',
-                    default: false,
-                    description: 'Include events in results',
-                  },
-                },
-                required: ['query'],
-              },
-            },
             // Greptile tools (only active when GREPTILE_API_KEY is set)
             ...(process.env.GREPTILE_API_KEY
               ? this.greptileHandlers.getToolDefinitions()
@@ -1763,112 +1539,6 @@ class LocalStackMemoryMCP {
 
             case 'sm_edit':
               result = await this.handleSmEdit(args);
-              break;
-
-            // Cord task orchestration
-            case 'cord_spawn':
-              if (!this.cordHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Cord handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.cordHandlers.handleCordSpawn(args);
-              }
-              break;
-
-            case 'cord_fork':
-              if (!this.cordHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Cord handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.cordHandlers.handleCordFork(args);
-              }
-              break;
-
-            case 'cord_complete':
-              if (!this.cordHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Cord handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.cordHandlers.handleCordComplete(args);
-              }
-              break;
-
-            case 'cord_ask':
-              if (!this.cordHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Cord handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.cordHandlers.handleCordAsk(args);
-              }
-              break;
-
-            case 'cord_tree':
-              if (!this.cordHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Cord handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.cordHandlers.handleCordTree(args);
-              }
-              break;
-
-            // Team collaboration
-            case 'team_context_get':
-              if (!this.teamHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Team handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.teamHandlers.handleTeamContextGet(args);
-              }
-              break;
-
-            case 'team_context_share':
-              if (!this.teamHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Team handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.teamHandlers.handleTeamContextShare(args);
-              }
-              break;
-
-            case 'team_search':
-              if (!this.teamHandlers) {
-                result = {
-                  content: [
-                    { type: 'text', text: 'Team handlers not initialized.' },
-                  ],
-                  is_error: true,
-                };
-              } else {
-                result = await this.teamHandlers.handleTeamSearch(args);
-              }
               break;
 
             // Provider tools

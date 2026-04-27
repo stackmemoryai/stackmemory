@@ -14,7 +14,7 @@ Lossless, project-scoped memory for AI coding tools. **[Website](https://stackme
 StackMemory is a **production-ready memory runtime** for AI coding tools that preserves full project context across sessions:
 
 - **Zero-config setup** — `stackmemory init` just works
-- **56 MCP tools** for Claude Code integration (context, tasks, Linear, traces, discovery, cord, team, planning, providers, and more)
+- **73 MCP tools** for Claude Code integration (context, tasks, Linear, traces, discovery, cord, team, planning, providers, and more)
 - **FTS5 full-text search** with BM25 scoring and hybrid retrieval
 - **Full Linear integration** with bidirectional sync and OAuth/API key support
 - **Context persistence** that survives `/clear` operations
@@ -97,6 +97,16 @@ stackmemory doctor
 
 Restart Claude Code and StackMemory MCP tools will be available.
 
+### Also available as `croissant-ai`
+
+[croissant.ai](https://croissant.ai) wraps StackMemory as a business-facing CLI for executive intelligence. Install via `npx croissant-ai` — all unknown commands forward to StackMemory automatically.
+
+```bash
+npx croissant-ai ask "What's our MRR?"   # croissant.ai query API
+npx croissant-ai memory capture           # → stackmemory capture
+npx croissant-ai init                     # → stackmemory init (fallback)
+```
+
 ### Wrapper Scripts
 
 StackMemory ships wrapper scripts that launch your coding tool with StackMemory context pre-loaded:
@@ -129,6 +139,44 @@ Frames can span multiple chat turns, tool calls, and sessions.
 ## How it integrates
 
 Runs as an MCP server. Editors (e.g., Claude Code) call StackMemory on each interaction to fetch a compiled context bundle; editors don't store memory themselves.
+
+---
+
+## Command Packs
+
+StackMemory ships installable command packs for Claude Code — curated slash commands that integrate session lifecycle management directly into your workflow.
+
+### Core Pack
+
+The **core** pack provides session lifecycle commands that use StackMemory for context persistence:
+
+| Command | Description |
+|---------|-------------|
+| `/start` | Boot a session — load memory, restore handoff, show git state, suggest next work |
+| `/stop` | End a session — summarize, capture handoff, review learnings |
+| `/restart` | Chain `/stop` → `/clear` → `/start` in one command |
+| `/next` | Suggest what to work on based on context |
+
+Internal dependencies (installed automatically): `/summary`, `/capture`, `/learn`, `/restore`
+
+```bash
+# Install core commands
+stackmemory setup-commands
+
+# List available packs
+stackmemory setup-commands --list
+
+# Preview what would be installed
+stackmemory setup-commands --dry-run
+
+# Reinstall (overwrite existing)
+stackmemory setup-commands --force
+
+# Remove installed commands
+stackmemory setup-commands --uninstall
+```
+
+Commands are symlinked to `~/.claude/commands/` and available immediately in Claude Code.
 
 ---
 
@@ -272,33 +320,53 @@ claude-sm
 
 ---
 
-## RLM (Recursive Language Model) Orchestration
+## RLM-Aware Harness
 
-StackMemory includes an RLM system that handles complex tasks through recursive decomposition and parallel execution using Claude Code's Task tool.
+StackMemory includes an RLM (Recursive Language Model) system inspired by [predict-rlm](https://github.com/Trampoline-AI/predict-rlm) — three layers that make agents self-harnessing:
 
-### Key Features
+### Layer 1: Context-as-REPL
 
-- **Recursive Task Decomposition**: Breaks complex tasks into manageable subtasks
-- **Parallel Subagent Execution**: Run multiple specialized agents concurrently
-- **8 Specialized Agent Types**: Planning, Code, Testing, Linting, Review, Improve, Context, Publish
-- **Multi-Stage Review**: Iterative improvement cycles with quality scoring (0-1 scale)
-- **Automatic Test Generation**: Unit, integration, and E2E test creation
+Agents access tenant data programmatically via tool functions instead of prose handoffs:
 
-### Usage
+- `search_knowledge(query, topK)` — vector search over tenant data
+- `read_context(query)` — knowledge graph entity/relationship queries
+- `list_runs(threadId)` — prior run history with status summaries
+- `get_run_events(runId)` — event stream replay for a specific run
+- `query_interrupts(threadId)` — pending approvals and blocks
+- `llm_summarize(prompt)` — sub-LLM (Haiku) for quick synthesis
+
+### Layer 2: Typed Dispatch
+
+Signature-based sub-agent spawning with validated I/O contracts:
+
+| Signature | Persona | Inputs | Outputs |
+|-----------|---------|--------|---------|
+| `ImplementFeature` | eng | spec, context_files | branch, changed_files, test_passed |
+| `FixBug` | eng | description, error_log | branch, changed_files, root_cause |
+| `ReviewPR` | eng | pr_url, focus_areas | verdict, comments, risk_level |
+| `Investigate` | data | question, data_sources | findings, evidence, confidence |
+| `Summarize` | data | content, format | summary, key_points |
+
+Parent runs dispatch typed sub-runs via `dispatchSubRun()` and collect validated results via `collectSubRun()` with timeout handling.
+
+### Layer 3: Critic + Self-Decomposition
+
+LLM quality gate that evaluates run output (ported from predict-rlm's critic pattern):
+
+- **Score >= 80**: Pass — run ships as-is
+- **Score 50-79**: Revise — creates a new run with critic feedback appended
+- **Score < 50**: Decompose — dispatches typed sub-runs to break down the task
+
+Loop control: max 3 revisions, max depth 2 for decomposition.
+
+### Legacy RLM Orchestrator
+
+The original RLM system remains available for direct use:
 
 ```bash
-# Basic usage
 stackmemory skills rlm "Your complex task description"
-
-# With options
-stackmemory skills rlm "Refactor authentication system" \
-  --max-parallel 8 \
-  --review-stages 5 \
-  --quality-threshold 0.9 \
-  --test-mode all
+stackmemory skills rlm "Refactor auth" --max-parallel 8 --quality-threshold 0.9
 ```
-
-### Configuration Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -307,7 +375,6 @@ stackmemory skills rlm "Refactor authentication system" \
 | `--review-stages` | Number of review iterations | 3 |
 | `--quality-threshold` | Target quality score (0-1) | 0.85 |
 | `--test-mode` | Test generation mode (unit/integration/e2e/all) | all |
-| `--verbose` | Show all recursive operations | false |
 
 **Note**: RLM requires Claude Code Max plan for unlimited subagent execution.
 
@@ -417,7 +484,7 @@ Options: `--until`, `--until-not`, `--until-empty`, `--until-non-empty`, `--unti
 ## Documentation
 
 - [Getting Started](./docs/GETTING_STARTED.md) — Quick start guide (5 minutes)
-- [MCP Tools Reference](https://stackmemoryai.github.io/stackmemory/tools.html) — All 56 MCP tools
+- [MCP Tools Reference](https://stackmemoryai.github.io/stackmemory/tools.html) — All 73 MCP tools
 - [CLI Reference](./docs/cli.md) — Full command reference
 - [Setup Guide](./docs/SETUP.md) — Advanced setup options
 - [Development Guide](./docs/DEVELOPMENT.md) — Contributing and development
@@ -426,6 +493,20 @@ Options: `--until`, `--until-not`, `--until-empty`, `--until-non-empty`, `--unti
 - [Vision](./docs/vision.md) — Product vision and principles
 - [Status](./docs/status.md) — Current project status
 - [Roadmap](./docs/roadmap.md) — Future plans
+
+---
+
+## Substrate: The Three-Layer Vision
+
+StackMemory is the foundation of a three-layer architecture for AI-native development:
+
+| Layer | Product | Status | Purpose |
+|-------|---------|--------|---------|
+| **L1** | StackMemory | Shipped (v1.10.6) | Context persistence — lossless memory across sessions |
+| **L2** | Substrate Desktop | Shipping | Agent orchestration — multi-agent coordination with worktree isolation |
+| **L3** | Substrate Cloud | Design | Multiplayer development — shared context across teams and agents |
+
+Grounded in distributed systems theory: FLP impossibility, Byzantine→Crash conversion via test hooks, Chandra-Toueg failure detectors for agent liveness. See [COORDINATION_THEORY.md](./docs/architecture/COORDINATION_THEORY.md).
 
 ---
 

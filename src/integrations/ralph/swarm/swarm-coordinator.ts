@@ -10,7 +10,6 @@ import * as path from 'path';
 import { logger } from '../../../core/monitoring/logger.js';
 import { FrameManager } from '../../../core/context/index.js';
 import { sessionManager } from '../../../core/session/index.js';
-import { sharedContextLayer } from '../../../core/context/shared-context-layer.js';
 import { RalphStackMemoryBridge } from '../bridge/ralph-stackmemory-bridge.js';
 import { GitWorkflowManager } from './git-workflow-manager.js';
 import { SwarmRegistry } from '../monitoring/swarm-registry.js';
@@ -131,7 +130,6 @@ export class SwarmCoordinator {
   async initialize(): Promise<void> {
     try {
       await sessionManager.initialize();
-      await sharedContextLayer.initialize();
 
       const session = await sessionManager.getOrCreateSession({});
       if (session.database) {

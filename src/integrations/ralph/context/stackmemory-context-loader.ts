@@ -5,7 +5,6 @@
 
 import { logger } from '../../../core/monitoring/logger.js';
 import { FrameManager } from '../../../core/context/index.js';
-import { sharedContextLayer } from '../../../core/context/shared-context-layer.js';
 import { ContextRetriever } from '../../../core/retrieval/context-retriever.js';
 import { sessionManager } from '../../../core/session/index.js';
 import { ContextBudgetManager } from './context-budget-manager.js';
@@ -65,7 +64,6 @@ export class StackMemoryContextLoader {
     try {
       // Initialize StackMemory components
       await sessionManager.initialize();
-      await sharedContextLayer.initialize();
 
       // Get current session
       const session = await sessionManager.getOrCreateSession({});
@@ -253,67 +251,18 @@ export class StackMemoryContextLoader {
    * Extract relevant patterns from historical data
    */
   private async extractRelevantPatterns(
-    taskDescription: string
+    _taskDescription: string
   ): Promise<HistoricalPattern[]> {
-    try {
-      const context = await sharedContextLayer.getSharedContext();
-      if (!context) return [];
-
-      const relevantPatterns: HistoricalPattern[] = [];
-
-      // Filter patterns by relevance to current task
-      for (const pattern of context.globalPatterns) {
-        const relevance = this.calculatePatternRelevance(
-          taskDescription,
-          pattern.pattern
-        );
-
-        if (relevance >= 0.5) {
-          relevantPatterns.push({
-            pattern: pattern.pattern,
-            type: pattern.type,
-            frequency: pattern.frequency,
-            lastSeen: pattern.lastSeen,
-            relevance,
-            resolution: pattern.resolution,
-            examples: await this.getPatternExamples(pattern.pattern),
-          });
-        }
-      }
-
-      // Sort by relevance and frequency
-      return relevantPatterns
-        .sort(
-          (a, b) =>
-            b.relevance * Math.log(b.frequency + 1) -
-            a.relevance * Math.log(a.frequency + 1)
-        )
-        .slice(0, 8); // Top 8 most relevant patterns
-    } catch (error: unknown) {
-      logger.error('Failed to extract patterns', error as Error);
-      return [];
-    }
+    // Shared context layer removed (local-only mode)
+    return [];
   }
 
   /**
    * Load recent decisions that might be relevant
    */
   private async loadRecentDecisions(): Promise<any[]> {
-    try {
-      const context = await sharedContextLayer.getSharedContext();
-      if (!context) return [];
-
-      // Get recent successful decisions
-      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000; // Last 7 days
-
-      return context.decisionLog
-        .filter((d) => d.timestamp >= cutoff && d.outcome === 'success')
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 5);
-    } catch (error: unknown) {
-      logger.error('Failed to load recent decisions', error as Error);
-      return [];
-    }
+    // Shared context layer removed (local-only mode)
+    return [];
   }
 
   /**
