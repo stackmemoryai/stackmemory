@@ -865,6 +865,7 @@ export type ProviderId =
   | 'cerebras'
   | 'deepinfra'
   | 'openrouter'
+  | 'moonshot'
   | 'ollama';
 
 /**
@@ -908,6 +909,11 @@ export function createProvider(
       return new GPTAdapter({
         apiKey: config.apiKey,
         baseUrl: config.baseUrl || 'https://openrouter.ai/api',
+      });
+    case 'moonshot':
+      return new GPTAdapter({
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl || 'https://api.moonshot.ai/v1',
       });
     default:
       throw new Error(`No adapter for provider: ${id}`);

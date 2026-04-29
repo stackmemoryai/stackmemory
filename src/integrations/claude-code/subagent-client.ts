@@ -25,6 +25,19 @@ import {
 import { AnthropicBatchClient } from '../anthropic/batch-client.js';
 import type { BatchRequest } from '../anthropic/batch-client.js';
 
+/** Error patterns indicating quota/rate limit exhaustion */
+const QUOTA_ERROR_PATTERNS = [
+  /rate.?limit/i,
+  /quota.?exceeded/i,
+  /too many requests/i,
+  /429/,
+  /capacity/i,
+  /billing/i,
+  /usage.?limit/i,
+  /plan.?limit/i,
+  /max.*requests/i,
+];
+
 export interface SubagentRequest {
   type:
     | 'planning'
@@ -184,6 +197,16 @@ export class ClaudeCodeSubagentClient {
         tokens: result.usage.inputTokens + result.usage.outputTokens,
       };
     } catch (error: any) {
+      // If Anthropic API hit quota, overflow to Kimi instead of CLI
+      if (
+        optimal.provider === 'anthropic' &&
+        this.isQuotaError(error.message)
+      ) {
+        logger.warn('Anthropic API quota hit, overflowing to Kimi', {
+          error: error.message,
+        });
+        return this.executeKimiOverflow(request, startTime, subagentId);
+      }
       logger.warn(`Direct API failed for ${optimal.provider}, falling back`, {
         error: error.message,
       });
@@ -268,6 +291,15 @@ export class ClaudeCodeSubagentClient {
         tokens: this.estimateTokens(fullPrompt + result.text),
       };
     } catch (error: any) {
+      // Detect quota/rate limit errors and overflow to Kimi
+      if (this.isQuotaError(error.message)) {
+        logger.warn('Claude quota/rate limit hit, overflowing to Kimi', {
+          subagentId,
+          error: error.message,
+        });
+        return this.executeKimiOverflow(request, startTime, subagentId);
+      }
+
       logger.error(`Subagent CLI execution failed: ${request.type}`, {
         error,
         subagentId,
@@ -307,6 +339,86 @@ export class ClaudeCodeSubagentClient {
         };
       }
     });
+  }
+
+  /**
+   * Check if an error message indicates quota/rate limit exhaustion
+   */
+  private isQuotaError(message: string): boolean {
+    return QUOTA_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+  }
+
+  /**
+   * Execute via Kimi/Moonshot API as overflow when Claude quota is exhausted.
+   * Uses OpenAI-compatible API at api.moonshot.ai/v1.
+   */
+  private async executeKimiOverflow(
+    request: SubagentRequest,
+    startTime: number,
+    subagentId: string
+  ): Promise<SubagentResponse> {
+    const apiKey = process.env['MOONSHOT_API_KEY'] || '';
+    if (!apiKey) {
+      logger.warn('No MOONSHOT_API_KEY set, cannot overflow to Kimi');
+      return {
+        success: false,
+        result: null,
+        error: 'Claude quota exceeded and no MOONSHOT_API_KEY configured',
+        duration: Date.now() - startTime,
+        subagentType: request.type,
+      };
+    }
+
+    try {
+      const adapter = createProvider('moonshot', {
+        apiKey,
+        baseUrl: 'https://api.moonshot.ai/v1',
+      });
+
+      const prompt = this.buildSubagentPrompt(request);
+      const result = await adapter.complete(
+        [{ role: 'user', content: prompt }],
+        { model: 'kimi-k2.6', maxTokens: 8192 }
+      );
+
+      const text = result.content
+        .filter((c): c is TextBlock => c.type === 'text')
+        .map((c) => c.text)
+        .join('');
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        parsed = { rawOutput: text };
+      }
+
+      logger.info('Kimi overflow completed', {
+        subagentId,
+        tokens: result.usage.inputTokens + result.usage.outputTokens,
+      });
+
+      return {
+        success: true,
+        result: parsed,
+        output: text,
+        duration: Date.now() - startTime,
+        subagentType: request.type,
+        tokens: result.usage.inputTokens + result.usage.outputTokens,
+      };
+    } catch (kimiError: any) {
+      logger.error('Kimi overflow also failed', {
+        subagentId,
+        error: kimiError.message,
+      });
+      return {
+        success: false,
+        result: null,
+        error: `Claude quota exceeded, Kimi fallback failed: ${kimiError.message}`,
+        duration: Date.now() - startTime,
+        subagentType: request.type,
+      };
+    }
   }
 
   /**

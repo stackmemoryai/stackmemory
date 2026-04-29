@@ -26,6 +26,7 @@ export type ModelProvider =
   | 'cerebras'
   | 'deepinfra'
   | 'openrouter'
+  | 'moonshot'
   | 'anthropic-batch'
   | 'custom';
 export type TaskType =
@@ -62,6 +63,9 @@ export const MODEL_TOKEN_LIMITS: Record<string, number> = {
   'llama-4-scout-17b-16e-instruct': 131072,
   // DeepInfra
   'THUDM/glm-4-9b-chat': 128000,
+  // Moonshot (Kimi)
+  'kimi-k2.6': 256000,
+  'kimi-k2.5': 256000,
 };
 
 /** Default context window when model is unknown */
@@ -120,6 +124,7 @@ export interface ModelRouterConfig {
     cerebras?: ModelConfig;
     deepinfra?: ModelConfig;
     openrouter?: ModelConfig;
+    moonshot?: ModelConfig;
     'anthropic-batch'?: ModelConfig;
     custom?: ModelConfig;
   };
@@ -181,6 +186,12 @@ const DEFAULT_CONFIG: ModelRouterConfig = {
       model: 'meta-llama/llama-4-scout',
       baseUrl: 'https://openrouter.ai/api',
       apiKeyEnv: 'OPENROUTER_API_KEY',
+    },
+    moonshot: {
+      provider: 'moonshot',
+      model: 'kimi-k2.6',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      apiKeyEnv: 'MOONSHOT_API_KEY',
     },
     'anthropic-batch': {
       provider: 'anthropic-batch',
@@ -398,7 +409,12 @@ const OPTIMAL_ROUTING: Record<
   },
 };
 
-const FALLBACK_CHAIN: ModelProvider[] = ['deepinfra', 'cerebras', 'anthropic'];
+const FALLBACK_CHAIN: ModelProvider[] = [
+  'moonshot',
+  'deepinfra',
+  'cerebras',
+  'anthropic',
+];
 
 /** Cheap providers for low-complexity routing */
 const CHEAP_PROVIDERS: {
@@ -407,6 +423,12 @@ const CHEAP_PROVIDERS: {
   apiKeyEnv: string;
   baseUrl?: string;
 }[] = [
+  {
+    provider: 'moonshot',
+    model: 'kimi-k2.6',
+    apiKeyEnv: 'MOONSHOT_API_KEY',
+    baseUrl: 'https://api.moonshot.ai/v1',
+  },
   {
     provider: 'openrouter',
     model: 'meta-llama/llama-4-scout',

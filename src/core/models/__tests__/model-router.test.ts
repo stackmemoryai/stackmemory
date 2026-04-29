@@ -28,6 +28,11 @@ describe('model-router', () => {
       expect(getModelTokenLimit('THUDM/glm-4-9b-chat')).toBe(128000);
     });
 
+    it('should return 256K limits for Kimi models', () => {
+      expect(getModelTokenLimit('kimi-k2.6')).toBe(256000);
+      expect(getModelTokenLimit('kimi-k2.5')).toBe(256000);
+    });
+
     it('should return default for unknown models', () => {
       expect(getModelTokenLimit('unknown-model')).toBe(200000);
       expect(getModelTokenLimit(undefined)).toBe(200000);
@@ -113,14 +118,38 @@ describe('model-router', () => {
       expect(result.apiKeyEnv).toBe('ANTHROPIC_API_KEY');
     });
 
-    it('should route low-complexity to cheap provider', () => {
+    it('should route low-complexity to moonshot when available', () => {
       process.env['STACKMEMORY_MULTI_PROVIDER'] = 'true';
+      process.env['MOONSHOT_API_KEY'] = 'test-key';
+
+      const result = getOptimalProvider('code', undefined, {
+        task: 'Fix typo in README',
+      });
+      expect(result.provider).toBe('moonshot');
+      expect(result.model).toBe('kimi-k2.6');
+    });
+
+    it('should route low-complexity to openrouter when moonshot key missing', () => {
+      process.env['STACKMEMORY_MULTI_PROVIDER'] = 'true';
+      delete process.env['MOONSHOT_API_KEY'];
       process.env['OPENROUTER_API_KEY'] = 'test-key';
 
       const result = getOptimalProvider('code', undefined, {
         task: 'Fix typo in README',
       });
       expect(result.provider).toBe('openrouter');
+    });
+
+    it('should try moonshot in fallback chain before deepinfra', () => {
+      process.env['STACKMEMORY_MULTI_PROVIDER'] = 'true';
+      process.env['MOONSHOT_API_KEY'] = 'test-key';
+      process.env['DEEPINFRA_API_KEY'] = 'test-key';
+      // Remove the direct route provider keys so it hits fallback chain
+      delete process.env['ANTHROPIC_API_KEY'];
+      delete process.env['CEREBRAS_API_KEY'];
+
+      const result = getOptimalProvider('default');
+      expect(result.provider).toBe('moonshot');
     });
 
     it('should force anthropic when sensitive content detected', () => {

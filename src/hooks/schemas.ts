@@ -24,6 +24,7 @@ export const ModelProviderSchema = z.enum([
   'cerebras',
   'deepinfra',
   'openrouter',
+  'moonshot',
   'anthropic-batch',
   'custom',
 ]);
@@ -70,6 +71,7 @@ export const ModelRouterConfigSchema = z.object({
       cerebras: ModelConfigSchema.optional(),
       deepinfra: ModelConfigSchema.optional(),
       openrouter: ModelConfigSchema.optional(),
+      moonshot: ModelConfigSchema.optional(),
       'anthropic-batch': ModelConfigSchema.optional(),
       custom: ModelConfigSchema.optional(),
     })
