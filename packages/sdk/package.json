@@ -41,5 +41,14 @@
     "ai",
     "llm"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stackmemoryai/stackmemory.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/stackmemoryai/stackmemory/tree/main/packages/sdk#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }
