@@ -1599,10 +1599,11 @@ class LocalStackMemoryMCP {
           if (cached.hit && cached.entry) {
             this.sessionCacheHits++;
             this.sessionTokensSaved += cached.tokensSaved;
-            logger.debug('Cache hit', {
-              tool: name,
-              tokensSaved: cached.tokensSaved,
-            });
+            const total = this.sessionCacheHits + this.sessionCacheMisses;
+            const rate = ((this.sessionCacheHits / total) * 100).toFixed(0);
+            console.error(
+              `[cache] HIT ${name} — saved ~${cached.tokensSaved} tokens (session: ${this.sessionTokensSaved.toLocaleString()} total, ${rate}% hit rate)`
+            );
             const cachedResult = JSON.parse(cached.entry.content);
             toolCall.result = cachedResult;
             toolCall.duration = Date.now() - startTime;
@@ -1925,7 +1926,16 @@ class LocalStackMemoryMCP {
           if (!error && result && cacheKey) {
             try {
               const serialized = JSON.stringify(result);
-              this.contentCache.putByKey(cacheKey, serialized, `tool:${name}`);
+              const entry = this.contentCache.putByKey(
+                cacheKey,
+                serialized,
+                `tool:${name}`
+              );
+              if (entry.hitCount === 0) {
+                console.error(
+                  `[cache] STORE ${name} — ~${entry.tokenCount} tokens cached for future dedup`
+                );
+              }
             } catch {
               // Cache store failure is non-fatal
             }
