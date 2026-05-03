@@ -644,6 +644,12 @@ export class MCPToolDefinitions {
               description: 'Which agent implements code',
             },
             maxIters: { type: 'number', default: 2 },
+            verificationCommands: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Optional repro/test commands that must pass after implementation',
+            },
             recordFrame: { type: 'boolean', default: true },
             execute: { type: 'boolean', default: true },
           },

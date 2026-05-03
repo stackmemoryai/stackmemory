@@ -23,6 +23,20 @@ export interface CritiqueResult {
   suggestions: string[];
 }
 
+export interface VerificationCommandResult {
+  command: string;
+  ok: boolean;
+  output: string;
+}
+
+export interface PostImplementationChecks {
+  lintOk: boolean;
+  lintOutput: string;
+  testsOk: boolean;
+  testOutput: string;
+  verifications: VerificationCommandResult[];
+}
+
 export interface HarnessOptions {
   plannerModel?: string; // e.g. 'claude-3-opus' or 'claude-3.5-sonnet'
   reviewerModel?: string;
@@ -34,6 +48,7 @@ export interface HarnessOptions {
   record?: boolean; // store plan/critique in local context DB
   recordFrame?: boolean; // create a real frame and anchors
   deterministicFixture?: boolean; // force deterministic fixture mode for smoke/replay checks
+  verificationCommands?: string[]; // task-specific repro/harness commands to gate approval
 }
 
 export interface ImplementationResult {
@@ -51,5 +66,7 @@ export interface HarnessResult {
     ok: boolean;
     outputPreview: string;
     critique: CritiqueResult;
+    checks?: PostImplementationChecks | null;
   }>;
+  verification?: PostImplementationChecks | null;
 }

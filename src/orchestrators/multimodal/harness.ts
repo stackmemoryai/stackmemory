@@ -87,6 +87,17 @@ function deterministicCritique(args: {
     suggestions.push('Fix failing tests before approval');
   }
 
+  const failedVerifications =
+    args.checks?.verifications.filter((verification) => !verification.ok) || [];
+  if (failedVerifications.length > 0) {
+    issues.push(
+      `Verification command failed: ${failedVerifications[0]?.command}`
+    );
+    suggestions.push(
+      'Use the verification output as the primary repro signal and fix the root cause'
+    );
+  }
+
   if (!args.diff || args.diff.startsWith('(no changes detected)')) {
     suggestions.push(
       'No code changes detected; verify the task can be satisfied without edits'
@@ -142,6 +153,7 @@ export async function runSpike(
   // Implementer (Codex by default) with retry loop driven by critique suggestions
   const implementer = (options.implementer || 'codex') as 'codex' | 'claude';
   const maxIters = Math.max(1, options.maxIters ?? 2);
+  const verificationCommands = options.verificationCommands || [];
   const iterations: HarnessResult['iterations'] = [];
 
   let approved = false;
@@ -158,7 +170,11 @@ export async function runSpike(
     const stepsList = plan.steps
       .map((s, idx) => `${idx + 1}. ${s.title}`)
       .join('\n');
-    const basePrompt = `Implement the following plan:\n${stepsList}\n\nKeep changes minimal and focused. Avoid unrelated edits.`;
+    const verificationPrompt =
+      verificationCommands.length > 0
+        ? `\n\nVerification commands that must pass:\n${verificationCommands.map((command) => `- ${command}`).join('\n')}`
+        : '\n\nIf this task fixes uncertain behavior, first create or identify a deterministic repro/test/trace that fails for the current behavior, then use it to guide the fix.';
+    const basePrompt = `Implement the following plan:\n${stepsList}\n\nKeep changes minimal and focused. Avoid unrelated edits.${verificationPrompt}`;
     const refine =
       i === 0
         ? ''
@@ -193,9 +209,20 @@ export async function runSpike(
 
     // Post-implementation verification: lint + tests
     const checks =
-      options.dryRun !== false ? null : runPostImplChecks(input.repoPath);
+      options.dryRun !== false
+        ? null
+        : runPostImplChecks(input.repoPath, verificationCommands);
+    const verificationSection =
+      checks && checks.verifications.length > 0
+        ? `\n  Custom verification:\n${checks.verifications
+            .map(
+              (verification) =>
+                `  - ${verification.ok ? 'PASS' : 'FAIL'} ${verification.command}\n${verification.output}`
+            )
+            .join('\n')}`
+        : '';
     const checksSection = checks
-      ? `\n\nPost-implementation checks:\n  Lint: ${checks.lintOk ? 'PASS' : 'FAIL'}\n${checks.lintOutput}\n  Tests: ${checks.testsOk ? 'PASS' : 'FAIL'}\n${checks.testOutput}`
+      ? `\n\nPost-implementation checks:\n  Lint: ${checks.lintOk ? 'PASS' : 'FAIL'}\n${checks.lintOutput}\n  Tests: ${checks.testsOk ? 'PASS' : 'FAIL'}\n${checks.testOutput}${verificationSection}`
       : '';
 
     // Critic reviews the diff, not the CLI log
@@ -234,6 +261,7 @@ export async function runSpike(
       ok,
       outputPreview: diff.slice(0, 2000),
       critique: lastCritique,
+      checks,
     });
 
     if (lastCritique.approved) {
@@ -379,6 +407,7 @@ export async function runSpike(
     },
     critique: lastCritique,
     iterations,
+    verification: iterations.at(-1)?.checks || null,
   };
 }
 

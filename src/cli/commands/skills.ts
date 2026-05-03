@@ -56,6 +56,13 @@ function getVersion(): string {
   return _version;
 }
 
+function collectRepeatedOption(
+  value: string,
+  previous: string[] = []
+): string[] {
+  return [...previous, value];
+}
+
 // Type-safe environment variable access
 function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
@@ -408,6 +415,12 @@ export function createSkillsCommand(): Command {
       false
     )
     .option('--audit-dir <path>', 'Persist spike results to directory')
+    .option(
+      '--verify <cmd>',
+      'Verification command to run after each implementation attempt; repeatable',
+      collectRepeatedOption,
+      []
+    )
     .option('--record-frame', 'Record as real frame with anchors', false)
     .option(
       '--record',
@@ -435,6 +448,7 @@ export function createSkillsCommand(): Command {
             maxIters: parseInt(options.maxIters),
             dryRun: !options.execute,
             auditDir: options.auditDir,
+            verificationCommands: options.verify,
             recordFrame: Boolean(options.recordFrame),
             record: Boolean(options.record),
           }

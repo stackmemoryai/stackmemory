@@ -1,6 +1,10 @@
 import { spawnSync } from 'child_process';
 
 import { STRUCTURED_RESPONSE_SUFFIX } from './constants.js';
+import type {
+  PostImplementationChecks,
+  VerificationCommandResult,
+} from './types.js';
 
 // Lightweight provider wrappers with safe fallbacks for a spike.
 
@@ -175,12 +179,10 @@ export function captureGitDiff(cwd: string, maxLen = 12000): string {
  * Run lint and test checks in a repo directory after implementation.
  * Returns pass/fail status and truncated output for each.
  */
-export function runPostImplChecks(cwd: string): {
-  lintOk: boolean;
-  lintOutput: string;
-  testsOk: boolean;
-  testOutput: string;
-} {
+export function runPostImplChecks(
+  cwd: string,
+  verificationCommands: string[] = []
+): PostImplementationChecks {
   const maxOutput = 2000;
 
   function truncate(s: string): string {
@@ -220,7 +222,63 @@ export function runPostImplChecks(cwd: string): {
     testOutput = truncate(e instanceof Error ? e.message : String(e));
   }
 
-  return { lintOk, lintOutput, testsOk, testOutput };
+  return {
+    lintOk,
+    lintOutput,
+    testsOk,
+    testOutput,
+    verifications: runVerificationCommands(cwd, verificationCommands),
+  };
+}
+
+export function runVerificationCommands(
+  cwd: string,
+  commands: string[],
+  options: { timeoutMs?: number; maxOutput?: number } = {}
+): VerificationCommandResult[] {
+  const timeout = options.timeoutMs ?? 120000;
+  const maxOutput = options.maxOutput ?? 4000;
+
+  const truncate = (value: string): string => {
+    if (value.length <= maxOutput) return value;
+    return (
+      value.slice(0, maxOutput) +
+      `\n... (truncated, ${value.length} total chars)`
+    );
+  };
+
+  return commands
+    .map((command) => command.trim())
+    .filter(Boolean)
+    .map((command) => {
+      try {
+        const result = spawnSync(command, {
+          cwd,
+          encoding: 'utf8',
+          shell: true,
+          timeout,
+          maxBuffer: Math.max(maxOutput * 4, 1024 * 1024),
+        });
+        const output = truncate((result.stdout || '') + (result.stderr || ''));
+        return {
+          command,
+          ok: result.status === 0,
+          output:
+            output ||
+            (result.status === 0
+              ? '(command completed with no output)'
+              : `(command failed with exit ${result.status ?? 'unknown'})`),
+        };
+      } catch (error: unknown) {
+        return {
+          command,
+          ok: false,
+          output: truncate(
+            error instanceof Error ? error.message : String(error)
+          ),
+        };
+      }
+    });
 }
 
 /**

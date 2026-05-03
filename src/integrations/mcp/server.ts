@@ -36,6 +36,8 @@ import { logger } from '../../core/monitoring/logger.js';
 import { isFeatureEnabled } from '../../core/config/feature-flags.js';
 import { ContentCache } from '../../core/cache/index.js';
 import type { CacheStats } from '../../core/cache/index.js';
+import { TraceEventStore } from '../../core/trace/trace-event-store.js';
+import type { TraceEvent } from '../../core/trace/trace-event.js';
 
 // Linear types - imported dynamically when needed
 type LinearTaskManager =
@@ -142,6 +144,8 @@ class LocalStackMemoryMCP {
   private crossSearchHandlers: CrossSearchHandlers;
   private pendingPlans: Map<string, any> = new Map();
   private contentCache: ContentCache;
+  private traceEventStore: TraceEventStore;
+  private sessionId: string;
   private sessionTokensSaved = 0;
   private sessionCacheHits = 0;
   private sessionCacheMisses = 0;
@@ -197,6 +201,10 @@ class LocalStackMemoryMCP {
 
     // Initialize content-hash cache for token deduplication
     this.contentCache = new ContentCache(this.db);
+
+    // Initialize ASI-shaped trace event store
+    this.traceEventStore = new TraceEventStore(this.db);
+    this.sessionId = uuidv4();
 
     // Initialize frame manager
     this.frameManager = new FrameManager(this.db, this.projectId);
@@ -339,6 +347,54 @@ class LocalStackMemoryMCP {
     }
     return {
       content: [{ type: 'text', text: JSON.stringify(result) }],
+      isError: false,
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Trace event handlers
+  // ------------------------------------------------------------------
+
+  private handleTraceEvents(args: Record<string, unknown>) {
+    const events = this.traceEventStore.query({
+      session_id: args.session_id as string | undefined,
+      operation: args.operation as string | undefined,
+      min_score: args.min_score as number | undefined,
+      has_feedback: args.has_feedback as boolean | undefined,
+      limit: (args.limit as number) ?? 50,
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(events) }],
+      isError: false,
+    };
+  }
+
+  private handleTraceEventStats(args: Record<string, unknown>) {
+    const stats = this.traceEventStore.getStats({
+      session_id: args.session_id as string | undefined,
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(stats) }],
+      isError: false,
+    };
+  }
+
+  private handleTraceEventAnnotate(args: Record<string, unknown>) {
+    const id = String(args.id ?? '');
+    if (!id) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'id is required' }) },
+        ],
+        isError: true,
+      };
+    }
+    const ok = this.traceEventStore.annotate(id, {
+      score: args.score as number | undefined,
+      feedback: args.feedback as string | undefined,
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ ok, id }) }],
       isError: false,
     };
   }
@@ -571,6 +627,12 @@ class LocalStackMemoryMCP {
                           description: 'Which agent implements code',
                         },
                         maxIters: { type: 'number', default: 2 },
+                        verificationCommands: {
+                          type: 'array',
+                          items: { type: 'string' },
+                          description:
+                            'Optional repro/test commands that must pass after implementation',
+                        },
                         recordFrame: { type: 'boolean', default: true },
                         execute: { type: 'boolean', default: true },
                       },
@@ -1424,6 +1486,50 @@ class LocalStackMemoryMCP {
                 required: ['content'],
               },
             },
+            // Trace event tools
+            {
+              name: 'trace_events',
+              description:
+                'Query ASI-shaped trace events. Filter by session, operation, min score, or feedback presence. Returns events with provenance, cost, and token data.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  session_id: { type: 'string' },
+                  operation: { type: 'string' },
+                  min_score: { type: 'number' },
+                  has_feedback: { type: 'boolean' },
+                  limit: { type: 'number' },
+                },
+              },
+            },
+            {
+              name: 'trace_event_stats',
+              description:
+                'Get aggregate trace event statistics: total tokens, cost, operation counts, host distribution.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  session_id: { type: 'string' },
+                },
+              },
+            },
+            {
+              name: 'trace_event_annotate',
+              description:
+                'Add a numeric score and/or textual feedback to a trace event. Used by GEPA-class optimizers.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'Trace event ID' },
+                  score: { type: 'number', description: 'Numeric score (0-1)' },
+                  feedback: {
+                    type: 'string',
+                    description: 'Textual ASI feedback',
+                  },
+                },
+                required: ['id'],
+              },
+            },
           ],
         };
       }
@@ -1791,6 +1897,19 @@ class LocalStackMemoryMCP {
               result = this.handleCacheLookup(args);
               break;
 
+            // Trace event tools
+            case 'trace_events':
+              result = this.handleTraceEvents(args);
+              break;
+
+            case 'trace_event_stats':
+              result = this.handleTraceEventStats(args);
+              break;
+
+            case 'trace_event_annotate':
+              result = this.handleTraceEventAnnotate(args);
+              break;
+
             default:
               throw new Error(`Unknown tool: ${name}`);
           }
@@ -1843,11 +1962,56 @@ class LocalStackMemoryMCP {
 
           // Add to trace detector
           this.traceDetector.addToolCall(toolCall);
+
+          // --- Record ASI-shaped trace event ---
+          try {
+            const traceEvent: TraceEvent = {
+              timestamp: new Date(startTime).toISOString(),
+              session_id: this.sessionId,
+              trace_id: callId,
+              tenant_id: 'local',
+              actor: {
+                host: process.env['STACKMEMORY_HOST'] || 'claude-code',
+                agent: 'stackmemory-mcp',
+                user: process.env['USER'] || 'anonymous',
+              },
+              operation: name,
+              inputs: args as Record<string, unknown>,
+              outputs: error
+                ? { error: error.message }
+                : ((result as Record<string, unknown>) ?? {}),
+              tokens_in: 0,
+              tokens_out: 0,
+              cost_usd: 0,
+              duration_ms: endTime - startTime,
+              error: error?.message,
+              provenance: {
+                sources: [{ type: 'tool', id: name }],
+                derivation: ['mcp-call'],
+                confidence: 1.0,
+              },
+            };
+            this.traceEventStore.record(traceEvent);
+          } catch {
+            // Trace recording is non-fatal
+          }
         }
 
         return result;
       }
     );
+  }
+
+  private getVerificationCommands(args: any): string[] {
+    const commands = args.verificationCommands ?? args.verifyCommands;
+    if (Array.isArray(commands)) {
+      return commands.map((command) => String(command).trim()).filter(Boolean);
+    }
+    const single = args.verificationCommand ?? args.verifyCommand;
+    if (typeof single === 'string' && single.trim()) {
+      return [single.trim()];
+    }
+    return [];
   }
 
   // Handle plan_and_code tool by invoking the mm harness
@@ -1873,6 +2037,7 @@ class LocalStackMemoryMCP {
     const record = Boolean(args.record);
     const recordFrame = Boolean(args.recordFrame);
     const compact = Boolean(args.compact);
+    const verificationCommands = this.getVerificationCommands(args);
 
     const task = String(args.task || 'Plan and implement change');
 
@@ -1888,6 +2053,7 @@ class LocalStackMemoryMCP {
         maxIters: isFinite(maxIters) ? Math.max(1, maxIters) : 2,
         dryRun: !execute,
         auditDir: undefined,
+        verificationCommands,
         recordFrame,
       }
     );
@@ -2091,6 +2257,7 @@ class LocalStackMemoryMCP {
     );
     const recordFrame = args.recordFrame !== false; // default true
     const execute = args.execute !== false; // default true
+    const verificationCommands = this.getVerificationCommands(args);
 
     const result = await runSpike(
       { task: pending.task, repoPath: this.projectRoot },
@@ -2104,6 +2271,7 @@ class LocalStackMemoryMCP {
         implementer: implementer === 'claude' ? 'claude' : 'codex',
         maxIters: isFinite(maxIters) ? Math.max(1, maxIters) : 2,
         dryRun: !execute,
+        verificationCommands,
         recordFrame,
       }
     );

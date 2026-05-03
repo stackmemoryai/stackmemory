@@ -3,29 +3,36 @@
 The `plan_and_code` MCP tool lets Claude Code trigger StackMemory’s multi‑agent flow silently and receive a single JSON result. It plans with Claude, implements with Codex or Claude, and critiques the result — with optional retry loops and context recording.
 
 ## What it does
+
 - Planner (Claude): generates a concise plan with acceptance criteria and risks.
 - Implementer (Codex/Claude): applies a focused change per step.
 - Critic (Claude): returns `{ approved, issues[], suggestions[] }` to gate retries.
+- Verification commands: optional task-specific repro/test commands run after each implementation attempt and included in the critic input.
 - Returns a single JSON payload: `{ plan, implementation, critique, iterations[] }`.
 
 ## Tool definition
+
 - name: `plan_and_code`
 - arguments:
   - `task` (string, required): short task description
   - `implementer` ("codex" | "claude", default: `codex`)
   - `maxIters` (number, default: `2`): retry loop iterations
   - `execute` (boolean, default: `false`): if `false`, implementer is dry‑run
+  - `verificationCommands` (string[], optional): repro/test commands that must pass after each implementation attempt
   - `record` (boolean, default: `false`): write plan/critique as simple context rows
   - `recordFrame` (boolean, default: `false`): write a real frame + anchors
 
 ## Environment defaults
+
 If not specified in arguments, the MCP handler reads these env vars:
+
 - `STACKMEMORY_MM_PLANNER_MODEL` (e.g., `claude-sonnet-4-20250514`)
 - `STACKMEMORY_MM_REVIEWER_MODEL` (defaults to planner model if unset)
 - `STACKMEMORY_MM_IMPLEMENTER` (`codex` or `claude`)
 - `STACKMEMORY_MM_MAX_ITERS` (e.g., `3`)
 
 ## Example (MCP request)
+
 ```json
 {
   "method": "tools/call",
@@ -36,6 +43,9 @@ If not specified in arguments, the MCP handler reads these env vars:
       "implementer": "codex",
       "maxIters": 2,
       "execute": true,
+      "verificationCommands": [
+        "npx vitest run src/orchestrators/multimodal/__tests__/determinism.test.ts --reporter=dot"
+      ],
       "recordFrame": true
     }
   }
@@ -43,6 +53,7 @@ If not specified in arguments, the MCP handler reads these env vars:
 ```
 
 Response content is a single `text` item containing a JSON string:
+
 ```json
 {
   "ok": true,
@@ -58,6 +69,7 @@ Response content is a single `text` item containing a JSON string:
 ```
 
 ## Recording behavior
+
 - `record: true` writes two entries into `.stackmemory/context.db` (simple `contexts` table):
   - `Plan: <summary>` (importance 0.8)
   - `Critique: approved|needs_changes` (importance 0.6)
@@ -68,6 +80,7 @@ Response content is a single `text` item containing a JSON string:
 - Both modes are best‑effort. If the DB isn’t ready, handler returns JSON without failing.
 
 ## Notes
+
 - Implementer `codex` calls `codex-sm` (must be on PATH). Use `--execute` in CLI, or `execute: true` in MCP, to actually run it; otherwise it’s a dry‑run.
 - Audit files are saved to `.stackmemory/build/spike-<timestamp>.json` to support review/debugging.
 - You can compare models:
@@ -75,11 +88,14 @@ Response content is a single `text` item containing a JSON string:
   - Implementer: set to `claude` to A/B against Codex, or keep `codex` (default).
 
 ## CLI equivalents (for quick checks)
+
 - Quiet JSON output:
   - `stackmemory build "Refactor config loader" --json`
   - `stackmemory skills spike --task "Refactor config loader" --json`
 - Execute implementer and record as frame:
   - `stackmemory skills spike --task "Refactor" --execute --max-iters 3 --json --record-frame`
+- Execute with a task-specific verification harness:
+  - `stackmemory build "Fix deterministic replay drift" --verify "npm run determinism:test" --execute`
 
 ---
 
@@ -152,11 +168,13 @@ Response (content[0].text is a JSON string):
 ```
 
 Notes:
+
 - `recordFrame: true` creates a real StackMemory frame + anchors (plan summary, commands, issues, suggestions).
 - `execute: true` actually invokes the implementer; otherwise it’s a dry‑run.
 - Approval IDs are persisted to `.stackmemory/build/pending.json` so editor restarts don’t lose pending approvals.
 
 ### Optional helper tools
+
 - `plan_only`: Returns a plan JSON without running code.
 - `call_claude`: Calls Claude directly (prompt/model/system).
 - `call_codex`: Calls Codex via `codex-sm` (prompt/args/execute).
