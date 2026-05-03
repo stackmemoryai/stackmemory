@@ -1,0 +1,28 @@
+name: coding/typescript-react
+version: 1.0.0
+description: TypeScript + React conventions, patterns, and guardrails for AI coding agents
+author: stackmemory
+license: MIT
+runtime:
+  type: local
+ingestion:
+  sources: []
+ontology:
+  entities:
+    - component
+    - hook
+    - context
+    - route
+    - api-endpoint
+  relations:
+    - renders
+    - depends-on
+    - provides
+mcp:
+  tools: []
+examples:
+  - input: "Create a React component that fetches data"
+    output: "Use a custom hook with useEffect + useState, handle loading/error states, return typed JSX"
+  - input: "How should I structure my TypeScript types?"
+    output: "Prefer interfaces for object shapes, use type for unions/intersections, export from a types.ts barrel file"
+instructions: instructions.md

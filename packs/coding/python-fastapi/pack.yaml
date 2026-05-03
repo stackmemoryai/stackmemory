@@ -1,0 +1,28 @@
+name: coding/python-fastapi
+version: 1.0.0
+description: Python + FastAPI conventions, patterns, and guardrails for AI coding agents
+author: stackmemory
+license: MIT
+runtime:
+  type: local
+ingestion:
+  sources: []
+ontology:
+  entities:
+    - endpoint
+    - model
+    - schema
+    - dependency
+    - middleware
+  relations:
+    - handles
+    - validates
+    - depends-on
+mcp:
+  tools: []
+examples:
+  - input: "Create a CRUD API endpoint"
+    output: "Use Pydantic models for request/response, dependency injection for DB session, proper HTTP status codes, async handlers"
+  - input: "How should I structure a FastAPI project?"
+    output: "app/ with routers/, models/, schemas/, dependencies/, core/ (config, security). Use APIRouter per domain."
+instructions: instructions.md

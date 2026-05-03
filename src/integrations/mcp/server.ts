@@ -34,6 +34,8 @@ import { execSync } from 'child_process';
 import { FrameManager, FrameType } from '../../core/context/index.js';
 import { logger } from '../../core/monitoring/logger.js';
 import { isFeatureEnabled } from '../../core/config/feature-flags.js';
+import { ContentCache } from '../../core/cache/index.js';
+import type { CacheStats } from '../../core/cache/index.js';
 
 // Linear types - imported dynamically when needed
 type LinearTaskManager =
@@ -81,6 +83,40 @@ function _getOptionalEnv(key: string): string | undefined {
 }
 
 // ============================================
+// Content-hash cache: read-only tools eligible for dedup
+// ============================================
+
+const CACHEABLE_TOOLS = new Set([
+  'get_context',
+  'get_hot_stack',
+  'get_active_tasks',
+  'get_task_metrics',
+  'get_traces',
+  'get_trace_statistics',
+  'smart_context',
+  'get_summary',
+  'sm_discover',
+  'sm_related_files',
+  'sm_session_summary',
+  'sm_search',
+  'sm_cross_search',
+  'sm_cross_discover',
+  'sm_cross_list',
+  'diffmem_get_user_context',
+  'diffmem_search',
+  'diffmem_status',
+  'greptile_list_prs',
+  'greptile_pr_details',
+  'greptile_pr_comments',
+  'greptile_status',
+  'linear_get_tasks',
+  'linear_status',
+  'provenant_search',
+  'provenant_status',
+  'provenant_contradictions',
+]);
+
+// ============================================
 // Simple Local MCP Server
 // ============================================
 
@@ -105,6 +141,10 @@ class LocalStackMemoryMCP {
     | null = null;
   private crossSearchHandlers: CrossSearchHandlers;
   private pendingPlans: Map<string, any> = new Map();
+  private contentCache: ContentCache;
+  private sessionTokensSaved = 0;
+  private sessionCacheHits = 0;
+  private sessionCacheMisses = 0;
 
   constructor() {
     // Find project root (where .git is)
@@ -154,6 +194,9 @@ class LocalStackMemoryMCP {
       );
       CREATE INDEX IF NOT EXISTS idx_edit_telemetry_ts ON edit_telemetry(timestamp);
     `);
+
+    // Initialize content-hash cache for token deduplication
+    this.contentCache = new ContentCache(this.db);
 
     // Initialize frame manager
     this.frameManager = new FrameManager(this.db, this.projectId);
@@ -232,6 +275,72 @@ class LocalStackMemoryMCP {
       projectRoot: this.projectRoot,
       projectId: this.projectId,
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Content-hash cache helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * Build a deterministic cache key from tool name + sorted args.
+   * Returns null for non-cacheable tools or empty args.
+   */
+  private buildCacheKey(
+    tool: string,
+    args: Record<string, unknown>
+  ): string | null {
+    if (!CACHEABLE_TOOLS.has(tool)) return null;
+    const sorted = JSON.stringify(args, Object.keys(args).sort());
+    return `${tool}:${sorted}`;
+  }
+
+  private handleCacheStats() {
+    const stats = this.contentCache.getStats();
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            session: {
+              cacheHits: this.sessionCacheHits,
+              cacheMisses: this.sessionCacheMisses,
+              tokensSaved: this.sessionTokensSaved,
+              hitRate:
+                this.sessionCacheHits + this.sessionCacheMisses > 0
+                  ? this.sessionCacheHits /
+                    (this.sessionCacheHits + this.sessionCacheMisses)
+                  : 0,
+            },
+            lifetime: stats,
+          }),
+        },
+      ],
+      isError: false,
+    };
+  }
+
+  private handleCacheLookup(args: Record<string, unknown>) {
+    const content = String(args.content ?? '');
+    if (!content) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ error: 'content is required' }),
+          },
+        ],
+        isError: true,
+      };
+    }
+    const result = this.contentCache.lookup(content, String(args.source ?? ''));
+    if (result.hit) {
+      this.sessionCacheHits++;
+      this.sessionTokensSaved += result.tokensSaved;
+    }
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result) }],
+      isError: false,
+    };
   }
 
   private findProjectRoot(): string {
@@ -1285,6 +1394,36 @@ class LocalStackMemoryMCP {
                 properties: {},
               },
             },
+            // Cache tools
+            {
+              name: 'cache_stats',
+              description:
+                'Get content-hash cache statistics: session token savings, hit rate, and lifetime totals. Call this to see how many tokens have been saved by deduplication.',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+              },
+            },
+            {
+              name: 'cache_lookup',
+              description:
+                'Check if content is already cached. Returns hit/miss and token savings. Use for explicit deduplication before sending large content.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  content: {
+                    type: 'string',
+                    description: 'The content to check against the cache.',
+                  },
+                  source: {
+                    type: 'string',
+                    description:
+                      'Optional source label (e.g., "file:src/index.ts").',
+                  },
+                },
+                required: ['content'],
+              },
+            },
           ],
         };
       }
@@ -1343,6 +1482,29 @@ class LocalStackMemoryMCP {
           arguments: args,
           timestamp: startTime,
         };
+
+        // --- Content-hash cache: check before execution ---
+        const cacheKey = this.buildCacheKey(name, args);
+        if (cacheKey) {
+          const cached = this.contentCache.lookupByKey(
+            cacheKey,
+            `tool:${name}`
+          );
+          if (cached.hit && cached.entry) {
+            this.sessionCacheHits++;
+            this.sessionTokensSaved += cached.tokensSaved;
+            logger.debug('Cache hit', {
+              tool: name,
+              tokensSaved: cached.tokensSaved,
+            });
+            const cachedResult = JSON.parse(cached.entry.content);
+            toolCall.result = cachedResult;
+            toolCall.duration = Date.now() - startTime;
+            this.traceDetector.addToolCall(toolCall);
+            return cachedResult;
+          }
+          this.sessionCacheMisses++;
+        }
 
         let result;
         let error;
@@ -1620,6 +1782,15 @@ class LocalStackMemoryMCP {
               result = await this.crossSearchHandlers.handleCrossList();
               break;
 
+            // Cache tools
+            case 'cache_stats':
+              result = this.handleCacheStats();
+              break;
+
+            case 'cache_lookup':
+              result = this.handleCacheLookup(args);
+              break;
+
             default:
               throw new Error(`Unknown tool: ${name}`);
           }
@@ -1630,6 +1801,16 @@ class LocalStackMemoryMCP {
           throw err;
         } finally {
           const endTime = Date.now();
+
+          // --- Content-hash cache: store result on success ---
+          if (!error && result && cacheKey) {
+            try {
+              const serialized = JSON.stringify(result);
+              this.contentCache.putByKey(cacheKey, serialized, `tool:${name}`);
+            } catch {
+              // Cache store failure is non-fatal
+            }
+          }
 
           // Log tool result event after execution (success or failure)
           // Skip for close_frame since the frame no longer exists after closing
@@ -3680,6 +3861,20 @@ ${typeBreakdown}`,
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('StackMemory MCP Server started');
+
+    // Print cache savings summary on exit
+    const printCacheSummary = () => {
+      if (this.sessionCacheHits > 0 || this.sessionCacheMisses > 0) {
+        const total = this.sessionCacheHits + this.sessionCacheMisses;
+        const rate = ((this.sessionCacheHits / total) * 100).toFixed(1);
+        console.error(
+          `\n📊 Cache: ${this.sessionCacheHits}/${total} hits (${rate}%), ~${this.sessionTokensSaved.toLocaleString()} tokens saved`
+        );
+      }
+    };
+    process.on('SIGINT', printCacheSummary);
+    process.on('SIGTERM', printCacheSummary);
+    process.on('exit', printCacheSummary);
   }
 }
 

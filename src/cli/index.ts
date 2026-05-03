@@ -77,6 +77,7 @@ import { createSnapshotCommand } from './commands/snapshot.js';
 import { createWikiCommand } from './commands/wiki.js';
 import { createLoopCommand } from './commands/loop.js';
 import { createSkillCommand } from './commands/skill.js';
+import { createPackCommand } from './commands/pack.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -818,6 +819,7 @@ program.addCommand(createWikiCommand());
 program.addCommand(createLoopCommand());
 program.addCommand(createRulesCommand());
 program.addCommand(createSkillCommand());
+program.addCommand(createPackCommand());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);

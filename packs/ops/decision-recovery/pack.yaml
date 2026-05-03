@@ -1,0 +1,89 @@
+name: ops/decision-recovery
+version: 1.0.0
+description: Decision tracking, context recovery, and session handoff patterns for agent workflows
+author: stackmemory
+license: MIT
+runtime:
+  type: local
+ingestion:
+  sources:
+    - linear
+    - github
+  scope: decisions-and-anchors
+ontology:
+  entities:
+    - decision
+    - anchor
+    - blocker
+    - handoff
+    - session
+  relations:
+    - supersedes
+    - blocks
+    - resolves
+    - continues
+mcp:
+  tools:
+    - name: log_decision
+      description: Record a decision with rationale, alternatives considered, and confidence level
+      inputSchema:
+        type: object
+        properties:
+          decision:
+            type: string
+            description: The decision made
+          rationale:
+            type: string
+            description: Why this was chosen
+          alternatives:
+            type: array
+            items:
+              type: string
+            description: Alternatives that were considered
+          confidence:
+            type: number
+            description: Confidence level (0-1)
+        required:
+          - decision
+          - rationale
+    - name: recover_context
+      description: Retrieve decisions, anchors, and blockers from the current or recent sessions
+      inputSchema:
+        type: object
+        properties:
+          scope:
+            type: string
+            enum:
+              - current
+              - recent
+              - all
+            description: How far back to look
+          filter:
+            type: string
+            description: Optional keyword filter
+    - name: create_handoff
+      description: Create a structured session handoff for the next agent or human
+      inputSchema:
+        type: object
+        properties:
+          summary:
+            type: string
+            description: What was accomplished
+          blockers:
+            type: array
+            items:
+              type: string
+            description: Open blockers
+          next_steps:
+            type: array
+            items:
+              type: string
+            description: Suggested next actions
+        required:
+          - summary
+examples:
+  - input: "We decided to use SQLite instead of Postgres for the local store"
+    output: "log_decision({ decision: 'Use SQLite for local store', rationale: 'Zero-config, file-based, FTS5 built-in, no server process', alternatives: ['Postgres', 'Dolt'], confidence: 0.9 })"
+  - input: "What decisions were made in the last session?"
+    output: "recover_context({ scope: 'recent', filter: 'decision' })"
+instructions: instructions.md
