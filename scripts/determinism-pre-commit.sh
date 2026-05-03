@@ -53,7 +53,7 @@ printf '%s\n' "$RELEVANT_FILES" | sed 's/^/  - /'
 
 REPORT_JSON="$(node --import tsx src/cli/index.ts bench determinism --task "$TASK" --runs "$RUNS" --json)"
 
-SCORE="$(printf '%s' "$REPORT_JSON" | node -e "let data='';process.stdin.on('data',d=>data+=d);process.stdin.on('end',()=>{const report=JSON.parse(data);process.stdout.write(String(report.score));});")"
+SCORE="$(printf '%s' "$REPORT_JSON" | node -e "let data='';process.stdin.on('data',d=>data+=d);process.stdin.on('end',()=>{const stored=JSON.parse(data);const score=stored.report?.score ?? stored.score;process.stdout.write(String(score));});")"
 
 if [ "$SCORE" != "100" ] && [ "$SCORE" != "100.00" ]; then
   log_skip "Determinism smoke failed with score $SCORE/100"
