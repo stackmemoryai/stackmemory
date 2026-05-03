@@ -23,6 +23,11 @@ import {
 import { FrameManager } from '../core/context/index.js';
 import { AgentTaskManager } from '../agents/core/agent-task-manager.js';
 import { logger } from '../core/monitoring/logger.js';
+import { ContentCache } from '../core/cache/content-cache.js';
+import { getSkillPackRegistry } from '../core/skill-packs/index.js';
+import { ProvenanceStore } from '../core/provenance/provenance-store.js';
+import { scoreConfidence } from '../core/provenance/confidence-scorer.js';
+import type { TraceEvent } from '../core/provenance/types.js';
 
 // Initialize project root (can be overridden by environment variable)
 const PROJECT_ROOT = process.env['STACKMEMORY_PROJECT'] || process.cwd();
@@ -38,6 +43,13 @@ const db = new Database(join(stackmemoryDir, 'cache.db'));
 const taskStore = new LinearTaskManager(PROJECT_ROOT, db);
 const frameManager = new FrameManager(db, PROJECT_ROOT, undefined);
 const agentTaskManager = new AgentTaskManager(taskStore, frameManager);
+
+// Initialize new modules
+const contentCacheDb = new Database(join(stackmemoryDir, 'content-cache.db'));
+const contentCache = new ContentCache(contentCacheDb);
+const provenanceDb = new Database(join(stackmemoryDir, 'provenance.db'));
+const provenanceStore = new ProvenanceStore(provenanceDb);
+const packRegistry = getSkillPackRegistry();
 
 // Track active Claude session
 
@@ -244,6 +256,147 @@ const TOOLS: Tool[] = [
         sessionId: { type: 'string', description: 'Session ID to retry' },
       },
       required: ['sessionId'],
+    },
+  },
+
+  // ── Content Cache ───────────────────────────────────────────────────
+  {
+    name: 'cache_lookup',
+    description:
+      'Check if content has been seen before. Returns cache hit/miss and token savings.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'Content to check/cache' },
+        source: {
+          type: 'string',
+          description:
+            'Where this content came from (e.g. "file:src/index.ts")',
+        },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'cache_stats',
+    description:
+      'Get content cache statistics: total entries, tokens cached, tokens saved, hit rate.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ── Skill Packs ─────────────────────────────────────────────────────
+  {
+    name: 'pack_list',
+    description:
+      'List installed skill packs, optionally filtered by namespace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        namespace: {
+          type: 'string',
+          description: 'Filter by namespace (e.g. "coding", "ops")',
+        },
+      },
+    },
+  },
+  {
+    name: 'pack_search',
+    description: 'Search installed skill packs by keyword.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search keyword' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'pack_get',
+    description:
+      'Get full details of a skill pack including instructions and MCP tools.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Pack name (e.g. "coding/typescript-react")',
+        },
+      },
+      required: ['name'],
+    },
+  },
+
+  // ── Provenance ──────────────────────────────────────────────────────
+  {
+    name: 'record_trace',
+    description:
+      'Record a provenance-tracked trace event with actor, operation, and source lineage.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        traceId: { type: 'string', description: 'Unique trace ID' },
+        sessionId: { type: 'string', description: 'Session ID' },
+        tenantId: { type: 'string', description: 'Tenant ID' },
+        operation: {
+          type: 'string',
+          description: 'What happened (e.g. "query", "decision", "edit")',
+        },
+        host: {
+          type: 'string',
+          description: 'Agent host (e.g. "claude-code", "cursor")',
+        },
+        inputs: { type: 'object', description: 'Operation inputs' },
+        outputs: { type: 'object', description: 'Operation outputs' },
+        tokensIn: { type: 'number', description: 'Input tokens' },
+        tokensOut: { type: 'number', description: 'Output tokens' },
+        costUsd: { type: 'number', description: 'Cost in USD' },
+        parentTraceId: { type: 'string', description: 'Parent trace ID' },
+        score: { type: 'number', description: 'Numeric evaluation score' },
+        feedback: {
+          type: 'string',
+          description: 'Textual feedback for optimization',
+        },
+        confidence: {
+          type: 'number',
+          description: 'Confidence level (0-1)',
+          minimum: 0,
+          maximum: 1,
+        },
+        sources: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              system: { type: 'string' },
+              externalId: { type: 'string' },
+              url: { type: 'string' },
+            },
+            required: ['system', 'externalId'],
+          },
+          description: 'Source references for provenance',
+        },
+      },
+      required: ['traceId', 'sessionId', 'tenantId', 'operation'],
+    },
+  },
+  {
+    name: 'score_confidence',
+    description:
+      'Score text for decision confidence. Returns confidence (0-1), signals, and classification (accept/review/discard).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text to score' },
+        actor: { type: 'string', description: 'Who said it (boosts score)' },
+        replyCount: {
+          type: 'number',
+          description: 'Thread reply count (boosts if >2)',
+        },
+      },
+      required: ['text'],
     },
   },
 ];
@@ -608,6 +761,195 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      // ── Content Cache handlers ──────────────────────────────────────
+      case 'cache_lookup': {
+        const { content, source } = args as {
+          content: string;
+          source?: string;
+        };
+        const result = contentCache.lookup(content, source ?? 'mcp');
+        if (!result.hit) {
+          contentCache.put(content, source ?? 'mcp');
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: result.hit
+                ? `Cache HIT (hash: ${result.hash.slice(0, 12)}...). Tokens saved: ${result.tokensSaved}. Total hits: ${result.entry?.hitCount ?? 0}.`
+                : `Cache MISS (hash: ${result.hash.slice(0, 12)}...). Content cached for future dedup.`,
+            },
+          ],
+        };
+      }
+
+      case 'cache_stats': {
+        const stats = contentCache.getStats();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Content Cache Stats:\n  Entries: ${stats.totalEntries}\n  Tokens cached: ${stats.totalTokensCached}\n  Tokens saved: ${stats.totalTokensSaved}\n  Hit rate: ${(stats.hitRate * 100).toFixed(1)}%\n  Top sources: ${stats.topSources.map((s) => `${s.source} (${s.tokensSaved} saved)`).join(', ') || 'none'}`,
+            },
+          ],
+        };
+      }
+
+      // ── Skill Pack handlers ─────────────────────────────────────────
+      case 'pack_list': {
+        const { namespace } = args as { namespace?: string };
+        const packs = packRegistry.list(namespace ? { namespace } : undefined);
+        if (packs.length === 0) {
+          return {
+            content: [{ type: 'text', text: 'No packs installed.' }],
+          };
+        }
+        const list = packs
+          .map((p) => {
+            const tools = p.manifest.mcp?.tools?.length ?? 0;
+            return `- ${p.manifest.name} v${p.manifest.version} (${tools} tools) — ${p.manifest.description}`;
+          })
+          .join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${packs.length} pack(s) installed:\n${list}`,
+            },
+          ],
+        };
+      }
+
+      case 'pack_search': {
+        const { query } = args as { query: string };
+        const results = packRegistry.search(query);
+        if (results.length === 0) {
+          return {
+            content: [{ type: 'text', text: `No packs matching "${query}".` }],
+          };
+        }
+        const list = results
+          .map(
+            (p) =>
+              `- ${p.manifest.name} v${p.manifest.version} — ${p.manifest.description}`
+          )
+          .join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${results.length} result(s) for "${query}":\n${list}`,
+            },
+          ],
+        };
+      }
+
+      case 'pack_get': {
+        const { name: packName } = args as { name: string };
+        const pack = packRegistry.get(packName);
+        if (!pack) {
+          return {
+            content: [{ type: 'text', text: `Pack "${packName}" not found.` }],
+          };
+        }
+        const m = pack.manifest;
+        const tools = m.mcp?.tools
+          ?.map((t) => `  - ${t.name}: ${t.description}`)
+          .join('\n');
+        const examples = m.examples
+          ?.map((e) => `  Q: ${e.input}\n  A: ${e.output}`)
+          .join('\n\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: [
+                `${m.name} v${m.version}`,
+                m.description,
+                `Author: ${m.author} | License: ${m.license}`,
+                `Runtime: ${m.runtime?.type ?? 'local'}`,
+                tools ? `\nMCP Tools:\n${tools}` : '',
+                examples ? `\nExamples:\n${examples}` : '',
+                pack.instructions
+                  ? `\nInstructions:\n${pack.instructions}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join('\n'),
+            },
+          ],
+        };
+      }
+
+      // ── Provenance handlers ─────────────────────────────────────────
+      case 'record_trace': {
+        const a = args as Record<string, unknown>;
+        const event: TraceEvent = {
+          timestamp: new Date().toISOString(),
+          traceId: a['traceId'] as string,
+          sessionId: a['sessionId'] as string,
+          tenantId: a['tenantId'] as string,
+          operation: a['operation'] as string,
+          actor: {
+            host: (a['host'] as string) || 'unknown',
+            agent: 'mcp',
+            user: 'unknown',
+          },
+          inputs: a['inputs'] ?? null,
+          outputs: a['outputs'] ?? null,
+          tokensIn: (a['tokensIn'] as number) || 0,
+          tokensOut: (a['tokensOut'] as number) || 0,
+          costUsd: (a['costUsd'] as number) || 0,
+          provenance: {
+            sources: (
+              (a['sources'] as Array<Record<string, string>>) || []
+            ).map((s) => ({
+              system: s['system'] ?? '',
+              externalId: s['externalId'] ?? '',
+              url: s['url'],
+              fetchedAt: new Date().toISOString(),
+            })),
+            derivation: [],
+            confidence: (a['confidence'] as number) || 0,
+          },
+        };
+        if (a['parentTraceId']) {
+          event.parentTraceId = a['parentTraceId'] as string;
+        }
+        if (a['score'] !== undefined) {
+          event.score = a['score'] as number;
+        }
+        if (a['feedback']) {
+          event.feedback = a['feedback'] as string;
+        }
+        provenanceStore.record(event);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Trace recorded: ${event.traceId} (${event.operation}, confidence: ${event.provenance.confidence})`,
+            },
+          ],
+        };
+      }
+
+      case 'score_confidence': {
+        const { text, actor, replyCount } = args as {
+          text: string;
+          actor?: string;
+          replyCount?: number;
+        };
+        const result = scoreConfidence(text, { actor, replyCount });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Confidence: ${result.confidence.toFixed(2)} (${result.classification})\nSignals: ${JSON.stringify(result.signals)}`,
+            },
+          ],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -660,6 +1002,8 @@ process.on('SIGINT', async () => {
   }
 
   db.close();
+  contentCacheDb.close();
+  provenanceDb.close();
   process.exit(0);
 });
 
