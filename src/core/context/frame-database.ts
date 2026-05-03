@@ -170,6 +170,29 @@ export class FrameDatabase {
         // Column already exists — safe to ignore
       }
 
+      // Migration: add provenance columns (v1.12 — invisible to users, populated on every write)
+      const provenanceCols = [
+        { table: 'frames', col: 'prov_source', def: "TEXT DEFAULT ''" },
+        { table: 'frames', col: 'prov_derivation', def: "TEXT DEFAULT '[]'" },
+        { table: 'frames', col: 'prov_confidence', def: 'REAL DEFAULT 1.0' },
+        { table: 'frames', col: 'prov_superseded_by', def: 'TEXT' },
+        {
+          table: 'frames',
+          col: 'prov_program_version',
+          def: "TEXT DEFAULT ''",
+        },
+        { table: 'anchors', col: 'prov_source', def: "TEXT DEFAULT ''" },
+        { table: 'anchors', col: 'prov_confidence', def: 'REAL DEFAULT 1.0' },
+        { table: 'anchors', col: 'prov_superseded_by', def: 'TEXT' },
+      ];
+      for (const { table, col, def } of provenanceCols) {
+        try {
+          this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+        } catch {
+          // Column already exists
+        }
+      }
+
       // Create indexes for performance
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_frames_run ON frames(run_id);
@@ -292,8 +315,8 @@ export class FrameDatabase {
   insertFrame(frame: Omit<Frame, 'created_at' | 'closed_at'>): Frame {
     try {
       const stmt = this.db.prepare(`
-        INSERT INTO frames (frame_id, run_id, project_id, parent_frame_id, depth, type, name, state, inputs, outputs, digest_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO frames (frame_id, run_id, project_id, parent_frame_id, depth, type, name, state, inputs, outputs, digest_json, prov_source, prov_derivation, prov_confidence, prov_program_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const result = stmt.run(
@@ -307,7 +330,11 @@ export class FrameDatabase {
         frame.state,
         JSON.stringify(frame.inputs),
         JSON.stringify(frame.outputs),
-        JSON.stringify(frame.digest_json)
+        JSON.stringify(frame.digest_json),
+        frame.type, // prov_source: frame type as source
+        JSON.stringify([`frame:${frame.type}`]), // prov_derivation
+        1.0, // prov_confidence: default full confidence
+        process.env['npm_package_version'] || '' // prov_program_version
       );
 
       if (result.changes === 0) {
@@ -588,8 +615,8 @@ export class FrameDatabase {
   insertAnchor(anchor: Omit<Anchor, 'created_at'>): Anchor {
     try {
       const stmt = this.db.prepare(`
-        INSERT INTO anchors (anchor_id, frame_id, project_id, type, text, priority, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO anchors (anchor_id, frame_id, project_id, type, text, priority, metadata, prov_source, prov_confidence)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const result = stmt.run(
@@ -599,7 +626,9 @@ export class FrameDatabase {
         anchor.type,
         anchor.text,
         anchor.priority,
-        JSON.stringify(anchor.metadata)
+        JSON.stringify(anchor.metadata),
+        anchor.type, // prov_source: anchor type (DECISION, EVENT, etc.)
+        1.0 // prov_confidence: default full confidence
       );
 
       if (result.changes === 0) {

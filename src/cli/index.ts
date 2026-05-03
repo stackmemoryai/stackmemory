@@ -78,6 +78,7 @@ import { createWikiCommand } from './commands/wiki.js';
 import { createLoopCommand } from './commands/loop.js';
 import { createSkillCommand } from './commands/skill.js';
 import { createPackCommand } from './commands/pack.js';
+import { createCacheCommand } from './commands/cache.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -139,6 +140,13 @@ function isTestEnv(): boolean {
     process.env['NODE_ENV'] === 'test' ||
     process.env['STACKMEMORY_TEST_SKIP_DB'] === '1'
   );
+}
+
+function collectRepeatedOption(
+  value: string,
+  previous: string[] = []
+): string[] {
+  return [...previous, value];
 }
 
 // Check for updates on CLI startup
@@ -820,6 +828,7 @@ program.addCommand(createLoopCommand());
 program.addCommand(createRulesCommand());
 program.addCommand(createSkillCommand());
 program.addCommand(createPackCommand());
+program.addCommand(createCacheCommand());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);
@@ -853,6 +862,12 @@ program
   .option('--implementer <name>', 'codex|claude', 'codex')
   .option('--max-iters <n>', 'Retry loop iterations', '2')
   .option('--audit-dir <path>', 'Persist spike results to directory')
+  .option(
+    '--verify <cmd>',
+    'Verification command to run after each implementation attempt; repeatable',
+    collectRepeatedOption,
+    []
+  )
   .option('--record-frame', 'Record as real frame with anchors', false)
   .option('--record', 'Record plan & critique into StackMemory context', false)
   .option(
@@ -884,6 +899,7 @@ program
           maxIters: parseInt(opts.maxIters),
           dryRun: !opts.execute,
           auditDir: opts.auditDir,
+          verificationCommands: opts.verify,
           recordFrame: Boolean(opts.recordFrame),
           record: Boolean(opts.record),
           deterministicFixture: Boolean(opts.deterministicFixture),
@@ -959,6 +975,12 @@ program
   .option('--implementer <name>', 'codex|claude', 'codex')
   .option('--max-iters <n>', 'Retry loop iterations', '2')
   .option('--audit-dir <path>', 'Persist spike results to directory')
+  .option(
+    '--verify <cmd>',
+    'Verification command to run after each implementation attempt; repeatable',
+    collectRepeatedOption,
+    []
+  )
   .option('--record-frame', 'Record as real frame with anchors')
   .option('--record', 'Record plan & critique into StackMemory context')
   .option(
@@ -1017,6 +1039,7 @@ program
           maxIters: parseInt(opts.maxIters),
           dryRun,
           auditDir: opts.auditDir,
+          verificationCommands: opts.verify,
           recordFrame: Boolean(opts.recordFrame),
           record: Boolean(opts.record),
           deterministicFixture: Boolean(opts.deterministicFixture),
