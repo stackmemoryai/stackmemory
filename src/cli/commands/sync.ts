@@ -5,8 +5,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { homedir } from 'os';
-import { hostname } from 'os';
+import { homedir, hostname } from 'os';
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { createHash } from 'crypto';

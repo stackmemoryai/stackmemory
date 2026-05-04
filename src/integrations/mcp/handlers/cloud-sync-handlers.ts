@@ -6,6 +6,14 @@
 import type { CloudSyncManager } from '../../../core/storage/cloud-sync-manager.js';
 import type { SyncTable } from '../../../core/storage/cloud-sync-types.js';
 
+const VALID_SYNC_TABLES = new Set<string>([
+  'frames',
+  'events',
+  'anchors',
+  'trace_events',
+  'entity_states',
+]);
+
 export interface CloudSyncHandlerDependencies {
   syncManager: CloudSyncManager | null;
 }
@@ -56,7 +64,9 @@ export class CloudSyncHandlers {
     tables?: string[];
   }): Promise<{ content: Array<{ type: string; text: string }> }> {
     const manager = this.ensureManager();
-    const tables = args.tables as SyncTable[] | undefined;
+    const tables = args.tables?.filter((t) => VALID_SYNC_TABLES.has(t)) as
+      | SyncTable[]
+      | undefined;
     const result = await manager.performPull('manual', tables);
 
     return {

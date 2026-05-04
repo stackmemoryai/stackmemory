@@ -72,6 +72,91 @@ const PK_COLUMN: Record<SyncTable, string> = {
   entity_states: 'id',
 };
 
+// Valid columns per table — whitelist for SQL injection prevention on pull/upsert
+const VALID_COLUMNS: Record<SyncTable, Set<string>> = {
+  frames: new Set([
+    'frame_id',
+    'run_id',
+    'project_id',
+    'parent_frame_id',
+    'depth',
+    'type',
+    'name',
+    'state',
+    'inputs',
+    'outputs',
+    'digest_text',
+    'digest_json',
+    'created_at',
+    'closed_at',
+    'retention_policy',
+    'importance_score',
+    'prov_source',
+    'prov_derivation',
+    'prov_confidence',
+    'prov_superseded_by',
+    'prov_program_version',
+    'access_count',
+    'last_accessed',
+  ]),
+  events: new Set([
+    'event_id',
+    'frame_id',
+    'run_id',
+    'seq',
+    'event_type',
+    'payload',
+    'ts',
+  ]),
+  anchors: new Set([
+    'anchor_id',
+    'frame_id',
+    'project_id',
+    'type',
+    'text',
+    'priority',
+    'created_at',
+    'metadata',
+    'prov_source',
+    'prov_confidence',
+    'prov_superseded_by',
+  ]),
+  trace_events: new Set([
+    'id',
+    'timestamp',
+    'session_id',
+    'trace_id',
+    'parent_trace_id',
+    'tenant_id',
+    'actor_host',
+    'actor_agent',
+    'actor_user',
+    'operation',
+    'inputs',
+    'outputs',
+    'tokens_in',
+    'tokens_out',
+    'cost_usd',
+    'duration_ms',
+    'score',
+    'feedback',
+    'provenance',
+    'error',
+    'tags',
+  ]),
+  entity_states: new Set([
+    'id',
+    'project_id',
+    'entity_name',
+    'relation',
+    'value',
+    'context',
+    'source_frame_id',
+    'valid_from',
+    'superseded_at',
+  ]),
+};
+
 export class CloudSyncEngine {
   private db: Database.Database;
   private config: CloudSyncConfig;
@@ -458,19 +543,28 @@ export class CloudSyncEngine {
   private upsertRow(
     table: SyncTable,
     data: Record<string, unknown>,
-    _pk: string
+    pk: string
   ): void {
-    const keys = Object.keys(data);
+    // Whitelist columns to prevent SQL injection from remote data keys
+    const valid = VALID_COLUMNS[table];
+    const safeEntries = Object.entries(data).filter(([k]) => valid.has(k));
+    if (safeEntries.length === 0) return;
+
+    const keys = safeEntries.map(([k]) => k);
+    const values = safeEntries.map(([, v]) => v);
     const placeholders = keys.map(() => '?').join(', ');
     const columns = keys.join(', ');
-    const updates = keys.map((k) => `${k} = excluded.${k}`).join(', ');
+    const updates = keys
+      .filter((k) => k !== pk)
+      .map((k) => `${k} = excluded.${k}`)
+      .join(', ');
 
     this.db
       .prepare(
         `INSERT INTO ${table} (${columns}) VALUES (${placeholders})
-         ON CONFLICT DO UPDATE SET ${updates}`
+         ON CONFLICT(${pk}) DO UPDATE SET ${updates}`
       )
-      .run(...keys.map((k) => data[k]));
+      .run(...values);
   }
 
   // --- Internal: Sync state management ---

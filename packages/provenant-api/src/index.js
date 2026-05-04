@@ -29,7 +29,7 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
-        headers: corsHeaders(),
+        headers: corsHeaders(request),
       });
     }
 
@@ -152,7 +152,7 @@ async function handlePull(request, sql, projectId, clientId) {
   let rows;
   if (tables && tables.length > 0) {
     rows = await sql`
-      SELECT id, table_name, version, tier, data
+      SELECT id, table_name, version, tier, data, pushed_at
       FROM sync_entities
       WHERE project_id = ${projectId}
         AND pushed_at > ${since}::timestamptz
@@ -163,7 +163,7 @@ async function handlePull(request, sql, projectId, clientId) {
     `;
   } else {
     rows = await sql`
-      SELECT id, table_name, version, tier, data
+      SELECT id, table_name, version, tier, data, pushed_at
       FROM sync_entities
       WHERE project_id = ${projectId}
         AND pushed_at > ${since}::timestamptz
@@ -182,11 +182,12 @@ async function handlePull(request, sql, projectId, clientId) {
     data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data,
   }));
 
-  // Server cursor = pushed_at of last returned entity, or `since` if empty
-  const serverCursor =
-    entities.length > 0
-      ? new Date().toISOString() // approximate — good enough for alpha
-      : since;
+  // Server cursor = pushed_at of last returned row (not approximate)
+  const lastRow =
+    rows.length > 0 ? rows[Math.min(rows.length, limit) - 1] : null;
+  const serverCursor = lastRow?.pushed_at
+    ? new Date(lastRow.pushed_at).toISOString()
+    : since;
 
   // Update pull cursor
   await sql`
@@ -227,19 +228,27 @@ async function handleStatus(sql, projectId, clientId) {
 
 // --- Helpers ---
 
-function json(data, status = 200) {
+function json(data, status = 200, request = null) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      ...corsHeaders(),
+      ...corsHeaders(request),
     },
   });
 }
 
-function corsHeaders() {
+const ALLOWED_ORIGINS = [
+  'https://app.stackmemory.ai',
+  'https://stackmemory.ai',
+  'http://localhost:3456',
+];
+
+function corsHeaders(request) {
+  const origin = request?.headers?.get('Origin');
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin':
+      origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Id',
   };

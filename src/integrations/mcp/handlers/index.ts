@@ -307,6 +307,11 @@ export class MCPHandlerFactory {
       'sm_cross_discover',
       'sm_cross_register',
       'sm_cross_list',
+
+      // Cloud sync tools
+      'cloud_sync_push',
+      'cloud_sync_pull',
+      'cloud_sync_status',
     ];
   }
 
