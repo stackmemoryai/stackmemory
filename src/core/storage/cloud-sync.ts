@@ -177,9 +177,16 @@ export class CloudSyncEngine {
   /**
    * Push local changes to cloud
    */
-  async push(): Promise<CloudSyncPushResult> {
+  async push(force = false): Promise<CloudSyncPushResult> {
     return this.mutex.withLock(async () => {
       try {
+        if (force) {
+          // Reset all sync state — re-push everything
+          this.db.prepare(`DELETE FROM cloud_sync_state`).run();
+          this.db
+            .prepare(`DELETE FROM cloud_sync_cursors WHERE direction = 'push'`)
+            .run();
+        }
         const pending = this.collectPendingEntities();
         if (pending.length === 0) {
           return { success: true, pushed: 0, rejected: 0, conflicts: 0 };

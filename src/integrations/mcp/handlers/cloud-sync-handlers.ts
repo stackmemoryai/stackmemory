@@ -38,7 +38,7 @@ export class CloudSyncHandlers {
     force?: boolean;
   }): Promise<{ content: Array<{ type: string; text: string }> }> {
     const manager = this.ensureManager();
-    const result = await manager.performPush('manual');
+    const result = await manager.performPush('manual', args.force);
 
     return {
       content: [

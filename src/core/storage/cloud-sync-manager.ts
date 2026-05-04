@@ -99,9 +99,10 @@ export class CloudSyncManager extends EventEmitter {
    * Perform a push
    */
   async performPush(
-    trigger: 'manual' | 'frame-close' | 'session-end' | 'periodic'
+    trigger: 'manual' | 'frame-close' | 'session-end' | 'periodic',
+    force = false
   ): Promise<CloudSyncPushResult> {
-    const result = await this.engine.push();
+    const result = await this.engine.push(force);
     this.emit('push', { trigger, result });
     return result;
   }

@@ -79,34 +79,70 @@ async function handlePush(request, sql, projectId, clientId) {
     });
   }
 
-  const rejected = [];
-  let accepted = 0;
+  if (entities.length > 500) {
+    return json({ error: 'Batch too large (max 500)' }, 400);
+  }
+
+  // Batch conflict check — single query instead of N+1
+  const incomingIds = entities.map((e) => e.id);
+  const incomingTables = entities.map((e) => e.table);
+  const existingRows = await sql`
+    SELECT id, table_name, version FROM sync_entities
+    WHERE project_id = ${projectId}
+      AND (id, table_name) IN (
+        SELECT UNNEST(${incomingIds}::text[]), UNNEST(${incomingTables}::text[])
+      )
+  `;
+
+  const existingMap = new Map();
+  for (const row of existingRows) {
+    existingMap.set(`${row.table_name}:${row.id}`, Number(row.version));
+  }
+
+  // Separate conflicts from upsertable entities
   const conflicts = [];
+  const toUpsert = [];
 
   for (const entity of entities) {
+    const key = `${entity.table}:${entity.id}`;
+    const serverVersion = existingMap.get(key);
+    if (serverVersion !== undefined && serverVersion > entity.version) {
+      conflicts.push({
+        id: entity.id,
+        table: entity.table,
+        serverVersion,
+        clientVersion: entity.version,
+      });
+    } else {
+      toUpsert.push(entity);
+    }
+  }
+
+  // Batch upsert — single query
+  const rejected = [];
+  let accepted = 0;
+
+  if (toUpsert.length > 0) {
     try {
-      // Check for conflict (newest_wins)
-      const existing = await sql`
-        SELECT version FROM sync_entities
-        WHERE project_id = ${projectId}
-          AND table_name = ${entity.table}
-          AND id = ${entity.id}
-      `;
+      const ids = toUpsert.map((e) => e.id);
+      const tableNames = toUpsert.map((e) => e.table);
+      const versions = toUpsert.map((e) => e.version);
+      const tiers = toUpsert.map((e) => e.tier);
+      const dataArr = toUpsert.map((e) => JSON.stringify(e.data));
+      const clientIds = toUpsert.map(() => clientId);
+      const projectIds = toUpsert.map(() => projectId);
 
-      if (existing.length > 0 && existing[0].version > entity.version) {
-        conflicts.push({
-          id: entity.id,
-          table: entity.table,
-          serverVersion: Number(existing[0].version),
-          clientVersion: entity.version,
-        });
-        continue;
-      }
-
-      // Upsert
       await sql`
         INSERT INTO sync_entities (id, project_id, table_name, version, tier, data, client_id)
-        VALUES (${entity.id}, ${projectId}, ${entity.table}, ${entity.version}, ${entity.tier}, ${JSON.stringify(entity.data)}, ${clientId})
+        SELECT * FROM UNNEST(
+          ${ids}::text[],
+          ${projectIds}::text[],
+          ${tableNames}::text[],
+          ${versions}::bigint[],
+          ${tiers}::text[],
+          ${dataArr}::jsonb[],
+          ${clientIds}::text[]
+        )
         ON CONFLICT (project_id, table_name, id)
         DO UPDATE SET
           version = EXCLUDED.version,
@@ -115,9 +151,12 @@ async function handlePush(request, sql, projectId, clientId) {
           client_id = EXCLUDED.client_id,
           pushed_at = NOW()
       `;
-      accepted++;
+      accepted = toUpsert.length;
     } catch (err) {
-      rejected.push({ id: entity.id, reason: String(err) });
+      // If batch fails, report all as rejected
+      for (const entity of toUpsert) {
+        rejected.push({ id: entity.id, reason: String(err) });
+      }
     }
   }
 
