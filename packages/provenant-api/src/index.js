@@ -22,7 +22,7 @@ export default {
 
     // Health check — no auth
     if (path === '/health' && request.method === 'GET') {
-      return json({ status: 'ok', version: '0.1.0' });
+      return json({ status: 'ok', version: '0.1.0' }, 200, request);
     }
 
     // CORS preflight
@@ -35,7 +35,12 @@ export default {
 
     // All sync endpoints require auth
     const sql = neon(env.DATABASE_URL);
-    const authResult = await authenticate(request, env, sql);
+    const authResult = await authenticate(
+      request,
+      env,
+      sql,
+      corsHeaders(request)
+    );
     if (authResult instanceof Response) return authResult;
 
     const { projectId, email } = authResult;
@@ -48,13 +53,13 @@ export default {
         case 'POST /v1/sync/pull':
           return await handlePull(request, sql, projectId, clientId);
         case 'GET /v1/sync/status':
-          return await handleStatus(sql, projectId, clientId);
+          return await handleStatus(request, sql, projectId, clientId);
         default:
-          return json({ error: 'Not found' }, 404);
+          return json({ error: 'Not found' }, 404, request);
       }
     } catch (err) {
       console.error('Sync API error:', err);
-      return json({ error: 'Internal server error' }, 500);
+      return json({ error: 'Internal server error' }, 500, request);
     }
   },
 };
@@ -67,25 +72,31 @@ async function handlePush(request, sql, projectId, clientId) {
   const body = await request.json();
 
   if (body.protocolVersion !== 1) {
-    return json({ error: 'Unsupported protocol version' }, 400);
+    return json({ error: 'Unsupported protocol version' }, 400, request);
   }
 
   const entities = body.entities || [];
   if (entities.length === 0) {
-    return json({
-      accepted: 0,
-      rejected: [],
-      serverCursor: new Date().toISOString(),
-    });
+    return json(
+      {
+        accepted: 0,
+        rejected: [],
+        serverCursor: new Date().toISOString(),
+      },
+      200,
+      request
+    );
   }
 
   if (entities.length > 500) {
-    return json({ error: 'Batch too large (max 500)' }, 400);
+    return json({ error: 'Batch too large (max 500)' }, 400, request);
   }
 
+  const uniqueEntities = dedupeEntities(entities);
+
   // Batch conflict check — single query instead of N+1
-  const incomingIds = entities.map((e) => e.id);
-  const incomingTables = entities.map((e) => e.table);
+  const incomingIds = uniqueEntities.map((e) => e.id);
+  const incomingTables = uniqueEntities.map((e) => e.table);
   const existingRows = await sql`
     SELECT id, table_name, version FROM sync_entities
     WHERE project_id = ${projectId}
@@ -103,7 +114,7 @@ async function handlePush(request, sql, projectId, clientId) {
   const conflicts = [];
   const toUpsert = [];
 
-  for (const entity of entities) {
+  for (const entity of uniqueEntities) {
     const key = `${entity.table}:${entity.id}`;
     const serverVersion = existingMap.get(key);
     if (serverVersion !== undefined && serverVersion > entity.version) {
@@ -170,12 +181,16 @@ async function handlePush(request, sql, projectId, clientId) {
     DO UPDATE SET cursor_value = EXCLUDED.cursor_value, updated_at = NOW()
   `;
 
-  return json({
-    accepted,
-    rejected,
-    serverCursor,
-    ...(conflicts.length > 0 ? { conflicts } : {}),
-  });
+  return json(
+    {
+      accepted,
+      rejected,
+      serverCursor,
+      ...(conflicts.length > 0 ? { conflicts } : {}),
+    },
+    200,
+    request
+  );
 }
 
 /**
@@ -236,13 +251,13 @@ async function handlePull(request, sql, projectId, clientId) {
     DO UPDATE SET cursor_value = EXCLUDED.cursor_value, updated_at = NOW()
   `;
 
-  return json({ entities, serverCursor, hasMore });
+  return json({ entities, serverCursor, hasMore }, 200, request);
 }
 
 /**
  * GET /v1/sync/status
  */
-async function handleStatus(sql, projectId, clientId) {
+async function handleStatus(request, sql, projectId, clientId) {
   const cursors = await sql`
     SELECT direction, cursor_value FROM sync_cursors
     WHERE project_id = ${projectId} AND client_id = ${clientId}
@@ -256,16 +271,32 @@ async function handleStatus(sql, projectId, clientId) {
     WHERE project_id = ${projectId}
   `;
 
-  return json({
-    projectId,
-    clientId,
-    lastPushAt: pushCursor?.cursor_value || null,
-    lastPullAt: pullCursor?.cursor_value || null,
-    totalEntities: entityCount[0]?.count || 0,
-  });
+  return json(
+    {
+      projectId,
+      clientId,
+      lastPushAt: pushCursor?.cursor_value || null,
+      lastPullAt: pullCursor?.cursor_value || null,
+      totalEntities: entityCount[0]?.count || 0,
+    },
+    200,
+    request
+  );
 }
 
 // --- Helpers ---
+
+function dedupeEntities(entities) {
+  const byKey = new Map();
+  for (const entity of entities) {
+    const key = `${entity.table}:${entity.id}`;
+    const existing = byKey.get(key);
+    if (!existing || Number(entity.version) >= Number(existing.version)) {
+      byKey.set(key, entity);
+    }
+  }
+  return [...byKey.values()];
+}
 
 function json(data, status = 200, request = null) {
   return new Response(JSON.stringify(data), {

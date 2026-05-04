@@ -30,9 +30,8 @@ const MIGRATIONS = [
   {
     version: 1,
     name: 'initial_schema',
-    up: `
-      -- API keys for client auth
-      CREATE TABLE IF NOT EXISTS api_keys (
+    up: [
+      `CREATE TABLE IF NOT EXISTS api_keys (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         key_hash TEXT NOT NULL UNIQUE,
         user_email TEXT NOT NULL,
@@ -40,11 +39,9 @@ const MIGRATIONS = [
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         last_used_at TIMESTAMPTZ,
         revoked_at TIMESTAMPTZ
-      );
-      CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
-
-      -- Sync entities (frames, events, anchors, traces, entity_states)
-      CREATE TABLE IF NOT EXISTS sync_entities (
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)`,
+      `CREATE TABLE IF NOT EXISTS sync_entities (
         id TEXT NOT NULL,
         project_id TEXT NOT NULL,
         table_name TEXT NOT NULL,
@@ -54,29 +51,25 @@ const MIGRATIONS = [
         client_id TEXT NOT NULL,
         pushed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (project_id, table_name, id)
-      );
-      CREATE INDEX IF NOT EXISTS idx_sync_entities_pushed
-        ON sync_entities(project_id, pushed_at);
-      CREATE INDEX IF NOT EXISTS idx_sync_entities_table
-        ON sync_entities(project_id, table_name, pushed_at);
-
-      -- Sync cursors per client
-      CREATE TABLE IF NOT EXISTS sync_cursors (
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_sync_entities_pushed
+        ON sync_entities(project_id, pushed_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_sync_entities_table
+        ON sync_entities(project_id, table_name, pushed_at)`,
+      `CREATE TABLE IF NOT EXISTS sync_cursors (
         project_id TEXT NOT NULL,
         client_id TEXT NOT NULL,
         direction TEXT NOT NULL,
         cursor_value TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (project_id, client_id, direction)
-      );
-
-      -- Schema version tracking
-      CREATE TABLE IF NOT EXISTS schema_migrations (
+      )`,
+      `CREATE TABLE IF NOT EXISTS schema_migrations (
         version INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `,
+      )`,
+    ],
   },
 ];
 
@@ -105,7 +98,9 @@ async function migrate() {
     }
 
     console.log(`  v${migration.version} (${migration.name}) — applying...`);
-    await sql(migration.up);
+    for (const statement of migration.up) {
+      await sql.query(statement);
+    }
     await sql`INSERT INTO schema_migrations (version, name) VALUES (${migration.version}, ${migration.name})`;
     console.log(`  v${migration.version} — done`);
   }

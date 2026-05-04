@@ -13,9 +13,5 @@
       "binding": "SYNC_OVERFLOW",
       "bucket_name": "provenant-sync-overflow"
     }
-  ],
-  // Rate limiting
-  "limits": {
-    "cpu_ms": 30000
-  }
+  ]
 }

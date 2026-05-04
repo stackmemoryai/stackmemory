@@ -9,16 +9,17 @@ import { createHash } from 'node:crypto';
  * @param {Request} request
  * @param {{ DATABASE_URL: string }} env
  * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {HeadersInit} responseHeaders
  * @returns {Promise<{ projectId: string; email: string } | Response>}
  */
-export async function authenticate(request, env, sql) {
+export async function authenticate(request, env, sql, responseHeaders = {}) {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(
       JSON.stringify({ error: 'Missing Authorization header' }),
       {
         status: 401,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...responseHeaders },
       }
     );
   }
@@ -35,7 +36,7 @@ export async function authenticate(request, env, sql) {
   if (rows.length === 0) {
     return new Response(JSON.stringify({ error: 'Invalid API key' }), {
       status: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...responseHeaders },
     });
   }
 

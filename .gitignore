@@ -120,6 +120,10 @@ service-account.json
 # StackMemory local context
 .stackmemory/
 
+# Neon local CLI context
+.neon
+**/.neon
+
 # Claude settings with secrets
 .claude/settings.local.json
 .claude/wiki/
