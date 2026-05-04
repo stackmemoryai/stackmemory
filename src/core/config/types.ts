@@ -34,6 +34,9 @@ export interface RetentionConfig {
     enabled: boolean;
     endpoint?: string;
     retention: string; // e.g., "infinite"
+    apiKey?: string;
+    autoSync?: boolean;
+    syncIntervalMinutes?: number;
   };
   generational_gc: {
     young_strategy: 'keep_all' | 'digest_only' | 'anchors_only';

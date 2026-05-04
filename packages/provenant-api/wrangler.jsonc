@@ -1,0 +1,21 @@
+{
+  "name": "provenant-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-04-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  // Neon database URL — set via `wrangler secret put DATABASE_URL`
+  // R2 bucket for large payload overflow
+  "r2_buckets": [
+    {
+      "binding": "SYNC_OVERFLOW",
+      "bucket_name": "provenant-sync-overflow"
+    }
+  ],
+  // Rate limiting
+  "limits": {
+    "cpu_ms": 30000
+  }
+}

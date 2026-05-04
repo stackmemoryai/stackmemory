@@ -1,0 +1,2 @@
+# Copy to .dev.vars and fill in values
+DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/provenant?sslmode=require

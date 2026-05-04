@@ -32,6 +32,10 @@ export {
   CrossSearchHandlers,
   type CrossSearchHandlerDependencies,
 } from './cross-search-handlers.js';
+export {
+  CloudSyncHandlers,
+  type CloudSyncHandlerDependencies,
+} from './cloud-sync-handlers.js';
 
 import {
   ContextHandlers,
@@ -46,6 +50,7 @@ import { TraceHandlers, TraceHandlerDependencies } from './trace-handlers.js';
 import { ProviderHandlers } from './provider-handlers.js';
 import { ProvenantHandlers } from './provenant-handlers.js';
 import { CrossSearchHandlers } from './cross-search-handlers.js';
+import { CloudSyncHandlers } from './cloud-sync-handlers.js';
 import {
   resolveToolAlias,
   resolveParamAliases,
@@ -72,6 +77,7 @@ export class MCPHandlerFactory {
   private providerHandlers: ProviderHandlers;
   private provenantHandlers?: ProvenantHandlers;
   private crossSearchHandlers: CrossSearchHandlers;
+  private cloudSyncHandlers: CloudSyncHandlers;
 
   constructor(deps: MCPHandlerDependencies) {
     this.contextHandlers = new ContextHandlers({
@@ -103,6 +109,18 @@ export class MCPHandlerFactory {
     }
 
     this.crossSearchHandlers = new CrossSearchHandlers({});
+    this.cloudSyncHandlers = new CloudSyncHandlers({
+      syncManager: null, // Initialized lazily when cloud sync is configured
+    });
+  }
+
+  /**
+   * Set the cloud sync manager (called after config/auth is loaded)
+   */
+  setCloudSyncManager(
+    manager: import('../../../core/storage/cloud-sync-manager.js').CloudSyncManager
+  ): void {
+    this.cloudSyncHandlers = new CloudSyncHandlers({ syncManager: manager });
   }
 
   /**
@@ -226,6 +244,14 @@ export class MCPHandlerFactory {
         return this.crossSearchHandlers.handleCrossList.bind(
           this.crossSearchHandlers
         );
+
+      // Cloud sync handlers
+      case 'cloud_sync_push':
+        return this.cloudSyncHandlers.handlePush.bind(this.cloudSyncHandlers);
+      case 'cloud_sync_pull':
+        return this.cloudSyncHandlers.handlePull.bind(this.cloudSyncHandlers);
+      case 'cloud_sync_status':
+        return this.cloudSyncHandlers.handleStatus.bind(this.cloudSyncHandlers);
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);

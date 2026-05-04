@@ -1,0 +1,19 @@
+{
+  "name": "@stackmemoryai/provenant-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Provenant hosted sync API — Cloudflare Workers + Neon Postgres",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "node src/migrate.js",
+    "typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.41.0"
+  }
+}

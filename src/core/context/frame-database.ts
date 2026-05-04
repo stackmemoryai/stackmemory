@@ -298,6 +298,30 @@ export class FrameDatabase {
           ON entity_states(entity_name, valid_from DESC);
       `);
 
+      // Cloud sync state tracking (Provenant hosted sync)
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS cloud_sync_state (
+          table_name TEXT NOT NULL,
+          row_id TEXT NOT NULL,
+          last_pushed_at INTEGER,
+          last_pushed_version INTEGER,
+          last_pulled_at INTEGER,
+          last_pulled_version INTEGER,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          push_error TEXT,
+          push_attempts INTEGER DEFAULT 0,
+          PRIMARY KEY (table_name, row_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_cloud_sync_status ON cloud_sync_state(sync_status);
+        CREATE INDEX IF NOT EXISTS idx_cloud_sync_pushed ON cloud_sync_state(last_pushed_at);
+
+        CREATE TABLE IF NOT EXISTS cloud_sync_cursors (
+          direction TEXT PRIMARY KEY,
+          cursor_value TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+
       logger.info('Frame database schema initialized');
     } catch (error: unknown) {
       throw new DatabaseError(

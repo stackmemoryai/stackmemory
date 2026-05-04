@@ -36,6 +36,7 @@ export class MCPToolDefinitions {
       ...this.getDesirePathTools(),
       ...this.getProvenantTools(),
       ...this.getCrossSearchTools(),
+      ...this.getCloudSyncTools(),
     ];
   }
 
@@ -1586,8 +1587,54 @@ export class MCPToolDefinitions {
         return this.getProvenantTools();
       case 'cross_search':
         return this.getProvenantTools();
+      case 'cloud_sync':
+        return this.getCloudSyncTools();
       default:
         return [];
     }
+  }
+
+  private getCloudSyncTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'cloud_sync_push',
+        description:
+          'Push local context changes to Provenant cloud. Syncs frames, events, anchors, traces, and entity states.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            force: {
+              type: 'boolean',
+              description: 'Push all data, ignoring sync cursors',
+            },
+          },
+        },
+      },
+      {
+        name: 'cloud_sync_pull',
+        description:
+          'Pull remote changes from Provenant cloud to local database.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tables: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Only pull specific tables (frames, events, anchors, trace_events, entity_states)',
+            },
+          },
+        },
+      },
+      {
+        name: 'cloud_sync_status',
+        description:
+          'Show current cloud sync status — connection, pending items, conflicts.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    ];
   }
 }
