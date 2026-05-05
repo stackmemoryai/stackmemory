@@ -13,7 +13,23 @@ import Database from 'better-sqlite3';
 import { CloudSyncEngine } from '../../core/storage/cloud-sync.js';
 import type { CloudSyncConfig } from '../../core/storage/cloud-sync-types.js';
 
+const DEFAULT_ENDPOINT = 'https://provenant-api.jpwu03.workers.dev';
+
 function loadSyncConfig(projectDir: string): CloudSyncConfig | null {
+  // Try env vars first (CI / advanced users)
+  const envKey = process.env['PROVENANT_API_KEY'];
+  const envProject = process.env['PROVENANT_PROJECT_ID'];
+  if (envKey) {
+    return buildConfig(
+      envKey,
+      envProject ||
+        createHash('sha256').update(projectDir).digest('hex').slice(0, 16),
+      process.env['PROVENANT_API_URL'] || DEFAULT_ENDPOINT,
+      projectDir
+    );
+  }
+
+  // Fall back to config file
   const cfgPath = join(homedir(), '.stackmemory', 'config.json');
   if (!existsSync(cfgPath)) return null;
 
@@ -21,36 +37,141 @@ function loadSyncConfig(projectDir: string): CloudSyncConfig | null {
     const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
     if (!cfg.auth?.apiKey) return null;
 
-    return {
-      enabled: true,
-      endpoint: cfg.auth?.apiUrl || 'https://api.stackmemory.ai',
-      apiKey: cfg.auth.apiKey,
-      projectId: createHash('sha256')
-        .update(projectDir)
-        .digest('hex')
-        .slice(0, 16),
-      clientId: createHash('sha256')
-        .update(hostname() + projectDir)
-        .digest('hex')
-        .slice(0, 16),
-      batchSize: 100,
-      conflictResolution: 'newest_wins',
-      generationalPolicy: {
-        youngMaxAgeDays: 1,
-        matureMaxAgeDays: 7,
-      },
-      timeoutMs: 30000,
-      retryAttempts: 3,
-      retryBaseDelayMs: 1000,
-    };
+    return buildConfig(
+      cfg.auth.apiKey,
+      cfg.auth.projectId ||
+        createHash('sha256').update(projectDir).digest('hex').slice(0, 16),
+      cfg.auth.apiUrl || DEFAULT_ENDPOINT,
+      projectDir
+    );
   } catch {
     return null;
   }
 }
 
+function buildConfig(
+  apiKey: string,
+  projectId: string,
+  endpoint: string,
+  projectDir: string
+): CloudSyncConfig {
+  return {
+    enabled: true,
+    endpoint,
+    apiKey,
+    projectId,
+    clientId: createHash('sha256')
+      .update(hostname() + projectDir)
+      .digest('hex')
+      .slice(0, 16),
+    batchSize: 100,
+    conflictResolution: 'newest_wins',
+    generationalPolicy: {
+      youngMaxAgeDays: 1,
+      matureMaxAgeDays: 7,
+    },
+    timeoutMs: 30000,
+    retryAttempts: 3,
+    retryBaseDelayMs: 1000,
+  };
+}
+
 function getDbPath(projectDir: string): string {
-  const smDir = join(projectDir, '.stackmemory');
-  return join(smDir, 'stackmemory.db');
+  // Check project-local first, then ~/.stackmemory/
+  const localDb = join(projectDir, '.stackmemory', 'stackmemory.db');
+  if (existsSync(localDb)) return localDb;
+  return join(homedir(), '.stackmemory', 'stackmemory.db');
+}
+
+export function createLoginCommand(): Command {
+  const cmd = new Command('login')
+    .description('Connect to Provenant cloud sync')
+    .argument('<email>', 'Your email address')
+    .option('--workspace <name>', 'Workspace name (for new accounts)')
+    .option('--reset', 'Reset API key (revokes existing keys)')
+    .action(
+      async (
+        email: string,
+        options: { workspace?: string; reset?: boolean }
+      ) => {
+        const endpoint = process.env['PROVENANT_API_URL'] || DEFAULT_ENDPOINT;
+
+        try {
+          const path = options.reset ? '/v1/setup/reset' : '/v1/setup';
+          const body: Record<string, string> = { email };
+          if (!options.reset) {
+            body['workspaceName'] = options.workspace ?? email.split('@')[0];
+          }
+
+          const res = await fetch(`${endpoint}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          const data = (await res.json()) as {
+            apiKey?: string;
+            workspaceId?: string;
+            projectId?: string;
+            error?: string;
+          };
+
+          if (res.status === 409 && !options.reset) {
+            // Workspace exists — suggest --reset
+            console.log(
+              chalk.yellow('Workspace already exists for this email.')
+            );
+            console.log(chalk.dim('  Run: stackmemory login <email> --reset'));
+            console.log(chalk.dim(`  Workspace ID: ${data.workspaceId}`));
+            console.log(chalk.dim(`  Project ID:   ${data.projectId}`));
+            return;
+          }
+
+          if (!res.ok || !data.apiKey) {
+            console.error(
+              chalk.red(`Login failed: ${data.error || res.statusText}`)
+            );
+            process.exit(1);
+          }
+
+          // Save to ~/.stackmemory/config.json
+          const smDir = join(homedir(), '.stackmemory');
+          const cfgPath = join(smDir, 'config.json');
+          let cfg: Record<string, unknown> = {};
+          if (existsSync(cfgPath)) {
+            try {
+              cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+            } catch {}
+          }
+
+          cfg['auth'] = {
+            apiKey: data.apiKey,
+            apiUrl: endpoint,
+            projectId: data.projectId,
+            workspaceId: data.workspaceId,
+            email,
+          };
+
+          const { writeFileSync, mkdirSync } = await import('fs');
+          mkdirSync(smDir, { recursive: true });
+          writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
+
+          console.log(chalk.green('Logged in to Provenant cloud sync.'));
+          console.log(chalk.dim(`  Workspace: ${data.workspaceId}`));
+          console.log(chalk.dim(`  Project:   ${data.projectId}`));
+          console.log(chalk.dim(`  Config:    ${cfgPath}`));
+        } catch (err) {
+          console.error(
+            chalk.red(
+              `Login failed: ${err instanceof Error ? err.message : err}`
+            )
+          );
+          process.exit(1);
+        }
+      }
+    );
+
+  return cmd;
 }
 
 export function createSyncCommand(): Command {

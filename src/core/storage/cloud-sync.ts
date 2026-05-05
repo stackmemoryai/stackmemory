@@ -349,6 +349,8 @@ export class CloudSyncEngine {
    * Get current sync status
    */
   status(): CloudSyncStatusResponse {
+    this.ensureSyncTables();
+
     const pendingPush = this.db
       .prepare(
         `SELECT COUNT(*) as count FROM cloud_sync_state WHERE sync_status = 'pending'`
@@ -376,6 +378,7 @@ export class CloudSyncEngine {
     // Count rows not yet tracked in cloud_sync_state (never pushed)
     let untrackedCount = 0;
     for (const table of SYNCABLE_TABLES) {
+      if (!this.tableExists(table)) continue;
       const pk = PK_COLUMN[table];
       const row = this.db
         .prepare(
@@ -400,12 +403,45 @@ export class CloudSyncEngine {
     };
   }
 
+  // --- Internal: Table helpers ---
+
+  private tableExists(name: string): boolean {
+    const row = this.db
+      .prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`)
+      .get(name) as unknown;
+    return !!row;
+  }
+
+  private ensureSyncTables(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS cloud_sync_state (
+        table_name TEXT NOT NULL,
+        row_id TEXT NOT NULL,
+        last_pushed_at INTEGER,
+        last_pushed_version INTEGER,
+        last_pulled_at INTEGER,
+        last_pulled_version INTEGER,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        push_error TEXT,
+        push_attempts INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (table_name, row_id)
+      );
+      CREATE TABLE IF NOT EXISTS cloud_sync_cursors (
+        direction TEXT NOT NULL PRIMARY KEY,
+        cursor_value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+  }
+
   // --- Internal: Collect pending entities ---
 
   private collectPendingEntities(): SyncEntity[] {
+    this.ensureSyncTables();
     const entities: SyncEntity[] = [];
 
     for (const table of SYNCABLE_TABLES) {
+      if (!this.tableExists(table)) continue;
       const pk = PK_COLUMN[table];
       const versionCol = VERSION_COLUMN[table];
 

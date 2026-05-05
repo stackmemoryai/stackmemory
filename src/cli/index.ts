@@ -48,9 +48,8 @@ import {
 } from './commands/decision.js';
 import clearCommand from './commands/clear.js';
 import serviceCommand from './commands/service.js';
-import { registerLoginCommand } from './commands/login.js';
 import { registerSignupCommand } from './commands/signup.js';
-import { createSyncCommand } from './commands/sync.js';
+import { createSyncCommand, createLoginCommand } from './commands/sync.js';
 import { registerLogoutCommand, registerDbCommands } from './commands/db.js';
 import { createHooksCommand } from './commands/hooks.js';
 import { createDaemonCommand } from './commands/daemon.js';
@@ -669,7 +668,7 @@ program
 // Register command modules
 registerOnboardingCommand(program);
 registerSignupCommand(program);
-registerLoginCommand(program);
+program.addCommand(createLoginCommand());
 registerLogoutCommand(program);
 registerDbCommands(program);
 registerProjectCommands(program);

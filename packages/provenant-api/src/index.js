@@ -45,6 +45,9 @@ export default {
       if (path === '/v1/setup' && request.method === 'POST') {
         return await handleSetup(request, sql);
       }
+      if (path === '/v1/setup/reset' && request.method === 'POST') {
+        return await handleSetupReset(request, sql);
+      }
 
       // All other endpoints require auth
       const authResult = await authenticate(
@@ -209,6 +212,61 @@ async function handleSetup(request, sql) {
       projectId,
       apiKey: rawKey,
       message: 'Save this API key — it will not be shown again.',
+    },
+    201,
+    request
+  );
+}
+
+/**
+ * POST /v1/setup/reset
+ * Revoke all existing keys and issue a new one.
+ * No auth — verified by workspace ownership (email match).
+ */
+async function handleSetupReset(request, sql) {
+  const body = await request.json();
+  const { email } = body;
+
+  if (!email) {
+    return json({ error: 'email is required' }, 400, request);
+  }
+
+  // Find workspace owned by this email
+  const ws = await sql`
+    SELECT w.id as workspace_id, p.id as project_id
+    FROM workspaces w
+    JOIN projects p ON p.workspace_id = w.id
+    WHERE w.owner_email = ${email}
+    LIMIT 1
+  `;
+
+  if (ws.length === 0) {
+    return json({ error: 'No workspace found for this email' }, 404, request);
+  }
+
+  const { workspace_id: workspaceId, project_id: projectId } = ws[0];
+
+  // Revoke all existing keys
+  await sql`
+    UPDATE api_keys SET revoked_at = NOW()
+    WHERE workspace_id = ${workspaceId} AND revoked_at IS NULL
+  `;
+
+  // Generate new key
+  const rawKey = `smk_${randomBytes(32).toString('hex')}`;
+  const keyHash = createHash('sha256').update(rawKey).digest('hex');
+
+  await sql`
+    INSERT INTO api_keys (key_hash, user_email, project_id, workspace_id, name)
+    VALUES (${keyHash}, ${email}, ${projectId}, ${workspaceId}, 'default')
+  `;
+
+  return json(
+    {
+      workspaceId,
+      projectId,
+      apiKey: rawKey,
+      message: 'All previous keys revoked. Save this new key.',
     },
     201,
     request
