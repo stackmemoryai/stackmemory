@@ -180,6 +180,7 @@ export class CloudSyncEngine {
   async push(force = false): Promise<CloudSyncPushResult> {
     return this.mutex.withLock(async () => {
       try {
+        this.ensureSyncTables();
         if (force) {
           // Reset all sync state — re-push everything
           this.db.prepare(`DELETE FROM cloud_sync_state`).run();
@@ -281,6 +282,7 @@ export class CloudSyncEngine {
   async pull(tables?: SyncTable[]): Promise<CloudSyncPullResult> {
     return this.mutex.withLock(async () => {
       try {
+        this.ensureSyncTables();
         let totalPulled = 0;
         let totalApplied = 0;
         let totalConflicts = 0;

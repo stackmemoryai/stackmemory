@@ -77,10 +77,16 @@ function buildConfig(
 }
 
 function getDbPath(projectDir: string): string {
-  // Check project-local first, then ~/.stackmemory/
+  // Project-local context.db (primary — where CLI/MCP write frames)
+  const contextDb = join(projectDir, '.stackmemory', 'context.db');
+  if (existsSync(contextDb)) return contextDb;
+  // Legacy stackmemory.db in project dir
   const localDb = join(projectDir, '.stackmemory', 'stackmemory.db');
   if (existsSync(localDb)) return localDb;
-  return join(homedir(), '.stackmemory', 'stackmemory.db');
+  // Global fallback
+  const globalDb = join(homedir(), '.stackmemory', 'stackmemory.db');
+  if (existsSync(globalDb)) return globalDb;
+  return contextDb; // Return expected path for error messages
 }
 
 export function createLoginCommand(): Command {
