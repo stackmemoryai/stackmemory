@@ -71,6 +71,51 @@ const MIGRATIONS = [
       )`,
     ],
   },
+  {
+    version: 2,
+    name: 'workspaces_and_members',
+    up: [
+      // Workspaces — a team/org that owns projects
+      `CREATE TABLE IF NOT EXISTS workspaces (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        name TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        owner_email TEXT NOT NULL,
+        plan TEXT NOT NULL DEFAULT 'free',
+        seat_limit INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug)`,
+
+      // Workspace members
+      `CREATE TABLE IF NOT EXISTS workspace_members (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'member',
+        invited_by TEXT,
+        joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (workspace_id, email)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_workspace_members_email ON workspace_members(email)`,
+
+      // Projects belong to a workspace
+      `CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(workspace_id)`,
+
+      // Link api_keys to workspace
+      `ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS workspace_id TEXT`,
+      `ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS name TEXT DEFAULT 'default'`,
+
+      // Link sync_entities to workspace
+      `ALTER TABLE sync_entities ADD COLUMN IF NOT EXISTS workspace_id TEXT`,
+    ],
+  },
 ];
 
 async function migrate() {

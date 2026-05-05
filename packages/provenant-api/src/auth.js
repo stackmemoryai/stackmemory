@@ -28,7 +28,7 @@ export async function authenticate(request, env, sql, responseHeaders = {}) {
   const keyHash = createHash('sha256').update(token).digest('hex');
 
   const rows = await sql`
-    SELECT id, user_email, project_id FROM api_keys
+    SELECT id, user_email, project_id, workspace_id FROM api_keys
     WHERE key_hash = ${keyHash}
       AND revoked_at IS NULL
   `;
@@ -47,5 +47,9 @@ export async function authenticate(request, env, sql, responseHeaders = {}) {
     () => {}
   );
 
-  return { projectId: key.project_id, email: key.user_email };
+  return {
+    projectId: key.project_id,
+    workspaceId: key.workspace_id,
+    email: key.user_email,
+  };
 }

@@ -2,13 +2,18 @@
  * Provenant Sync API — Cloudflare Worker
  *
  * Endpoints:
- *   POST /v1/sync/push   — Accept entities from local clients
- *   POST /v1/sync/pull   — Return entities since cursor
- *   GET  /v1/sync/status  — Server-side sync status
- *   GET  /health          — Health check
+ *   POST /v1/setup             — Bootstrap workspace + first API key (no auth)
+ *   POST /v1/workspaces/:id/keys    — Create API key (auth required)
+ *   GET  /v1/workspaces/:id         — Get workspace details (auth required)
+ *   POST /v1/workspaces/:id/members — Invite member (auth, owner/admin)
+ *   POST /v1/sync/push         — Accept entities from local clients
+ *   POST /v1/sync/pull         — Return entities since cursor
+ *   GET  /v1/sync/status        — Server-side sync status
+ *   GET  /health                — Health check
  */
 
 import { neon } from '@neondatabase/serverless';
+import { createHash, randomBytes } from 'node:crypto';
 import { authenticate } from './auth.js';
 
 export default {
@@ -22,7 +27,7 @@ export default {
 
     // Health check — no auth
     if (path === '/health' && request.method === 'GET') {
-      return json({ status: 'ok', version: '0.1.0' }, 200, request);
+      return json({ status: 'ok', version: '0.2.0' }, 200, request);
     }
 
     // CORS preflight
@@ -33,20 +38,61 @@ export default {
       });
     }
 
-    // All sync endpoints require auth
     const sql = neon(env.DATABASE_URL);
-    const authResult = await authenticate(
-      request,
-      env,
-      sql,
-      corsHeaders(request)
-    );
-    if (authResult instanceof Response) return authResult;
-
-    const { projectId, email } = authResult;
-    const clientId = request.headers.get('X-Client-Id') || 'unknown';
 
     try {
+      // Setup — no auth required (bootstrap flow)
+      if (path === '/v1/setup' && request.method === 'POST') {
+        return await handleSetup(request, sql);
+      }
+
+      // All other endpoints require auth
+      const authResult = await authenticate(
+        request,
+        env,
+        sql,
+        corsHeaders(request)
+      );
+      if (authResult instanceof Response) return authResult;
+
+      const { projectId, workspaceId, email } = authResult;
+      const clientId = request.headers.get('X-Client-Id') || 'unknown';
+
+      // Workspace routes (path pattern matching)
+      const workspaceKeysMatch = path.match(
+        /^\/v1\/workspaces\/([^/]+)\/keys$/
+      );
+      const workspaceMembersMatch = path.match(
+        /^\/v1\/workspaces\/([^/]+)\/members$/
+      );
+      const workspaceDetailMatch = path.match(/^\/v1\/workspaces\/([^/]+)$/);
+
+      if (workspaceKeysMatch && request.method === 'POST') {
+        return await handleCreateKey(
+          request,
+          sql,
+          workspaceKeysMatch[1],
+          email
+        );
+      }
+      if (workspaceMembersMatch && request.method === 'POST') {
+        return await handleInviteMember(
+          request,
+          sql,
+          workspaceMembersMatch[1],
+          email
+        );
+      }
+      if (workspaceDetailMatch && request.method === 'GET') {
+        return await handleGetWorkspace(
+          request,
+          sql,
+          workspaceDetailMatch[1],
+          email
+        );
+      }
+
+      // Sync routes
       switch (`${request.method} ${path}`) {
         case 'POST /v1/sync/push':
           return await handlePush(request, sql, projectId, clientId);
@@ -58,11 +104,279 @@ export default {
           return json({ error: 'Not found' }, 404, request);
       }
     } catch (err) {
-      console.error('Sync API error:', err);
+      console.error('API error:', err);
       return json({ error: 'Internal server error' }, 500, request);
     }
   },
 };
+
+// =============================================
+// Workspace + Key Provisioning
+// =============================================
+
+/**
+ * POST /v1/setup
+ * Bootstrap: create workspace, default project, first API key.
+ * No auth required — this is the signup entry point.
+ * Returns the raw API key (only time it's visible).
+ */
+async function handleSetup(request, sql) {
+  const body = await request.json();
+  const { email, workspaceName } = body;
+
+  if (!email || !workspaceName) {
+    return json(
+      { error: 'email and workspaceName are required' },
+      400,
+      request
+    );
+  }
+
+  // Idempotent: if workspace already exists for this email, return existing
+  const existing = await sql`
+    SELECT w.id as workspace_id, p.id as project_id
+    FROM workspaces w
+    JOIN projects p ON p.workspace_id = w.id
+    WHERE w.owner_email = ${email}
+    LIMIT 1
+  `;
+
+  if (existing.length > 0) {
+    return json(
+      {
+        error:
+          'Workspace already exists for this email. Use your existing API key.',
+        workspaceId: existing[0].workspace_id,
+        projectId: existing[0].project_id,
+      },
+      409,
+      request
+    );
+  }
+
+  // Generate slug from workspace name
+  const slug = workspaceName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  // Check slug uniqueness
+  const slugCheck = await sql`
+    SELECT id FROM workspaces WHERE slug = ${slug}
+  `;
+  if (slugCheck.length > 0) {
+    return json(
+      { error: `Workspace slug "${slug}" is taken. Choose another name.` },
+      409,
+      request
+    );
+  }
+
+  // Create workspace
+  const wsRows = await sql`
+    INSERT INTO workspaces (name, slug, owner_email)
+    VALUES (${workspaceName}, ${slug}, ${email})
+    RETURNING id
+  `;
+  const workspaceId = wsRows[0].id;
+
+  // Add owner as member
+  await sql`
+    INSERT INTO workspace_members (workspace_id, email, role)
+    VALUES (${workspaceId}, ${email}, 'owner')
+  `;
+
+  // Create default project
+  const projRows = await sql`
+    INSERT INTO projects (workspace_id, name)
+    VALUES (${workspaceId}, 'Default')
+    RETURNING id
+  `;
+  const projectId = projRows[0].id;
+
+  // Generate API key: smk_<32 random hex>
+  const rawKey = `smk_${randomBytes(32).toString('hex')}`;
+  const keyHash = createHash('sha256').update(rawKey).digest('hex');
+
+  await sql`
+    INSERT INTO api_keys (key_hash, user_email, project_id, workspace_id, name)
+    VALUES (${keyHash}, ${email}, ${projectId}, ${workspaceId}, 'default')
+  `;
+
+  return json(
+    {
+      workspaceId,
+      projectId,
+      apiKey: rawKey,
+      message: 'Save this API key — it will not be shown again.',
+    },
+    201,
+    request
+  );
+}
+
+/**
+ * POST /v1/workspaces/:id/keys
+ * Create a new API key for the workspace.
+ */
+async function handleCreateKey(request, sql, workspaceId, callerEmail) {
+  // Verify membership
+  const member = await sql`
+    SELECT role FROM workspace_members
+    WHERE workspace_id = ${workspaceId} AND email = ${callerEmail}
+  `;
+  if (member.length === 0) {
+    return json({ error: 'Not a member of this workspace' }, 403, request);
+  }
+
+  const body = await request.json();
+  const keyName = body.name || 'unnamed';
+  const projectId = body.projectId;
+
+  if (!projectId) {
+    return json({ error: 'projectId is required' }, 400, request);
+  }
+
+  // Verify project belongs to workspace
+  const proj = await sql`
+    SELECT id FROM projects
+    WHERE id = ${projectId} AND workspace_id = ${workspaceId}
+  `;
+  if (proj.length === 0) {
+    return json({ error: 'Project not found in this workspace' }, 404, request);
+  }
+
+  const rawKey = `smk_${randomBytes(32).toString('hex')}`;
+  const keyHash = createHash('sha256').update(rawKey).digest('hex');
+
+  await sql`
+    INSERT INTO api_keys (key_hash, user_email, project_id, workspace_id, name)
+    VALUES (${keyHash}, ${callerEmail}, ${projectId}, ${workspaceId}, ${keyName})
+  `;
+
+  return json(
+    {
+      apiKey: rawKey,
+      projectId,
+      name: keyName,
+      message: 'Save this API key — it will not be shown again.',
+    },
+    201,
+    request
+  );
+}
+
+/**
+ * GET /v1/workspaces/:id
+ * Get workspace details + members + projects.
+ */
+async function handleGetWorkspace(request, sql, workspaceId, callerEmail) {
+  // Verify membership
+  const member = await sql`
+    SELECT role FROM workspace_members
+    WHERE workspace_id = ${workspaceId} AND email = ${callerEmail}
+  `;
+  if (member.length === 0) {
+    return json({ error: 'Not a member of this workspace' }, 403, request);
+  }
+
+  const ws = await sql`
+    SELECT id, name, slug, owner_email, plan, seat_limit, created_at
+    FROM workspaces WHERE id = ${workspaceId}
+  `;
+  if (ws.length === 0) {
+    return json({ error: 'Workspace not found' }, 404, request);
+  }
+
+  const members = await sql`
+    SELECT email, role, joined_at FROM workspace_members
+    WHERE workspace_id = ${workspaceId}
+    ORDER BY joined_at ASC
+  `;
+
+  const projects = await sql`
+    SELECT id, name, created_at FROM projects
+    WHERE workspace_id = ${workspaceId}
+    ORDER BY created_at ASC
+  `;
+
+  const keys = await sql`
+    SELECT id, name, project_id, created_at, last_used_at FROM api_keys
+    WHERE workspace_id = ${workspaceId} AND revoked_at IS NULL
+    ORDER BY created_at ASC
+  `;
+
+  return json(
+    {
+      ...ws[0],
+      members,
+      projects,
+      keys,
+    },
+    200,
+    request
+  );
+}
+
+/**
+ * POST /v1/workspaces/:id/members
+ * Invite a member to the workspace. Requires owner or admin role.
+ */
+async function handleInviteMember(request, sql, workspaceId, callerEmail) {
+  // Verify caller is owner or admin
+  const caller = await sql`
+    SELECT role FROM workspace_members
+    WHERE workspace_id = ${workspaceId} AND email = ${callerEmail}
+  `;
+  if (caller.length === 0 || !['owner', 'admin'].includes(caller[0].role)) {
+    return json(
+      { error: 'Only owners and admins can invite members' },
+      403,
+      request
+    );
+  }
+
+  const body = await request.json();
+  const { email, role } = body;
+
+  if (!email) {
+    return json({ error: 'email is required' }, 400, request);
+  }
+
+  const memberRole = role || 'member';
+  if (!['member', 'admin'].includes(memberRole)) {
+    return json({ error: 'role must be "member" or "admin"' }, 400, request);
+  }
+
+  // Check seat limit
+  const ws = await sql`
+    SELECT seat_limit FROM workspaces WHERE id = ${workspaceId}
+  `;
+  const currentMembers = await sql`
+    SELECT COUNT(*)::int as count FROM workspace_members
+    WHERE workspace_id = ${workspaceId}
+  `;
+  if (currentMembers[0].count >= ws[0].seat_limit) {
+    return json(
+      { error: `Seat limit reached (${ws[0].seat_limit}). Upgrade your plan.` },
+      403,
+      request
+    );
+  }
+
+  // Idempotent insert
+  await sql`
+    INSERT INTO workspace_members (workspace_id, email, role, invited_by)
+    VALUES (${workspaceId}, ${email}, ${memberRole}, ${callerEmail})
+    ON CONFLICT (workspace_id, email) DO UPDATE SET role = ${memberRole}
+  `;
+
+  return json({ email, role: memberRole, workspaceId }, 201, request);
+}
+
+// =============================================
+// Sync
+// =============================================
 
 /**
  * POST /v1/sync/push

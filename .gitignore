@@ -21,6 +21,7 @@ out/
 .env.production
 .env.development
 .env.linear
+.dev.vars
 
 # IDE & Editor
 .vscode/
@@ -79,6 +80,10 @@ ENV/
 # Rust
 target/
 Cargo.lock
+
+# Swift
+.build/
+**/.build/
 
 # Go
 *.test
