@@ -135,9 +135,11 @@ function sequenceHash(seq: string[]): string {
 export class DaemonDesirePathService {
   private config: DesirePathConfig;
   private state: DesirePathState;
-  private scanInterval?: NodeJS.Timeout;
+  private scanTimeout?: NodeJS.Timeout;
   private isRunning = false;
   private onLog: (level: string, message: string, data?: unknown) => void;
+  private lastActivityTime = 0;        // last time an action was logged
+  private consecutiveIdleScans = 0;     // scans with no new actions
 
   constructor(
     config: DesirePathConfig,
@@ -185,6 +187,7 @@ export class DaemonDesirePathService {
 
       appendFileSync(STREAM_FILE, JSON.stringify(entry) + '\n', 'utf-8');
       this.state.actionsLogged++;
+      this.lastActivityTime = Date.now();
     } catch (err) {
       this.addError(String(err));
     }
@@ -470,7 +473,30 @@ export class DaemonDesirePathService {
     ].filter(line => line !== '').join('\n') + '\n';
   }
 
-  // ─── Lifecycle ────────────────────────────────────────────
+  // ─── Lifecycle (adaptive backoff) ──────────────────────────
+  //
+  // Active sessions:  scan every 1 hour
+  // Idle (no actions): backoff 1h → 2h → 4h → 8h → 12h (cap)
+  // New activity resets to 1h immediately
+
+  private static readonly BASE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
+  private static readonly MAX_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
+  private static readonly IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 min = idle
+
+  private getNextInterval(): number {
+    const now = Date.now();
+    const timeSinceActivity = now - this.lastActivityTime;
+
+    // If recent activity, scan hourly
+    if (this.lastActivityTime > 0 && timeSinceActivity < DaemonDesirePathService.IDLE_THRESHOLD_MS) {
+      this.consecutiveIdleScans = 0;
+      return DaemonDesirePathService.BASE_INTERVAL_MS;
+    }
+
+    // Backoff: 1h × 2^idle_scans, capped at 12h
+    const backoff = DaemonDesirePathService.BASE_INTERVAL_MS * Math.pow(2, this.consecutiveIdleScans);
+    return Math.min(backoff, DaemonDesirePathService.MAX_INTERVAL_MS);
+  }
 
   start(): void {
     if (this.isRunning || this.isOptedOut()) {
@@ -483,33 +509,47 @@ export class DaemonDesirePathService {
     this.isRunning = true;
     mkdirSync(DP_DIR, { recursive: true });
 
-    // Periodic pattern scan (default: every 6 hours)
-    const scanIntervalMs = (this.config.interval || 360) * 60 * 1000;
+    this.onLog('INFO', 'Desire-path service started (adaptive backoff: 1h active, up to 12h idle)');
 
-    this.onLog('INFO', 'Desire-path service started', { scanInterval: this.config.interval });
-
-    // First scan after 2 minutes (let actions accumulate)
-    setTimeout(() => {
+    // First scan after 2 minutes
+    this.scanTimeout = setTimeout(() => {
       if (!this.isRunning) return;
-      this.runScan();
+      this.runScanAndScheduleNext();
     }, 120_000);
 
-    this.scanInterval = setInterval(() => {
-      this.runScan();
-    }, scanIntervalMs);
-
-    if (this.scanInterval.unref) this.scanInterval.unref();
+    if (this.scanTimeout.unref) this.scanTimeout.unref();
   }
 
   stop(): void {
-    if (this.scanInterval) {
-      clearInterval(this.scanInterval);
-      this.scanInterval = undefined;
+    if (this.scanTimeout) {
+      clearTimeout(this.scanTimeout);
+      this.scanTimeout = undefined;
     }
     this.isRunning = false;
   }
 
+  private runScanAndScheduleNext(): void {
+    this.runScan();
+
+    if (!this.isRunning) return;
+
+    const nextMs = this.getNextInterval();
+    this.onLog('DEBUG', 'Next scan scheduled', {
+      next_min: Math.round(nextMs / 60_000),
+      idle_scans: this.consecutiveIdleScans,
+    });
+
+    this.scanTimeout = setTimeout(() => {
+      if (!this.isRunning) return;
+      this.runScanAndScheduleNext();
+    }, nextMs);
+
+    if (this.scanTimeout.unref) this.scanTimeout.unref();
+  }
+
   private runScan(): void {
+    const prevActionsLogged = this.state.actionsLogged;
+
     try {
       const patterns = this.detectPatterns();
       if (patterns.length > 0) {
@@ -518,9 +558,17 @@ export class DaemonDesirePathService {
           patterns: patterns.length,
           suggestions: suggestions.length,
           topPattern: patterns[0] ? sequenceHash(patterns[0].sequence) : 'none',
+          interval_min: Math.round(this.getNextInterval() / 60_000),
         });
       }
       this.state.lastScanTime = Date.now();
+
+      // Track idle scans (no new actions since last scan)
+      if (this.state.actionsLogged === prevActionsLogged) {
+        this.consecutiveIdleScans++;
+      } else {
+        this.consecutiveIdleScans = 0;
+      }
     } catch (err) {
       this.addError(String(err));
       this.onLog('ERROR', 'Desire-path scan failed', { error: String(err) });
