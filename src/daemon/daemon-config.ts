@@ -78,6 +78,13 @@ export interface DesirePathConfig extends DaemonServiceConfig {
   maxSequenceLength: number;
 }
 
+export interface ResearchStreamConfig extends DaemonServiceConfig {
+  /** Keywords to filter signals by relevance */
+  keywords: string[];
+  /** Max signals to keep per scan cycle (default 50) */
+  maxSignalsPerScan: number;
+}
+
 export interface DaemonConfig {
   version: string;
   context: ContextServiceConfig;
@@ -88,6 +95,7 @@ export interface DaemonConfig {
   fileWatch: FileWatchConfig;
   telemetry: TelemetryServiceConfig;
   desirePaths: DesirePathConfig;
+  researchStream: ResearchStreamConfig;
   heartbeatInterval: number; // seconds
   inactivityTimeout: number; // minutes, 0 = disabled
   logLevel: 'debug' | 'info' | 'warn' | 'error';
@@ -148,6 +156,18 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     maxLogSizeBytes: 10 * 1024 * 1024, // 10MB rotation
     retentionDays: 30,
     maxSequenceLength: 8,
+    autoPromoteThreshold: 0.8, // auto-promote skills above 80% confidence
+    autoPromoteMinSessions: 5, // require 5+ sessions before promoting
+  },
+  researchStream: {
+    enabled: true, // opt-out via STACKMEMORY_RESEARCH_STREAM=0
+    interval: 360, // every 6 hours
+    keywords: [
+      'agent', 'ai', 'llm', 'mcp', 'context', 'memory',
+      'orchestration', 'skill', 'workflow', 'automation',
+      'browser agent', 'coding assistant',
+    ],
+    maxSignalsPerScan: 50,
   },
   heartbeatInterval: 60, // 1 minute
   inactivityTimeout: 0, // Disabled by default

@@ -42,6 +42,12 @@ export interface DesirePathConfig extends DaemonServiceConfig {
   retentionDays: number;
   /** Max sequence length to detect (default 8) */
   maxSequenceLength: number;
+  /** Auto-promote skills above this confidence (0-1, default 0.8). Set to 1 to disable. */
+  autoPromoteThreshold: number;
+  /** Min sessions required for auto-promotion (default 5) */
+  autoPromoteMinSessions: number;
+  /** Directory to promote skills into (default: cwd/.claude/skills/knowledge or skills/) */
+  skillsDir?: string;
 }
 
 export interface ActionEntry {
@@ -79,6 +85,7 @@ export interface DesirePathState {
   actionsLogged: number;
   patternsDetected: number;
   suggestionsGenerated: number;
+  skillsAutoPromoted: number;
   errors: string[];
 }
 
@@ -152,6 +159,7 @@ export class DaemonDesirePathService {
       actionsLogged: 0,
       patternsDetected: 0,
       suggestionsGenerated: 0,
+      skillsAutoPromoted: 0,
       errors: [],
     };
   }
@@ -373,7 +381,93 @@ export class DaemonDesirePathService {
     }
 
     this.state.suggestionsGenerated = suggestions.length;
+
+    // Auto-promote high-confidence suggestions
+    this.autoPromote(suggestions);
+
     return suggestions;
+  }
+
+  // ─── 4. Auto-Promotion ────────────────────────────────────
+
+  /**
+   * Auto-promote skills above confidence threshold.
+   * Copies from suggestions/ to the project's skills/ directory.
+   * Only promotes if: confidence ≥ threshold AND sessions ≥ minSessions.
+   */
+  private autoPromote(suggestions: SkillSuggestion[]): void {
+    const threshold = this.config.autoPromoteThreshold ?? 0.8;
+    const minSessions = this.config.autoPromoteMinSessions ?? 5;
+
+    if (threshold >= 1) return; // disabled
+
+    // Find target skills directory
+    const skillsDir = this.config.skillsDir || this.findSkillsDir();
+    if (!skillsDir) return;
+
+    const patterns = this.loadPatterns();
+
+    for (const suggestion of suggestions) {
+      if (suggestion.confidence < threshold) continue;
+
+      // Check session count from the pattern
+      const pattern = patterns.find(p => p.id === suggestion.pattern_id);
+      if (!pattern || pattern.sessions < minSessions) continue;
+
+      // Check if already promoted
+      const destFile = join(skillsDir, `${suggestion.name}.skill.md`);
+      if (existsSync(destFile)) continue;
+
+      // Promote
+      const srcFile = join(SUGGESTIONS_DIR, `${suggestion.name}.skill.md`);
+      if (!existsSync(srcFile)) continue;
+
+      try {
+        mkdirSync(skillsDir, { recursive: true });
+        let content = readFileSync(srcFile, 'utf-8');
+        content = content.replace('status: suggested', 'status: auto-promoted');
+        writeFileSync(destFile, content, 'utf-8');
+
+        this.state.skillsAutoPromoted++;
+        this.onLog('INFO', `Skill auto-promoted: ${suggestion.name}`, {
+          confidence: suggestion.confidence,
+          sessions: pattern.sessions,
+          frequency: pattern.frequency,
+          dest: destFile,
+        });
+      } catch (err) {
+        this.addError(`Auto-promote failed for ${suggestion.name}: ${String(err)}`);
+      }
+    }
+  }
+
+  /** Find the best skills directory for auto-promotion. */
+  private findSkillsDir(): string | null {
+    const cwd = process.cwd();
+
+    // Priority: .claude/skills/knowledge > skills/ > null
+    const candidates = [
+      join(cwd, '.claude', 'skills', 'knowledge'),
+      join(cwd, 'skills'),
+    ];
+
+    for (const dir of candidates) {
+      if (existsSync(dir)) return dir;
+    }
+
+    // Create .claude/skills/knowledge if .claude exists
+    const claudeDir = join(cwd, '.claude');
+    if (existsSync(claudeDir)) {
+      const target = join(claudeDir, 'skills', 'knowledge');
+      try {
+        mkdirSync(target, { recursive: true });
+        return target;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   private patternToSuggestion(pattern: DetectedPattern): SkillSuggestion | null {
