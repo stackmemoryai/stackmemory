@@ -65,6 +65,19 @@ export interface TelemetryServiceConfig extends DaemonServiceConfig {
   maxSnapshots: number; // rolling history cap (default 90)
 }
 
+export interface DesirePathConfig extends DaemonServiceConfig {
+  /** Min occurrences to be a pattern (default 3) */
+  minFrequency: number;
+  /** Min distinct sessions for a pattern (default 2) */
+  minSessions: number;
+  /** Max JSONL file size before rotation in bytes (default 10MB) */
+  maxLogSizeBytes: number;
+  /** Days to retain action stream data (default 30) */
+  retentionDays: number;
+  /** Max sequence length to detect (default 8) */
+  maxSequenceLength: number;
+}
+
 export interface DaemonConfig {
   version: string;
   context: ContextServiceConfig;
@@ -74,6 +87,7 @@ export interface DaemonConfig {
   memory: MemoryServiceConfig;
   fileWatch: FileWatchConfig;
   telemetry: TelemetryServiceConfig;
+  desirePaths: DesirePathConfig;
   heartbeatInterval: number; // seconds
   inactivityTimeout: number; // minutes, 0 = disabled
   logLevel: 'debug' | 'info' | 'warn' | 'error';
@@ -125,6 +139,15 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     enabled: true, // opt-out via STACKMEMORY_TELEMETRY=0
     interval: 1440, // 24 hours
     maxSnapshots: 90, // ~3 months of daily
+  },
+  desirePaths: {
+    enabled: true, // opt-out via STACKMEMORY_DESIRE_PATHS=0
+    interval: 360, // scan every 6 hours
+    minFrequency: 3, // 3+ occurrences to be a pattern
+    minSessions: 2, // across 2+ distinct sessions
+    maxLogSizeBytes: 10 * 1024 * 1024, // 10MB rotation
+    retentionDays: 30,
+    maxSequenceLength: 8,
   },
   heartbeatInterval: 60, // 1 minute
   inactivityTimeout: 0, // Disabled by default

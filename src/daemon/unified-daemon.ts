@@ -30,6 +30,7 @@ import { DaemonGitHubService } from './services/github-service.js';
 import { DaemonMaintenanceService } from './services/maintenance-service.js';
 import { DaemonMemoryService } from './services/memory-service.js';
 import { DaemonTelemetryService } from './services/telemetry-service.js';
+import { DaemonDesirePathService } from './services/desire-path-service.js';
 
 interface LogEntry {
   timestamp: string;
@@ -48,6 +49,7 @@ export class UnifiedDaemon {
   private maintenanceService: DaemonMaintenanceService;
   private memoryService: DaemonMemoryService;
   private telemetryService: DaemonTelemetryService;
+  private desirePathService: DaemonDesirePathService;
   private heartbeatInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
   private startTime: number = 0;
@@ -86,6 +88,11 @@ export class UnifiedDaemon {
       this.config.telemetry,
       (level, msg, data) => this.log(level, 'telemetry', msg, data),
       () => this.getStatus()
+    );
+
+    this.desirePathService = new DaemonDesirePathService(
+      this.config.desirePaths,
+      (level, msg, data) => this.log(level, 'desire-paths', msg, data)
     );
   }
 
@@ -314,6 +321,7 @@ export class UnifiedDaemon {
     this.maintenanceService.stop();
     this.memoryService.stop();
     this.telemetryService.stop();
+    this.desirePathService.stop();
 
     // Cleanup
     this.cleanup();
@@ -359,6 +367,7 @@ export class UnifiedDaemon {
     this.maintenanceService.start();
     this.memoryService.start();
     this.telemetryService.start();
+    this.desirePathService.start();
 
     // Start heartbeat
     this.heartbeatInterval = setInterval(() => {
