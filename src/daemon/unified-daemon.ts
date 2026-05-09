@@ -29,6 +29,7 @@ import { DaemonLinearService } from './services/linear-service.js';
 import { DaemonGitHubService } from './services/github-service.js';
 import { DaemonMaintenanceService } from './services/maintenance-service.js';
 import { DaemonMemoryService } from './services/memory-service.js';
+import { DaemonTelemetryService } from './services/telemetry-service.js';
 
 interface LogEntry {
   timestamp: string;
@@ -46,6 +47,7 @@ export class UnifiedDaemon {
   private githubService: DaemonGitHubService;
   private maintenanceService: DaemonMaintenanceService;
   private memoryService: DaemonMemoryService;
+  private telemetryService: DaemonTelemetryService;
   private heartbeatInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
   private startTime: number = 0;
@@ -78,6 +80,12 @@ export class UnifiedDaemon {
     this.memoryService = new DaemonMemoryService(
       this.config.memory,
       (level, msg, data) => this.log(level, 'memory', msg, data)
+    );
+
+    this.telemetryService = new DaemonTelemetryService(
+      this.config.telemetry,
+      (level, msg, data) => this.log(level, 'telemetry', msg, data),
+      () => this.getStatus()
     );
   }
 
@@ -290,6 +298,7 @@ export class UnifiedDaemon {
       githubSyncs: this.githubService.getState().syncCount,
       maintenanceRuns: this.maintenanceService.getState().ftsRebuilds,
       memoryTriggers: this.memoryService.getState().triggerCount,
+      telemetrySnapshots: this.telemetryService.getState().snapshotCount,
     });
 
     // Stop heartbeat
@@ -304,6 +313,7 @@ export class UnifiedDaemon {
     this.githubService.stop();
     this.maintenanceService.stop();
     this.memoryService.stop();
+    this.telemetryService.stop();
 
     // Cleanup
     this.cleanup();
@@ -348,6 +358,7 @@ export class UnifiedDaemon {
     await this.githubService.start();
     this.maintenanceService.start();
     this.memoryService.start();
+    this.telemetryService.start();
 
     // Start heartbeat
     this.heartbeatInterval = setInterval(() => {

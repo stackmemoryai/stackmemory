@@ -61,6 +61,10 @@ export interface FileWatchConfig extends DaemonServiceConfig {
   debounceMs: number;
 }
 
+export interface TelemetryServiceConfig extends DaemonServiceConfig {
+  maxSnapshots: number; // rolling history cap (default 90)
+}
+
 export interface DaemonConfig {
   version: string;
   context: ContextServiceConfig;
@@ -69,6 +73,7 @@ export interface DaemonConfig {
   maintenance: MaintenanceServiceConfig;
   memory: MemoryServiceConfig;
   fileWatch: FileWatchConfig;
+  telemetry: TelemetryServiceConfig;
   heartbeatInterval: number; // seconds
   inactivityTimeout: number; // minutes, 0 = disabled
   logLevel: 'debug' | 'info' | 'warn' | 'error';
@@ -115,6 +120,11 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     extensions: ['.ts', '.js', '.tsx', '.jsx', '.py', '.go', '.rs'],
     ignore: ['node_modules', '.git', 'dist', 'build', '.stackmemory'],
     debounceMs: 2000,
+  },
+  telemetry: {
+    enabled: true, // opt-out via STACKMEMORY_TELEMETRY=0
+    interval: 1440, // 24 hours
+    maxSnapshots: 90, // ~3 months of daily
   },
   heartbeatInterval: 60, // 1 minute
   inactivityTimeout: 0, // Disabled by default
