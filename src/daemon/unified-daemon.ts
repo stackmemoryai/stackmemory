@@ -31,6 +31,7 @@ import { DaemonMaintenanceService } from './services/maintenance-service.js';
 import { DaemonMemoryService } from './services/memory-service.js';
 import { DaemonTelemetryService } from './services/telemetry-service.js';
 import { DaemonDesirePathService } from './services/desire-path-service.js';
+import { ResearchStreamService } from './services/research-stream-service.js';
 
 interface LogEntry {
   timestamp: string;
@@ -50,6 +51,7 @@ export class UnifiedDaemon {
   private memoryService: DaemonMemoryService;
   private telemetryService: DaemonTelemetryService;
   private desirePathService: DaemonDesirePathService;
+  private researchStreamService: ResearchStreamService;
   private heartbeatInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
   private startTime: number = 0;
@@ -93,6 +95,11 @@ export class UnifiedDaemon {
     this.desirePathService = new DaemonDesirePathService(
       this.config.desirePaths,
       (level, msg, data) => this.log(level, 'desire-paths', msg, data)
+    );
+
+    this.researchStreamService = new ResearchStreamService(
+      this.config.researchStream,
+      (level, msg, data) => this.log(level, 'research-stream', msg, data)
     );
   }
 
@@ -306,6 +313,7 @@ export class UnifiedDaemon {
       maintenanceRuns: this.maintenanceService.getState().ftsRebuilds,
       memoryTriggers: this.memoryService.getState().triggerCount,
       telemetrySnapshots: this.telemetryService.getState().snapshotCount,
+      researchSignals: this.researchStreamService.getState().signalsCollected,
     });
 
     // Stop heartbeat
@@ -322,6 +330,7 @@ export class UnifiedDaemon {
     this.memoryService.stop();
     this.telemetryService.stop();
     this.desirePathService.stop();
+    this.researchStreamService.stop();
 
     // Cleanup
     this.cleanup();
@@ -368,6 +377,7 @@ export class UnifiedDaemon {
     this.memoryService.start();
     this.telemetryService.start();
     this.desirePathService.start();
+    this.researchStreamService.start();
 
     // Start heartbeat
     this.heartbeatInterval = setInterval(() => {

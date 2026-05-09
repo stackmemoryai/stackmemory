@@ -76,6 +76,12 @@ export interface DesirePathConfig extends DaemonServiceConfig {
   retentionDays: number;
   /** Max sequence length to detect (default 8) */
   maxSequenceLength: number;
+  /** Auto-promote skills above this confidence (0-1, default 0.8). Set to 1 to disable. */
+  autoPromoteThreshold: number;
+  /** Min sessions required for auto-promotion (default 5) */
+  autoPromoteMinSessions: number;
+  /** Directory to promote skills into */
+  skillsDir?: string;
 }
 
 export interface ResearchStreamConfig extends DaemonServiceConfig {
@@ -156,8 +162,8 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     maxLogSizeBytes: 10 * 1024 * 1024, // 10MB rotation
     retentionDays: 30,
     maxSequenceLength: 8,
-    autoPromoteThreshold: 0.8, // auto-promote skills above 80% confidence
-    autoPromoteMinSessions: 5, // require 5+ sessions before promoting
+    autoPromoteThreshold: 0.8,
+    autoPromoteMinSessions: 5,
   },
   researchStream: {
     enabled: true, // opt-out via STACKMEMORY_RESEARCH_STREAM=0
