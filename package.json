@@ -15,7 +15,9 @@
     "claude-sm": "bin/claude-sm",
     "claude-smd": "bin/claude-smd",
     "opencode-sm": "bin/opencode-sm",
-    "gemini-sm": "bin/gemini-sm"
+    "gemini-sm": "bin/gemini-sm",
+    "hermes-sm": "bin/hermes-sm",
+    "hermes-smd": "bin/hermes-smd"
   },
   "files": [
     "bin",
