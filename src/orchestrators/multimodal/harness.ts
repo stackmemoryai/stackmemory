@@ -1,3 +1,4 @@
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 import {
   callClaude,
   callCodexCLI,
@@ -293,7 +294,7 @@ export async function runSpike(
     editAttempts: editMetrics.editAttempts,
     editSuccesses: editMetrics.editSuccesses,
     editFuzzyFallbacks: editMetrics.editFuzzyFallbacks,
-    contextTokens: Math.ceil(finalDiff.length / 4),
+    contextTokens: estimateTokens(finalDiff),
   };
 
   // Persist audit + metrics unless explicitly disabled for replay/smoke runs.

@@ -6,6 +6,7 @@
  */
 
 import { logger } from '../../core/monitoring/logger.js';
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 import { STRUCTURED_RESPONSE_SUFFIX } from '../../orchestrators/multimodal/constants.js';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
@@ -288,7 +289,7 @@ export class ClaudeCodeSubagentClient {
         output: result.text,
         duration: Date.now() - startTime,
         subagentType: request.type,
-        tokens: this.estimateTokens(fullPrompt + result.text),
+        tokens: estimateTokens(fullPrompt + result.text),
       };
     } catch (error: any) {
       // Detect quota/rate limit errors and overflow to Kimi
@@ -773,16 +774,8 @@ function greetUser(name: string): string {
       output: `Mock ${request.type} subagent completed successfully`,
       duration: Date.now() - startTime,
       subagentType: request.type,
-      tokens: this.estimateTokens(JSON.stringify(result)),
+      tokens: estimateTokens(JSON.stringify(result)),
     };
-  }
-
-  /**
-   * Estimate token usage
-   */
-  private estimateTokens(text: string): number {
-    // Rough estimation: 1 token ≈ 4 characters
-    return Math.ceil(text.length / 4);
   }
 
   /**

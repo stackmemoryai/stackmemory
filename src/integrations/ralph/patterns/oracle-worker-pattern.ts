@@ -9,6 +9,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../../core/monitoring/logger.js';
+import { estimateTokens } from '../../../core/cache/token-estimator.js';
 import { SwarmCoordinator } from '../swarm/swarm-coordinator.js';
 import { RalphStackMemoryBridge } from '../bridge/ralph-stackmemory-bridge.js';
 
@@ -139,7 +140,7 @@ export class OracleWorkerCoordinator extends SwarmCoordinator {
     const taskId = uuidv4();
 
     const oraclePrompt = this.buildOraclePrompt(type, description, hints);
-    const estimatedTokens = this.estimateTokens(oraclePrompt);
+    const estimatedTokens = estimateTokens(oraclePrompt);
 
     logger.info('Oracle task created', {
       taskId,
@@ -238,7 +239,7 @@ Remember: Your intelligence is expensive. Focus on high-value strategic thinking
     const result = await ralph.run();
 
     // Track Oracle costs
-    const tokens = this.estimateTokens(result);
+    const tokens = estimateTokens(result);
     const cost = tokens * this.oracle.costPerToken;
     this.costTracker.oracleSpent += cost;
 
@@ -353,7 +354,7 @@ Execute your task now.
 
     // Track worker costs
     const workerModel = this.selectWorkerForTask(task);
-    const tokens = this.estimateTokens(result);
+    const tokens = estimateTokens(result);
     const cost = tokens * workerModel.costPerToken;
     this.costTracker.workerSpent += cost;
 
@@ -413,14 +414,6 @@ Execute your task now.
     // Parse JSON from Oracle output
     // Implementation would extract the JSON task decomposition
     return [];
-  }
-
-  /**
-   * Estimate token usage for cost calculation
-   */
-  private estimateTokens(text: string): number {
-    // Rough estimation: ~4 characters per token
-    return Math.ceil(text.length / 4);
   }
 
   /**

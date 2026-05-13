@@ -16,6 +16,7 @@ import {
   DiffMemStatus,
 } from '../../integrations/diffmem/types.js';
 import { logger } from '../monitoring/logger.js';
+import { estimateTokens } from '../cache/token-estimator.js';
 
 /**
  * Configuration for unified context assembly
@@ -94,15 +95,6 @@ export const DEFAULT_UNIFIED_CONTEXT_CONFIG: UnifiedContextConfig = {
   systemContextBudget: 0.1, // 10%
   privacyMode: 'standard',
 };
-
-/**
- * Estimate token count from content
- * Uses rough approximation: 1 token ≈ 4 characters
- */
-function estimateTokens(content: string): number {
-  if (!content) return 0;
-  return Math.ceil(content.length / 4);
-}
 
 /**
  * Truncate content to fit within token budget

@@ -15,7 +15,11 @@ export { ProvenanceStore } from './provenance.js';
 
 // Pure functions
 export { scoreConfidence } from './confidence-scorer.js';
-export { estimateTokens, hashContent } from './token-estimator.js';
+export {
+  estimateTokens,
+  isTiktokenActive,
+  hashContent,
+} from './token-estimator.js';
 
 // Types
 export type {

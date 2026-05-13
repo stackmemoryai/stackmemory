@@ -15,6 +15,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../core/monitoring/logger.js';
+import { estimateTokens } from '../core/cache/token-estimator.js';
 import { FrameManager } from '../core/context/index.js';
 import { DualStackManager } from '../core/context/dual-stack-manager.js';
 import { ContextRetriever } from '../core/retrieval/context-retriever.js';
@@ -550,8 +551,7 @@ Rules:
 
     // Process agent response
     node.result = response.result;
-    node.tokens =
-      response.tokens || this.estimateTokens(JSON.stringify(response));
+    node.tokens = response.tokens || estimateTokens(JSON.stringify(response));
     node.cost = this.calculateNodeCost(node.tokens, agentConfig.model);
 
     // Share results with other agents if real-time sharing is enabled
@@ -818,11 +818,6 @@ Rules:
       `- Lint: npm run lint (eslint + prettier)`,
       `- Output structured JSON when possible`,
     ].join('\n');
-  }
-
-  private estimateTokens(text: string): number {
-    // Rough estimation: 1 token ≈ 4 characters
-    return Math.ceil(text.length / 4);
   }
 
   private async shareAgentResults(_node: TaskNode): Promise<void> {

@@ -8,6 +8,7 @@
 import { DualStackManager } from './dual-stack-manager.js';
 import { ContextRetriever } from '../retrieval/context-retriever.js';
 import { logger } from '../monitoring/logger.js';
+import { estimateTokens } from '../cache/token-estimator.js';
 import { ValidationError, ErrorCode } from '../errors/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -551,9 +552,6 @@ export class RecursiveContextManager {
   ): ContextChunk[] {
     const selected: ContextChunk[] = [];
     let totalTokens = 0;
-
-    // Rough token estimation (1 token ≈ 4 chars)
-    const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
     for (const chunk of chunks) {
       const chunkTokens = estimateTokens(chunk.content);

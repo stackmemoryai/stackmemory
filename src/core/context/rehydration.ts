@@ -9,6 +9,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../monitoring/logger.js';
+import { estimateTokens } from '../cache/token-estimator.js';
 import { FrameManager } from './index.js';
 import type { _Anchor, Event } from './index.js';
 import {
@@ -114,8 +115,7 @@ export class CompactionHandler {
    * Track token usage from a message
    */
   trackTokens(content: string): void {
-    // Rough estimation: 1 token ≈ 4 characters
-    const estimatedTokens = Math.ceil(content.length / 4);
+    const estimatedTokens = estimateTokens(content);
     this.tokenAccumulator += estimatedTokens;
     this.metrics.estimatedTokens += estimatedTokens;
 
