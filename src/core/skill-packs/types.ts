@@ -91,6 +91,32 @@ export const SkillPackExampleSchema = z.object({
 export type SkillPackExample = z.infer<typeof SkillPackExampleSchema>;
 
 // ============================================================
+// LICENSE
+// ============================================================
+
+/**
+ * Known licenses for skill packs.
+ * Code licenses (MIT, Apache-2.0, ISC) and content licenses (CC-BY-4.0, CC-BY-SA-4.0)
+ * are both valid — skills are often prompt text (content) rather than executable code.
+ */
+export const KnownLicenseSchema = z.enum([
+  'MIT',
+  'Apache-2.0',
+  'ISC',
+  'BSD-2-Clause',
+  'BSD-3-Clause',
+  'CC-BY-4.0',
+  'CC-BY-SA-4.0',
+  'CC0-1.0',
+  'UNLICENSED',
+]);
+
+export type KnownLicense = z.infer<typeof KnownLicenseSchema>;
+
+/** Accepts known SPDX identifiers or any custom string */
+const LicenseSchema = KnownLicenseSchema.or(z.string().min(1));
+
+// ============================================================
 // PACK NAME (namespace/pack-name)
 // ============================================================
 
@@ -111,7 +137,7 @@ export const SkillPackManifestSchema = z.object({
   version: SemverSchema,
   description: z.string().min(1),
   author: z.string().min(1),
-  license: z.string().default('MIT'),
+  license: LicenseSchema.default('MIT'),
   runtime: SkillPackRuntimeSchema.optional(),
   ingestion: SkillPackIngestionSchema.optional(),
   ontology: SkillPackOntologySchema.optional(),
