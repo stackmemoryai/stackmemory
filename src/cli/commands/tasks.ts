@@ -6,11 +6,24 @@
 import { Command } from 'commander';
 import Database from 'better-sqlite3';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import {
   LinearTaskManager,
   TaskPriority,
 } from '../../features/tasks/linear-task-manager.js';
+import {
+  parseMasterTasks,
+  getNextTask,
+  addTaskToFile,
+  updateTaskInFile,
+  type TaskPriority as MdPriority,
+  type TaskStatus as MdStatus,
+  type TaskSync,
+} from '../../core/tasks/md-task-parser.js';
+import {
+  MASTER_TASKS_TEMPLATE,
+  TASKS_CONFIG_TEMPLATE,
+} from '../../core/tasks/master-tasks-template.js';
 
 /** Raw task row from task_cache table */
 interface TaskCacheRow {
@@ -263,7 +276,191 @@ export function createTaskCommands(): Command {
       }
     });
 
+  // ── Init: scaffold master-tasks.md ─────────────────────────
+  tasks
+    .command('init')
+    .description('Scaffold .stackmemory/tasks/master-tasks.md')
+    .action(() => {
+      const projectRoot = process.cwd();
+      const tasksDir = join(projectRoot, '.stackmemory', 'tasks');
+      const mdPath = join(tasksDir, 'master-tasks.md');
+      const configPath = join(tasksDir, 'config.json');
+
+      if (existsSync(mdPath)) {
+        console.log(`Already exists: ${mdPath}`);
+        return;
+      }
+
+      mkdirSync(tasksDir, { recursive: true });
+      writeFileSync(mdPath, MASTER_TASKS_TEMPLATE, 'utf-8');
+      writeFileSync(
+        configPath,
+        JSON.stringify(TASKS_CONFIG_TEMPLATE, null, 2),
+        'utf-8'
+      );
+      console.log(`Created: ${mdPath}`);
+      console.log(`Created: ${configPath}`);
+    });
+
+  // ── MD subcommands (local-first master-tasks.md) ──────────
+  const md = new Command('md').description(
+    'Local-first task management via master-tasks.md'
+  );
+
+  md.command('list')
+    .alias('ls')
+    .description('List tasks from master-tasks.md')
+    .option('-p, --priority <P>', 'Filter by priority (P0, P1, P2, P3)')
+    .option(
+      '-s, --status <status>',
+      'Filter by status (todo, active, done, blocked, cut)'
+    )
+    .option('-o, --owner <owner>', 'Filter by owner (@me, @agent, @defer)')
+    .option('--json', 'Output as JSON')
+    .action((options) => {
+      const mdPath = resolveMdPath();
+      if (!mdPath) return;
+
+      let tasks = parseMasterTasks(readFileSync(mdPath, 'utf-8'));
+
+      if (options.priority)
+        tasks = tasks.filter((t) => t.priority === options.priority);
+      if (options.status)
+        tasks = tasks.filter((t) => t.status === options.status);
+      if (options.owner) tasks = tasks.filter((t) => t.owner === options.owner);
+
+      if (options.json) {
+        console.log(JSON.stringify(tasks, null, 2));
+        return;
+      }
+
+      if (tasks.length === 0) {
+        console.log('No tasks found');
+        return;
+      }
+
+      console.log(`\nTasks (${tasks.length})\n`);
+      for (const t of tasks) {
+        const pColor =
+          t.priority === 'P0'
+            ? '\x1b[31m'
+            : t.priority === 'P1'
+              ? '\x1b[33m'
+              : '\x1b[90m';
+        const sIcon =
+          t.status === 'done'
+            ? '[x]'
+            : t.status === 'active'
+              ? '[>]'
+              : t.status === 'blocked'
+                ? '[!]'
+                : '[ ]';
+        console.log(
+          `${sIcon} ${pColor}${t.priority}\x1b[0m ${t.id} ${t.task} ${t.owner} ${t.branchPr ? `(${t.branchPr})` : ''}`
+        );
+      }
+      console.log('');
+    });
+
+  md.command('next')
+    .description('Show the next task to work on')
+    .option('--json', 'Output as JSON')
+    .action((options) => {
+      const mdPath = resolveMdPath();
+      if (!mdPath) return;
+
+      const tasks = parseMasterTasks(readFileSync(mdPath, 'utf-8'));
+      const next = getNextTask(tasks);
+
+      if (!next) {
+        console.log('No actionable tasks');
+        return;
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify(next));
+        return;
+      }
+
+      console.log(`\nNext: ${next.id} [${next.priority}] ${next.task}`);
+      console.log(`  Owner: ${next.owner} | Sync: ${next.sync}`);
+      if (next.notes) console.log(`  Notes: ${next.notes}`);
+      console.log('');
+    });
+
+  md.command('add <description>')
+    .description('Add a task to master-tasks.md')
+    .option('-p, --priority <P>', 'Priority (P0-P3)', 'P1')
+    .option('-o, --owner <owner>', 'Owner (@me, @agent, @defer)', '@me')
+    .option('-s, --sync <sync>', 'Sync target (local, linear, gh)', 'local')
+    .option('-b, --branch <branch>', 'Branch or PR')
+    .option('-n, --notes <notes>', 'Notes')
+    .action((description, options) => {
+      const mdPath = resolveMdPath();
+      if (!mdPath) return;
+
+      const id = addTaskToFile(mdPath, {
+        priority: options.priority as MdPriority,
+        status: 'todo',
+        owner: options.owner,
+        sync: options.sync as TaskSync,
+        task: description,
+        branchPr: options.branch || '',
+        notes: options.notes || '',
+      });
+
+      console.log(`Added: ${id} ${description}`);
+    });
+
+  md.command('update <taskId>')
+    .description('Update a task in master-tasks.md')
+    .option(
+      '-s, --status <status>',
+      'New status (todo, active, done, blocked, cut)'
+    )
+    .option('-p, --priority <P>', 'New priority (P0-P3)')
+    .option('-o, --owner <owner>', 'New owner')
+    .option('-b, --branch <branch>', 'Branch or PR')
+    .option('-n, --notes <notes>', 'Notes')
+    .option('--sync <sync>', 'Sync target (local, linear, gh)')
+    .action((taskId, options) => {
+      const mdPath = resolveMdPath();
+      if (!mdPath) return;
+
+      try {
+        const updates: Record<string, string> = {};
+        if (options.status) updates.status = options.status;
+        if (options.priority) updates.priority = options.priority;
+        if (options.owner) updates.owner = options.owner;
+        if (options.branch) updates.branchPr = options.branch;
+        if (options.notes) updates.notes = options.notes;
+        if (options.sync) updates.sync = options.sync;
+
+        updateTaskInFile(mdPath, taskId.toUpperCase(), updates);
+        console.log(`Updated: ${taskId.toUpperCase()}`);
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
+      }
+    });
+
+  tasks.addCommand(md);
+
   return tasks;
+}
+
+/** Resolve master-tasks.md path — check .stackmemory/tasks/ then project root */
+function resolveMdPath(): string | null {
+  const projectRoot = process.cwd();
+  const smPath = join(projectRoot, '.stackmemory', 'tasks', 'master-tasks.md');
+  if (existsSync(smPath)) return smPath;
+
+  const rootPath = join(projectRoot, 'master-tasks.md');
+  if (existsSync(rootPath)) return rootPath;
+
+  console.error(
+    'No master-tasks.md found. Run "stackmemory tasks init" first.'
+  );
+  return null;
 }
 
 function findTaskByPartialId(
