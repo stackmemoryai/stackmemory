@@ -62,3 +62,35 @@ fi
 # Append entry (no content/data — just tool + target pattern)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "{\"ts\":\"${TIMESTAMP}\",\"sid\":\"${SESSION_ID}\",\"tool\":\"${TOOL_NAME}\",\"target\":\"${FIRST_ARG}\",\"dur\":${DURATION}}" >> "$STREAM_FILE"
+
+# --- Script suggestions: detect patterns that match existing scripts ---
+echo "$INPUT" | node "$(dirname "$0")/script-suggest.cjs" 2>/dev/null
+
+# --- Auto-route: suggest dedicated tools for replaceable Bash calls ---
+if [ "$TOOL_NAME" = "Bash" ] && [ -n "$FIRST_ARG" ]; then
+  SUGGESTION=$(echo "$FIRST_ARG" | node -e "
+    const cmd = require('fs').readFileSync(0,'utf-8').trim();
+    // ls/find → Glob
+    if (/^ls\s/.test(cmd) || /^find\s/.test(cmd)) {
+      const dir = cmd.replace(/^(ls|find)\s+/, '').split(/\s/)[0] || '.';
+      console.log('[route] Use Glob instead of \"' + cmd.slice(0,40) + '\" — e.g. Glob(pattern=\"**/*\", path=\"' + dir + '\")');
+    }
+    // cat/head/tail → Read
+    else if (/^(cat|head|tail|sed\s+-n|nl)\s/.test(cmd)) {
+      const file = cmd.replace(/^(cat|head|tail|sed\s+-n|nl)\s+/, '').split(/\s/)[0] || '';
+      if (file && !file.startsWith('-')) {
+        console.log('[route] Use Read instead of \"' + cmd.slice(0,40) + '\" — Read(file_path=\"' + file + '\")');
+      }
+    }
+    // grep/rg → Grep
+    else if (/^(grep|rg|ag)\s/.test(cmd)) {
+      const parts = cmd.split(/\s+/);
+      const pattern = parts[1] || '';
+      console.log('[route] Use Grep instead of \"' + cmd.slice(0,40) + '\" — Grep(pattern=\"' + pattern + '\")');
+    }
+  " 2>/dev/null)
+
+  if [ -n "$SUGGESTION" ]; then
+    echo "{\"systemMessage\":\"$SUGGESTION\"}"
+  fi
+fi
