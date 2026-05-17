@@ -253,6 +253,54 @@ class CodexSM {
     }
   }
 
+  /**
+   * Emit context budget advice based on tool-call count from checkpoint state.
+   * Mirrors the Claude Code context-budget.js hook.
+   */
+  private emitContextBudgetAdvice(): void {
+    const COMPACT_SUGGEST = 50;
+    const COMPACT_STRONG = 65;
+    const RESTART_RECOMMEND = 80;
+
+    try {
+      const stateFile = path.join(
+        os.homedir(),
+        '.stackmemory',
+        `checkpoint-state-${this.config.instanceId}.json`
+      );
+      if (!fs.existsSync(stateFile)) return;
+
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      const cwd = process.cwd();
+      const toolCount = state.projects?.[cwd]?.toolCount || 0;
+
+      if (toolCount >= RESTART_RECOMMEND) {
+        console.log(
+          chalk.yellow(
+            `[CONTEXT_BUDGET] ${toolCount} tool calls (~150K+ tokens). ` +
+              `Recommend: save context then start fresh session.`
+          )
+        );
+      } else if (toolCount >= COMPACT_STRONG) {
+        console.log(
+          chalk.yellow(
+            `[CONTEXT_BUDGET] ${toolCount} tool calls (~100-130K tokens). ` +
+              `Context heavy — consider compacting or restarting.`
+          )
+        );
+      } else if (toolCount >= COMPACT_SUGGEST) {
+        console.log(
+          chalk.gray(
+            `[CONTEXT_BUDGET] ${toolCount} tool calls (~80-100K tokens). ` +
+              `Context getting heavy.`
+          )
+        );
+      }
+    } catch {
+      // Silent — never block exit
+    }
+  }
+
   private loadContext(): void {
     if (!this.config.contextEnabled) return;
     try {
@@ -590,6 +638,9 @@ class CodexSM {
       } catch {
         // Non-fatal: don't block exit
       }
+
+      // Context budget check
+      this.emitContextBudgetAdvice();
 
       if (this.config.tracingEnabled) {
         const summary = trace.getExecutionSummary();

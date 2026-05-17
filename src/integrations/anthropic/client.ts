@@ -6,6 +6,7 @@
  */
 
 import { logger } from '../../core/monitoring/logger.js';
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 import { STRUCTURED_RESPONSE_SUFFIX } from '../../orchestrators/multimodal/constants.js';
 
 export interface CompletionRequest {
@@ -314,8 +315,8 @@ describe('validateInput', () => {
       stopReason: 'stop_sequence',
       model: request.model,
       usage: {
-        inputTokens: Math.ceil(request.prompt.length / 4),
-        outputTokens: Math.ceil(content.length / 4),
+        inputTokens: estimateTokens(request.prompt),
+        outputTokens: estimateTokens(content),
       },
     };
   }

@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+/**
+ * Hermes-SMD CLI Launcher (ESM) — danger mode
+ * Delegates to built CLI in dist without requiring tsx.
+ */
+import('../dist/src/cli/hermes-sm.js');

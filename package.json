@@ -1,7 +1,7 @@
 {
   "name": "@stackmemoryai/stackmemory",
-  "version": "1.12.0",
-  "description": "Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 56 MCP tools, FTS5 search, conductor orchestrator, loop/watch monitoring, snapshot capture, pre-flight overlap checks, Claude/Codex/OpenCode wrappers, Linear sync, and automatic hooks.",
+  "version": "1.13.0",
+  "description": "Lossless, project-scoped memory for AI coding tools. Durable context across sessions with 60+ MCP tools, FTS5 search, cloud sync, conductor orchestration, loop/watch monitoring, trace optimization, Claude/Codex/OpenCode/Gemini wrappers, skill packs, and automatic hooks.",
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
@@ -15,7 +15,9 @@
     "claude-sm": "bin/claude-sm",
     "claude-smd": "bin/claude-smd",
     "opencode-sm": "bin/opencode-sm",
-    "gemini-sm": "bin/gemini-sm"
+    "gemini-sm": "bin/gemini-sm",
+    "hermes-sm": "bin/hermes-sm",
+    "hermes-smd": "bin/hermes-smd"
   },
   "files": [
     "bin",
@@ -46,6 +48,7 @@
     "scripts/smoke-init-db.sh",
     "templates",
     "packs",
+    "docs/guides/README_INSTALL.md",
     "README.md",
     "LICENSE"
   ],
@@ -176,6 +179,7 @@
     "helmet": "^8.1.0",
     "ignore": "^7.0.5",
     "inquirer": "^9.3.8",
+    "js-tiktoken": "^1.0.21",
     "msgpackr": "^1.10.1",
     "node-pty": "^1.1.0",
     "open": "^11.0.0",

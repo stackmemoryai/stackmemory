@@ -273,9 +273,13 @@ describe('StackMemory SDK', () => {
   });
 
   describe('pure functions', () => {
-    it('estimateTokens approximates', () => {
-      expect(estimateTokens('hello')).toBe(2);
+    it('estimateTokens returns positive count for non-empty strings', () => {
+      expect(estimateTokens('hello')).toBeGreaterThan(0);
       expect(estimateTokens('')).toBe(0);
+      // Longer text should produce more tokens
+      expect(estimateTokens('hello world foo bar baz')).toBeGreaterThan(
+        estimateTokens('hello')
+      );
     });
 
     it('hashContent is deterministic', () => {

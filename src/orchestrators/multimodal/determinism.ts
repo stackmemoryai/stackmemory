@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 import {
   appendFileSync,
   existsSync,
@@ -116,7 +117,7 @@ function normalizeResult(result: HarnessResult) {
 
 function estimateContextTokens(result: HarnessResult): number {
   const normalized = normalizeResult(result);
-  return Math.ceil(stableStringify(normalized).length / 4);
+  return estimateTokens(stableStringify(normalized));
 }
 
 function toSnapshot(result: HarnessResult, index: number): DeterminismSnapshot {

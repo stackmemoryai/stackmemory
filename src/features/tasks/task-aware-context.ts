@@ -11,6 +11,7 @@ import {
   FrameManager,
 } from '../../core/context/index.js';
 import { logger } from '../../core/monitoring/logger.js';
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 
 /** Raw task row from SQLite before hydration */
 interface TaskRow {
@@ -476,7 +477,7 @@ export class TaskAwareContextManager {
     activeTasks.forEach((task) => {
       const line = `- [${task.status.toUpperCase()}] ${task.name} (${task.priority})\n`;
       context += line;
-      totalTokens += line.length / 4; // Rough token estimate
+      totalTokens += estimateTokens(line);
       relevanceScores[task.task_id] = 1.0;
     });
     context += '\n';

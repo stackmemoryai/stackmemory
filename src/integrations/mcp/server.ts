@@ -28,6 +28,14 @@ import {
 } from 'fs';
 import { homedir } from 'os';
 import { compactPlan } from '../../orchestrators/multimodal/utils.js';
+import {
+  parseMasterTasks,
+  getNextTask,
+  addTaskToFile,
+  updateTaskInFile,
+  type TaskPriority as MdPriority,
+  type TaskSync,
+} from '../../core/tasks/md-task-parser.js';
 import { filterPending } from './pending-utils.js';
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
@@ -1909,6 +1917,18 @@ class LocalStackMemoryMCP {
 
             case 'trace_event_annotate':
               result = this.handleTraceEventAnnotate(args);
+              break;
+
+            case 'get_next_master_task':
+              result = this.handleGetNextMasterTask(args);
+              break;
+
+            case 'update_master_task':
+              result = this.handleUpdateMasterTask(args);
+              break;
+
+            case 'create_master_task':
+              result = this.handleCreateMasterTask(args);
               break;
 
             default:
@@ -4053,6 +4073,124 @@ ${typeBreakdown}`,
     process.on('SIGINT', printCacheSummary);
     process.on('SIGTERM', printCacheSummary);
     process.on('exit', printCacheSummary);
+  }
+
+  // ── Master Task Handlers ───────────────────────────────────
+
+  private resolveMasterTasksPath(): string | null {
+    const smPath = join(
+      this.projectRoot,
+      '.stackmemory',
+      'tasks',
+      'master-tasks.md'
+    );
+    if (existsSync(smPath)) return smPath;
+    const rootPath = join(this.projectRoot, 'master-tasks.md');
+    if (existsSync(rootPath)) return rootPath;
+    return null;
+  }
+
+  private handleGetNextMasterTask(args: Record<string, unknown>) {
+    const mdPath = this.resolveMasterTasksPath();
+    if (!mdPath) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'No master-tasks.md found. Run "stackmemory tasks init" to create one.',
+          },
+        ],
+      };
+    }
+
+    let tasks = parseMasterTasks(readFileSync(mdPath, 'utf-8'));
+    if (args.owner) {
+      tasks = tasks.filter((t) => t.owner === String(args.owner));
+    }
+
+    const next = getNextTask(tasks);
+    if (!next) {
+      return {
+        content: [{ type: 'text', text: 'No actionable tasks found.' }],
+      };
+    }
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(next, null, 2) }],
+    };
+  }
+
+  private handleUpdateMasterTask(args: Record<string, unknown>) {
+    const mdPath = this.resolveMasterTasksPath();
+    if (!mdPath) {
+      return {
+        content: [{ type: 'text', text: 'No master-tasks.md found.' }],
+      };
+    }
+
+    const taskId = String(args.task_id || '').toUpperCase();
+    if (!taskId) {
+      return {
+        content: [{ type: 'text', text: 'task_id is required.' }],
+        isError: true,
+      };
+    }
+
+    const updates: Record<string, string> = {};
+    if (args.status) updates.status = String(args.status);
+    if (args.priority) updates.priority = String(args.priority);
+    if (args.owner) updates.owner = String(args.owner);
+    if (args.branch_pr) updates.branchPr = String(args.branch_pr);
+    if (args.notes) updates.notes = String(args.notes);
+    if (args.sync) updates.sync = String(args.sync);
+
+    try {
+      updateTaskInFile(mdPath, taskId, updates);
+      return {
+        content: [{ type: 'text', text: `Updated ${taskId}` }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: 'text', text: (err as Error).message }],
+        isError: true,
+      };
+    }
+  }
+
+  private handleCreateMasterTask(args: Record<string, unknown>) {
+    const mdPath = this.resolveMasterTasksPath();
+    if (!mdPath) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'No master-tasks.md found. Run "stackmemory tasks init" to create one.',
+          },
+        ],
+      };
+    }
+
+    const task = String(args.task || '');
+    if (!task) {
+      return {
+        content: [{ type: 'text', text: 'task description is required.' }],
+        isError: true,
+      };
+    }
+
+    const id = addTaskToFile(mdPath, {
+      priority: String(args.priority || 'P1') as MdPriority,
+      status: 'todo',
+      owner: String(args.owner || '@me'),
+      sync: String(args.sync || 'local') as TaskSync,
+      task,
+      branchPr: '',
+      notes: String(args.notes || ''),
+    });
+
+    return {
+      content: [{ type: 'text', text: `Created ${id}: ${task}` }],
+    };
   }
 }
 

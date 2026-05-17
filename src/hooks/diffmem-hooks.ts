@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../core/monitoring/logger.js';
+import { estimateTokens } from '../core/cache/token-estimator.js';
 import type { HookEventEmitter, HookEventData } from './events.js';
 import type { FrameManager } from '../core/context/frame-manager.js';
 import type {
@@ -256,7 +257,7 @@ export class DiffMemHooks {
     for (const [category, contents] of sections) {
       const label = categoryLabels[category] || category;
       const categoryHeader = `\n### ${label}`;
-      const headerTokens = Math.ceil(categoryHeader.length / 4);
+      const headerTokens = estimateTokens(categoryHeader);
 
       if (estimatedTokens + headerTokens > maxTokens) {
         break;
@@ -267,7 +268,7 @@ export class DiffMemHooks {
 
       for (const content of contents) {
         const contentLine = `- ${content}`;
-        const contentTokens = Math.ceil(contentLine.length / 4);
+        const contentTokens = estimateTokens(contentLine);
 
         if (estimatedTokens + contentTokens > maxTokens) {
           lines.push('- (additional items truncated for token budget)');

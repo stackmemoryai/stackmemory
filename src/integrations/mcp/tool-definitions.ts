@@ -37,6 +37,7 @@ export class MCPToolDefinitions {
       ...this.getProvenantTools(),
       ...this.getCrossSearchTools(),
       ...this.getCloudSyncTools(),
+      ...this.getMasterTaskTools(),
     ];
   }
 
@@ -1589,6 +1590,8 @@ export class MCPToolDefinitions {
         return this.getProvenantTools();
       case 'cloud_sync':
         return this.getCloudSyncTools();
+      case 'master_tasks':
+        return this.getMasterTaskTools();
       default:
         return [];
     }
@@ -1633,6 +1636,104 @@ export class MCPToolDefinitions {
         inputSchema: {
           type: 'object',
           properties: {},
+        },
+      },
+    ];
+  }
+
+  private getMasterTaskTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'get_next_master_task',
+        description:
+          'Get the highest-priority actionable task from master-tasks.md. Returns the next task to work on based on priority (P0 > P1 > P2 > P3), skipping blocked/done/cut tasks.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            owner: {
+              type: 'string',
+              description:
+                'Filter by owner (@me, @agent, @defer). If omitted, returns highest priority regardless of owner.',
+            },
+          },
+        },
+      },
+      {
+        name: 'update_master_task',
+        description:
+          'Update a task in master-tasks.md by task ID (e.g. T01). Can update status, priority, owner, branch, notes, or sync target.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: {
+              type: 'string',
+              description: 'Task ID (e.g. T01, T02)',
+            },
+            status: {
+              type: 'string',
+              enum: ['todo', 'active', 'done', 'blocked', 'cut'],
+              description: 'New status',
+            },
+            priority: {
+              type: 'string',
+              enum: ['P0', 'P1', 'P2', 'P3'],
+              description: 'New priority',
+            },
+            owner: {
+              type: 'string',
+              description: 'New owner (@me, @agent, @defer)',
+            },
+            branch_pr: {
+              type: 'string',
+              description: 'Branch name or PR link',
+            },
+            notes: {
+              type: 'string',
+              description: 'Updated notes',
+            },
+            sync: {
+              type: 'string',
+              enum: ['local', 'linear', 'gh'],
+              description: 'Sync target',
+            },
+          },
+          required: ['task_id'],
+        },
+      },
+      {
+        name: 'create_master_task',
+        description:
+          'Add a new task to master-tasks.md. Auto-assigns the next available ID (T01, T02...).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task: {
+              type: 'string',
+              description: 'Task description',
+            },
+            priority: {
+              type: 'string',
+              enum: ['P0', 'P1', 'P2', 'P3'],
+              default: 'P1',
+              description: 'Priority level',
+            },
+            owner: {
+              type: 'string',
+              default: '@me',
+              description: 'Task owner (@me, @agent, @defer)',
+            },
+            sync: {
+              type: 'string',
+              enum: ['local', 'linear', 'gh'],
+              default: 'local',
+              description: 'Sync target',
+            },
+            notes: {
+              type: 'string',
+              description: 'Optional notes',
+            },
+          },
+          required: ['task'],
         },
       },
     ];

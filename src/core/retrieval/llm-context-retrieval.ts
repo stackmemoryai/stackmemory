@@ -20,6 +20,7 @@ import {
   RetrievalMetadata,
 } from './types.js';
 import { logger } from '../monitoring/logger.js';
+import { estimateTokens } from '../cache/token-estimator.js';
 import { LazyContextLoader } from '../performance/lazy-context-loader.js';
 import { ContextCache } from '../performance/context-cache.js';
 import { LLMProvider, createLLMProvider } from './llm-provider.js';
@@ -185,12 +186,12 @@ class HeuristicAnalyzer {
     let tokens = 50; // Base frame header
     tokens += frame.eventCount * 30; // Estimate per event
     tokens += frame.anchorCount * 40; // Estimate per anchor
-    if (frame.digestPreview) tokens += frame.digestPreview.length / 4;
+    if (frame.digestPreview) tokens += estimateTokens(frame.digestPreview);
     return Math.floor(tokens);
   }
 
   private estimateSummaryTokens(summary: CompressedSummary): number {
-    return Math.floor(JSON.stringify(summary).length / 4);
+    return estimateTokens(JSON.stringify(summary));
   }
 
   private assessQueryComplexity(
@@ -599,8 +600,8 @@ Respond with only the JSON object, no other text.`;
         })),
         metadata: {
           analysisTimeMs: 0,
-          summaryTokens: Math.floor(
-            JSON.stringify(request.compressedSummary).length / 4
+          summaryTokens: estimateTokens(
+            JSON.stringify(request.compressedSummary)
           ),
           queryComplexity: this.assessQueryComplexity(request.currentQuery),
           matchedPatterns: [],

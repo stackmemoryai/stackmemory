@@ -8,6 +8,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { spawn } from 'child_process';
 import { logger } from '../../core/monitoring/logger.js';
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 import { ClaudeCodeAgent } from './agent-bridge.js';
 
 export interface TaskExecution {
@@ -508,8 +509,7 @@ export class ClaudeCodeTaskCoordinator {
    * Estimate token usage
    */
   private estimateTokenUsage(prompt: string, response: string): number {
-    // Rough estimation: ~4 characters per token
-    return Math.ceil((prompt.length + response.length) / 4);
+    return estimateTokens(prompt + response);
   }
 
   /**

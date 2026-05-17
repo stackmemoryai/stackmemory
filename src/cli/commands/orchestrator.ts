@@ -9,6 +9,7 @@
  */
 
 import { spawn, execSync, type ChildProcess } from 'child_process';
+import { estimateTokens } from '../../core/cache/token-estimator.js';
 import {
   appendFileSync,
   existsSync,
@@ -2295,7 +2296,7 @@ export class Conductor {
                 }
                 if (block.type === 'text' && block.text) {
                   const text = block.text as string;
-                  run.tokensUsed += Math.ceil(text.length / 4);
+                  run.tokensUsed += estimateTokens(text);
                   turnTextParts.push(text);
                 }
               }
@@ -2489,7 +2490,7 @@ export class Conductor {
 
             // Estimate tokens from message sizes
             if (msg.method === 'item/text' && params?.text) {
-              run.tokensUsed += Math.ceil((params.text as string).length / 4);
+              run.tokensUsed += estimateTokens(params.text as string);
             }
 
             // Update agent status file periodically (every 5 tool calls)

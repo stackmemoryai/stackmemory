@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../../../core/monitoring/logger.js';
+import { estimateTokens as estimateTokensCore } from '../../../core/cache/token-estimator.js';
 import {
   IterationContext,
   TaskContext,
@@ -19,7 +20,6 @@ export class ContextBudgetManager {
   private config: RalphStackMemoryConfig['contextBudget'];
   private tokenUsage: Map<string, number> = new Map();
   private readonly DEFAULT_MAX_TOKENS = 4000;
-  private readonly TOKEN_CHAR_RATIO = 0.25; // Rough estimate: 1 token ≈ 4 chars
 
   constructor(config?: Partial<RalphStackMemoryConfig['contextBudget']>) {
     this.config = {
@@ -41,17 +41,7 @@ export class ContextBudgetManager {
    */
   estimateTokens(text: string): number {
     if (!text) return 0;
-
-    // More accurate estimation based on common patterns
-    const baseTokens = text.length * this.TOKEN_CHAR_RATIO;
-
-    // Adjust for code content (typically more dense)
-    const codeMultiplier = this.detectCodeContent(text) ? 1.2 : 1.0;
-
-    // Adjust for JSON content (typically less dense)
-    const jsonMultiplier = this.detectJsonContent(text) ? 0.9 : 1.0;
-
-    return Math.ceil(baseTokens * codeMultiplier * jsonMultiplier);
+    return estimateTokensCore(text);
   }
 
   /**
@@ -344,32 +334,6 @@ export class ContextBudgetManager {
           gitHistory: 0.15,
           dependencies: 0.05,
         };
-    }
-  }
-
-  /**
-   * Detect if text contains code
-   */
-  private detectCodeContent(text: string): boolean {
-    const codePatterns = [
-      /function\s+\w+\s*\(/,
-      /class\s+\w+/,
-      /const\s+\w+\s*=/,
-      /import\s+.*from/,
-      /\{[\s\S]*\}/,
-    ];
-    return codePatterns.some((pattern) => pattern.test(text));
-  }
-
-  /**
-   * Detect if text contains JSON
-   */
-  private detectJsonContent(text: string): boolean {
-    try {
-      JSON.parse(text);
-      return true;
-    } catch {
-      return text.includes('"') && text.includes(':') && text.includes('{');
     }
   }
 

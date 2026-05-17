@@ -112,6 +112,30 @@ describe('parsePackYaml', () => {
     expect(() => parsePackYaml(yaml.dump(bad))).toThrow();
   });
 
+  it('should accept content licenses like CC-BY-4.0', () => {
+    const manifest = {
+      name: 'learning/opportunities',
+      version: '1.0.0',
+      description: 'Learning exercises for AI-assisted coding',
+      author: 'drcathicks',
+      license: 'CC-BY-4.0',
+    };
+    const pack = parsePackYaml(yaml.dump(manifest));
+    expect(pack.manifest.license).toBe('CC-BY-4.0');
+  });
+
+  it('should accept custom license strings', () => {
+    const manifest = {
+      name: 'test/custom',
+      version: '1.0.0',
+      description: 'Custom license pack',
+      author: 'test',
+      license: 'Proprietary',
+    };
+    const pack = parsePackYaml(yaml.dump(manifest));
+    expect(pack.manifest.license).toBe('Proprietary');
+  });
+
   it('should accept all valid runtime types', () => {
     for (const type of ['local', 'e2b', 'cua', 'modal']) {
       const manifest = {
