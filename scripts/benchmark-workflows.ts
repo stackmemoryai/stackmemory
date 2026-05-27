@@ -24,6 +24,7 @@ import {
   WorkflowReplayer,
   WorkflowBenchmark,
 } from '../src/features/browser/stagehand-workflows.js';
+import { CliBrowserAgent } from '../src/features/browser/cli-browser-agent.js';
 
 // ─── Config ───────────────────────────────────────────────────
 
@@ -33,6 +34,28 @@ const RUNS = parseInt(
 const WORKFLOW_FILTER = process.argv.find(
   (_, i, a) => a[i - 1] === '--workflow'
 );
+
+// Load .env for API keys if available
+try {
+  const { readFileSync } = await import('fs');
+  const envFile = readFileSync('.env', 'utf-8');
+  for (const line of envFile.split('\n')) {
+    const match = line.match(/^([A-Z_]+)=(.+)$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
+  }
+} catch {
+  /* no .env file */
+}
+
+// Stagehand defaults to OpenAI — prefer Anthropic if available
+if (process.env.ANTHROPIC_API_KEY) {
+  delete process.env.OPENAI_API_KEY; // Remove stale key
+}
+
+// Mode: 'api' uses direct LLM API, 'cli' uses claude -p subprocess
+const MODE = process.argv.includes('--cli') ? 'cli' : 'api';
 
 // ─── Test Workflows ───────────────────────────────────────────
 
@@ -60,9 +83,24 @@ const WORKFLOWS: WorkflowDefinition[] = [
     ],
     playwrightFn: async (page: any) => {
       await page.goto('https://github.com/browserbase/stagehand');
-      await page.waitForSelector('#repo-stars-counter-star');
-      const stars = await page.textContent('#repo-stars-counter-star');
-      const desc = await page.textContent('[data-testid="about-description"]');
+      await page.waitForLoadState('domcontentloaded');
+      // Use robust selectors — GitHub changes these frequently
+      const stars = await page
+        .locator('[id*="star"]')
+        .first()
+        .textContent()
+        .catch(() => 'N/A');
+      const desc = await page
+        .locator('p.f4')
+        .first()
+        .textContent()
+        .catch(() =>
+          page
+            .locator('[class*="about"] p, .BorderGrid-cell p')
+            .first()
+            .textContent()
+            .catch(() => 'N/A')
+        );
       return { stars, desc };
     },
   },
@@ -97,9 +135,11 @@ const WORKFLOWS: WorkflowDefinition[] = [
     ],
     playwrightFn: async (page: any) => {
       await page.goto('https://www.npmjs.com/package/@browserbasehq/stagehand');
-      await page.waitForSelector('h3');
+      await page.waitForLoadState('domcontentloaded');
       const version = await page
-        .textContent('[data-testid="version"]')
+        .locator('[class*="version"], span:has-text(".")')
+        .first()
+        .textContent()
         .catch(() => 'unknown');
       return { version };
     },
@@ -177,15 +217,86 @@ async function main() {
       }
     }
 
-    // ── Stagehand AI Benchmark ──
-    if (Stagehand) {
+    // ── CLI Agent Benchmark (claude -p / codex, subscription-based) ──
+    if (MODE === 'cli' || process.argv.includes('--all')) {
+      const cliProvider = process.argv.includes('--codex')
+        ? ('codex' as const)
+        : ('claude' as const);
+      // First run: cold (CLI call + cache write)
+      for (let i = 0; i < RUNS; i++) {
+        const agent = new CliBrowserAgent({
+          provider: cliProvider,
+          headless: true,
+        });
+        const start = Date.now();
+        try {
+          await agent.init();
+          await agent.goto(wf.startUrl);
+
+          for (const step of wf.steps) {
+            if (step.type === 'extract') {
+              const r = await agent.extract(step.instruction);
+              console.log(
+                `    extracted (cache=${r.fromCache}, ${r.cliTokens} tokens, ${r.duration}ms)`
+              );
+            } else if (step.type === 'act') {
+              await agent.act(step.instruction);
+            }
+          }
+
+          const result = {
+            workflow: wf.name,
+            approach: `cli-${cliProvider}${i > 0 ? '-cached' : ''}` as any,
+            duration: Date.now() - start,
+            tokens: 0,
+            success: true,
+            selfHealed: false,
+            steps: wf.steps.length,
+          };
+          benchmark.getResults().push(result);
+          console.log(
+            `  [cli-${cliProvider}]      run ${i + 1}/${RUNS}: OK (${result.duration}ms)`
+          );
+        } catch (e: any) {
+          const result = {
+            workflow: wf.name,
+            approach: `cli-${cliProvider}` as any,
+            duration: Date.now() - start,
+            tokens: 0,
+            success: false,
+            selfHealed: false,
+            steps: wf.steps.length,
+            error: e.message,
+          };
+          benchmark.getResults().push(result);
+          console.log(
+            `  [cli-${cliProvider}]      run ${i + 1}/${RUNS}: FAIL - ${e.message.slice(0, 100)}`
+          );
+        }
+        await agent.close();
+      }
+    }
+
+    // ── Stagehand AI Benchmark (direct API — needs API key) ──
+    if (Stagehand && MODE === 'api') {
       for (let i = 0; i < RUNS; i++) {
         let stagehand: any;
         try {
+          const modelConfig = process.env.ANTHROPIC_API_KEY
+            ? {
+                modelName: 'anthropic/claude-sonnet-4-20250514',
+                apiKey: process.env.ANTHROPIC_API_KEY,
+              }
+            : process.env.OPENAI_API_KEY
+              ? {
+                  modelName: 'openai/gpt-4o-mini',
+                  apiKey: process.env.OPENAI_API_KEY,
+                }
+              : { modelName: 'openai/gpt-4o-mini' };
           stagehand = new Stagehand({
             env: 'LOCAL',
-            enableCaching: true,
-            headless: true,
+            cacheDir: `${process.env.HOME}/.stackmemory/workflows/stagehand-cache`,
+            model: modelConfig,
           });
           await stagehand.init();
 
@@ -221,6 +332,14 @@ async function main() {
               env: 'LOCAL',
               enableCaching: true,
               headless: true,
+              modelName: process.env.ANTHROPIC_API_KEY
+                ? 'claude-sonnet-4-20250514'
+                : undefined,
+              modelClientOptions: process.env.ANTHROPIC_API_KEY
+                ? {
+                    apiKey: process.env.ANTHROPIC_API_KEY,
+                  }
+                : undefined,
             });
             await stagehand.init();
 
