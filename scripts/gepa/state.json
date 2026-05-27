@@ -1,0 +1,14 @@
+{
+  "currentGeneration": 0,
+  "bestVariant": "baseline",
+  "bestScore": 0,
+  "targetPath": "/Users/jwu/.claude/commands/summary.md",
+  "history": [
+    {
+      "generation": 0,
+      "variant": "baseline",
+      "action": "init",
+      "timestamp": "2026-05-27T21:41:38.112Z"
+    }
+  ]
+}

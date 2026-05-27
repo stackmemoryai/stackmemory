@@ -1,0 +1,1 @@
+{"passed":false,"passRate":0,"criteria":{},"judgeMode":"llm","duration":12679,"output":"Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"Invalid authentication credentials\"},\"request_id\":\"req_011CaFKu99FwG6fkF1Ka8aXR\"}\n"}

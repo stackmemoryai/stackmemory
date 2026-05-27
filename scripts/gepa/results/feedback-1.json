@@ -1,0 +1,527 @@
+{
+  "bug_fixed": [
+    {
+      "variant": "baseline",
+      "task": "fix_bug",
+      "feedback": "Provide the complete corrected code block showing the loop with the `<` operator in place, not just a description of the fix. For example, show the entire fixed loop with line numbers or context."
+    }
+  ],
+  "has_offset": [
+    {
+      "variant": "baseline",
+      "task": "add_feature",
+      "feedback": "Either add an offset parameter to the query params (e.g., `?offset=0&limit=20`) or clarify that offset can be calculated from page (offset = (page - 1) * limit). The current implementation only supports page-based pagination, not offset-based pagination."
+    }
+  ],
+  "backwards_compatible": [
+    {
+      "variant": "baseline",
+      "task": "add_feature",
+      "feedback": "Explicitly state how backwards compatibility is maintained. For example: confirm that requests without pagination parameters will default to page=1&limit=20, or describe a compatibility mode. Also clarify whether the response shape change (from direct array to `{ data: [], pagination: {} }`) breaks existing clients and if so, recommend versioning the endpoint (e.g., `/api/v2/endpoint`) or feature-flagging the change."
+    }
+  ],
+  "identifies_performance_issue": [
+    {
+      "variant": "baseline",
+      "task": "code_review",
+      "feedback": "If performance issues exist in the PR, they should be identified and explained. For example, check for: missing database indexes that could slow queries, N+1 query patterns, inefficient loops, or unnecessary database round-trips. If no performance issues exist, explicitly state that the review found no performance concerns."
+    }
+  ],
+  "reads_existing_code": [
+    {
+      "variant": "baseline",
+      "task": "express_route_bug_fix",
+      "feedback": "Add explicit step: 'First, read src/routes/query.js and src/core/errors.js to understand the current route structure and error pattern.' Place this before the implementation steps."
+    }
+  ],
+  "test_commands": [
+    {
+      "variant": "baseline",
+      "task": "express_route_bug_fix",
+      "feedback": "Specify exact commands: 'Run: `npm run lint` then `npm test` (note: npm test is long-running; run it in the background or in a separate terminal).'"
+    }
+  ],
+  "supertest_pattern": [
+    {
+      "variant": "baseline",
+      "task": "express_route_bug_fix",
+      "feedback": "Add guidance: 'Write tests using Supertest. Pass the route factory an injected `app` object (not `server`). Example: `const route = createQueryRoute(deps); route(app);` then test with `request(app).get(...)`'"
+    }
+  ],
+  "di_factory_pattern": [
+    {
+      "variant": "baseline",
+      "task": "express_route_bug_fix",
+      "feedback": "Add guidance: 'The route uses a createRouter(deps) factory pattern for dependency injection. When writing tests, instantiate the route by passing a mocked dependencies object to this factory, then attach it to the test app.'"
+    }
+  ],
+  "no_jest_globals_import": [
+    {
+      "variant": "baseline",
+      "task": "jest_test_conventions",
+      "feedback": "The prompt template must explicitly state: 'Do NOT import from @jest/globals. Use the global jest object and global describe/it/expect instead.' Add this to the Instructions section before step 1."
+    }
+  ],
+  "clear_all_mocks_warning": [
+    {
+      "variant": "baseline",
+      "task": "jest_test_conventions",
+      "feedback": "Add to Instructions: 'In beforeEach hooks, re-set all mock return values after jest.clearAllMocks(), as clearAllMocks() wipes mockReturnValue but not the mock itself. Example: jest.clearAllMocks(); mockFn.mockReturnValue(defaultValue);'"
+    }
+  ],
+  "eslint_catch_pattern": [
+    {
+      "variant": "baseline",
+      "task": "jest_test_conventions",
+      "feedback": "Add to Instructions: 'Use `catch {}` not `catch (_err) {}` per ESLint rules. Unused catch bindings must be omitted or will fail pre-commit validation.'"
+    }
+  ],
+  "check_existing_patterns": [
+    {
+      "variant": "baseline",
+      "task": "jest_test_conventions",
+      "feedback": "Add to Instructions before step 2: 'First, review existing test files in src/**/__tests__/ to understand the project's test structure, naming conventions, assertion patterns, and mock setup style. Match those patterns when writing new tests.'"
+    }
+  ],
+  "migration_naming": [
+    {
+      "variant": "baseline",
+      "task": "database_migration",
+      "feedback": "The prompt template should include explicit instruction such as: 'Create a migration file in `src/db/migrations/` following the naming pattern `NNN_description.sql` (e.g., `001_add_prompt_version_to_queries.sql`) where NNN is a zero-padded sequential number.' This ensures the agent creates files in the correct location with the correct naming convention."
+    }
+  ],
+  "check_latest_number": [
+    {
+      "variant": "baseline",
+      "task": "database_migration",
+      "feedback": "The prompt should include a step such as: 'Before creating the migration file, check `src/db/migrations/` to determine the latest migration number, then increment it by one. For example, if the latest file is `005_some_change.sql`, create `006_add_prompt_version_to_queries.sql`.' This prevents numbering conflicts."
+    }
+  ],
+  "auto_migration_startup": [
+    {
+      "variant": "baseline",
+      "task": "database_migration",
+      "feedback": "The prompt should clarify: 'Migrations in this repository are applied automatically on application startup. After creating the migration file, no manual execution is required; the system will detect and apply it when deployed. For local testing, you can manually run migrations with `npm run migrate` if needed.' This sets correct expectations about the migration lifecycle."
+    }
+  ],
+  "read_existing_templates": [
+    {
+      "variant": "baseline",
+      "task": "recipe_template_addition",
+      "feedback": "The prompt should include an explicit step like 'Read src/db/migrations/028_expanded_recipe_templates.sql and identify the exact INSERT structure, field names, and JSON shape used in existing recipe templates before writing the new #035 template.' This ensures the agent understands the requirement is to study existing patterns before implementing, not just follow them implicitly."
+    }
+  ],
+  "step_runner_stages": [
+    {
+      "variant": "baseline",
+      "task": "recipe_template_addition",
+      "feedback": "The prompt should explicitly state: 'The recipe steps must follow the step-runner pipeline model: trigger (webhook input) → enrich (LLM + Clearbit) → transform (format data) → output (Slack channel). Each stage maps to a step in the steps JSON array with type and config fields.' This clarifies the expected structure and order."
+    }
+  ],
+  "enrichment_cjs": [
+    {
+      "variant": "baseline",
+      "task": "recipe_template_addition",
+      "feedback": "Add: 'Enrichment is handled by the enrichment service at src/enrichment/service.js (CommonJS). Use require() syntax, not import statements. Ensure the agent knows to call the enrichment service's LLM and Clearbit lookup methods within the enrich step definition.'"
+    }
+  ],
+  "recipe_service_path": [
+    {
+      "variant": "baseline",
+      "task": "recipe_template_addition",
+      "feedback": "The prompt should state: 'Register the recipe template in src/recipes/service.js. Ensure the template is exported from the recipe service and follows the service's registration pattern. Reference the service to understand how templates are loaded, validated, and made available to the pipeline.' This prevents ad-hoc implementation and ensures correct integration."
+    }
+  ],
+  "no_hardcoded_stripe_ids": [
+    {
+      "variant": "baseline",
+      "task": "stripe_integration_change",
+      "feedback": "Add explicit warning language: 'Do NOT hardcode Stripe product IDs directly in code — always reference them from Railway environment variables (e.g., process.env.STRIPE_PRODUCT_STARTER_V2). Hardcoding breaks portability and increases security risk.'"
+    }
+  ],
+  "check_billing_routes": [
+    {
+      "variant": "baseline",
+      "task": "stripe_integration_change",
+      "feedback": "Revise to: 'Review the existing billing routes (check for subscription creation patterns, payment method handling, and error handling). Then update the routes to support annual subscription creation while maintaining consistency with existing patterns.'"
+    }
+  ],
+  "test_vs_live_keys": [
+    {
+      "variant": "baseline",
+      "task": "stripe_integration_change",
+      "feedback": "Add test/live key safeguard: 'Before testing, verify that STRIPE_SECRET_KEY is a test-mode key (begins with sk_test_). Never use live keys (sk_live_) in development or staging environments. If testing webhook handlers, use the X-Test-Mode: true header to avoid charging real cards.'"
+    }
+  ],
+  "auth_middleware_reference": [
+    {
+      "variant": "baseline",
+      "task": "auth_middleware_handling",
+      "feedback": "The prompt should explicitly state: 'Use the authenticateAny middleware from src/auth/auth.middleware.js to protect this endpoint.' This removes ambiguity and ensures the agent applies the correct middleware from the correct file."
+    }
+  ],
+  "three_auth_modes": [
+    {
+      "variant": "baseline",
+      "task": "auth_middleware_handling",
+      "feedback": "The prompt should explicitly state: 'Support all three authentication modes: Clerk JWT, API key auth, and test mode. Ensure test mode requests are rejected or handled with appropriate restrictions to prevent test credentials from affecting production key rotation.'"
+    }
+  ],
+  "tenant_isolation": [
+    {
+      "variant": "baseline",
+      "task": "auth_middleware_handling",
+      "feedback": "The prompt should explicitly state: 'Scope all database operations by tenant_id. Retrieve the tenant_id from the authenticated request context and use it as the primary filter when querying and updating API keys. Never scope by user_id alone.' This removes ambiguity and prevents accidental cross-tenant key exposure."
+    }
+  ],
+  "credential_encryption": [
+    {
+      "variant": "baseline",
+      "task": "auth_middleware_handling",
+      "feedback": "The prompt should explicitly state: 'Encrypt the new API key at rest using AES-256-GCM before persisting to the database. Use the KMS module to handle encryption/decryption. Never store API keys in plaintext.' This ensures the agent implements cryptographically sound credential storage."
+    }
+  ],
+  "vite_base_path": [
+    {
+      "variant": "baseline",
+      "task": "dashboard_component",
+      "feedback": "The prompt should include explicit instructions: 'Ensure vite.config.js maintains base: \"/app/\" and BrowserRouter is configured with basename=\"/app\"' to preserve routing consistency in the dashboard application."
+    }
+  ],
+  "design_system": [
+    {
+      "variant": "baseline",
+      "task": "dashboard_component",
+      "feedback": "The prompt should reference the design system by adding: 'Follow component patterns and styling conventions in docs/STYLE.md when implementing the bar chart component.'"
+    }
+  ],
+  "build_command": [
+    {
+      "variant": "baseline",
+      "task": "dashboard_component",
+      "feedback": "Add to the Instructions section: 'Build the dashboard with: cd dashboard-app && npx vite build' to ensure developers use the correct build process for this Vite-based application."
+    }
+  ],
+  "product_gating": [
+    {
+      "variant": "baseline",
+      "task": "dashboard_component",
+      "feedback": "The prompt should include: 'The COO dashboard is product-gated. Verify that the feature flag and role-based access control for COO-level users are preserved and tested before deployment.'"
+    }
+  ],
+  "model_tiers": [
+    {
+      "variant": "baseline",
+      "task": "llm_adapter_change",
+      "feedback": "The prompt should explicitly instruct: 'Check the tenant's model tier (fast/balanced/deep) before comparing token usage against budget thresholds, as budget limits and cost multipliers vary by tier.' This ensures the agent considers tier-specific budget rules."
+    }
+  ],
+  "anthropic_native": [
+    {
+      "variant": "baseline",
+      "task": "llm_adapter_change",
+      "feedback": "The prompt should state: 'This adapter uses Anthropic-native SDK patterns. Ensure token usage recording follows the Anthropic Messages API shape (input_tokens, output_tokens) before checking budget thresholds.' This grounds the implementation in the correct SDK."
+    }
+  ],
+  "read_adapter_first": [
+    {
+      "variant": "baseline",
+      "task": "llm_adapter_change",
+      "feedback": "The prompt should include as step 0: 'Before implementing, read src/llm/adapter.js to understand the current usage recording pattern, hook points, and token field names. This ensures the budget check integrates cleanly without duplicating logic.'"
+    }
+  ],
+  "trace_logger": [
+    {
+      "variant": "baseline",
+      "task": "llm_adapter_change",
+      "feedback": "The prompt should specify: 'Use trace-logger to emit structured alerts with fields: {tenant_id, model_tier, tokens_used, budget_threshold, exceeded_by}. This ensures observability integrates with ProvenantAI's centralized tracing system rather than ad-hoc logging.'"
+    }
+  ],
+  "fixture_pattern": [
+    {
+      "variant": "baseline",
+      "task": "integration_connector",
+      "feedback": "Add explicit guidance to the prompt: 'Use test fixtures from src/__fixtures__/ (follow existing connector fixture patterns for mock HubSpot data)' to ensure the agent creates fixtures in the correct location rather than using inline mocks."
+    }
+  ],
+  "integration_test_path": [
+    {
+      "variant": "baseline",
+      "task": "integration_connector",
+      "feedback": "Add specific test path guidance to the prompt: 'Place integration tests in src/integrations/ following the naming pattern of existing connectors (e.g., hubspot.integration.test.js)' to enforce path consistency."
+    }
+  ],
+  "webhook_signature_module": [
+    {
+      "variant": "baseline",
+      "task": "webhook_handler",
+      "feedback": "Add explicit instruction: 'Use the webhook-signature.js module to verify HMAC-SHA256 signatures' or 'Import and use src/recipes/webhook-signature.js for signature verification.' This prevents reimplementation and ensures consistency with existing security patterns."
+    }
+  ],
+  "parameterized_queries": [
+    {
+      "variant": "baseline",
+      "task": "webhook_handler",
+      "feedback": "Add explicit security instruction: 'Use parameterized queries (e.g., $1, $2 placeholders) for all database operations. Do not use string interpolation or template literals when constructing SQL queries to prevent SQL injection attacks.' This ensures data from untrusted webhook sources is safely escaped."
+    }
+  ],
+  "service_registry": [
+    {
+      "variant": "baseline",
+      "task": "webhook_handler",
+      "feedback": "Add instruction: 'Retrieve the database client from the service registry singleton rather than instantiating a new connection. Use the existing service registry pattern to access database and configuration services.' This ensures proper resource management and maintains architectural consistency."
+    }
+  ],
+  "ctx_schema": [
+    {
+      "variant": "baseline",
+      "task": "context_graph_feature",
+      "feedback": "The prompt should explicitly list the ctx_nodes schema (id, tenant_id, entity_id, content, embedding, created_at) and ctx_edges schema (id, tenant_id, src_id, dst_id, rel_type). Include example column references so the implementer knows what fields are available for the contradiction_score calculation."
+    }
+  ],
+  "tenant_scoping": [
+    {
+      "variant": "baseline",
+      "task": "context_graph_feature",
+      "feedback": "Add an explicit instruction: 'All queries MUST scope by tenant_id. Never query ctx_nodes without WHERE tenant_id = $1. Ensure the function signature accepts tenant_id as a parameter.' This should be highlighted as a non-negotiable constraint."
+    }
+  ],
+  "graph_service_wrapper": [
+    {
+      "variant": "baseline",
+      "task": "context_graph_feature",
+      "feedback": "Add explicit instruction: 'Use the GraphService wrapper at src/graph/service.ts for all database access. Do not write raw SQL queries. Review how existing query functions in graph-query.js invoke GraphService to understand the pattern.'"
+    }
+  ],
+  "playwright_projects": [
+    {
+      "variant": "baseline",
+      "task": "e2e_test_addition",
+      "feedback": "The prompt template should explicitly state: 'Target the \"api\" Playwright project (defined in playwright.config.ts)' or 'Use the api project from Playwright config projects array (api, business, chromium)' to ensure the generated spec targets the correct project."
+    }
+  ],
+  "existing_e2e_patterns": [
+    {
+      "variant": "baseline",
+      "task": "e2e_test_addition",
+      "feedback": "Add explicit instruction: 'Read existing specs in e2e/specs/ to match their import style, fixture usage, and test structure before writing the new spec.' This ensures pattern consistency across the test suite."
+    }
+  ],
+  "test_mode_header": [
+    {
+      "variant": "baseline",
+      "task": "e2e_test_addition",
+      "feedback": "Add to prompt: 'Authenticate API requests using the X-Test-Mode: true header (not real credentials or tokens)' to ensure test requests are properly authenticated without leaking credentials."
+    }
+  ],
+  "e2e_api_command": [
+    {
+      "variant": "baseline",
+      "task": "e2e_test_addition",
+      "feedback": "Add instruction: 'Run API E2E tests locally with: npm run e2e:api' to clarify the execution command and ensure developers know how to validate the spec."
+    }
+  ],
+  "trace_logger_reference": [
+    {
+      "variant": "baseline",
+      "task": "observability_addition",
+      "feedback": "The prompt should explicitly state: 'Use the trace-logger utility at src/utils/trace-logger.js to wrap step execution.' This removes ambiguity and ensures agents use the correct module."
+    }
+  ],
+  "trace_span_pattern": [
+    {
+      "variant": "baseline",
+      "task": "observability_addition",
+      "feedback": "Include a concrete code example such as: `traceLogger.traceSpan('executeStep', { stepName, duration, success, inputTokens, outputTokens }, async () => { /* step logic */ })` to show the exact pattern agents should replicate."
+    }
+  ],
+  "no_pii_logging": [
+    {
+      "variant": "baseline",
+      "task": "observability_addition",
+      "feedback": "Add a section: 'Do NOT log PII or sensitive data (email addresses, API tokens, credit card numbers, user content) in span metadata. Only log sanitized step identifiers and aggregate metrics.' This aligns with ProvenantAI observability conventions."
+    }
+  ],
+  "structured_metadata": [
+    {
+      "variant": "baseline",
+      "task": "observability_addition",
+      "feedback": "Specify a structured metadata schema, e.g.: `{ stepName: string, duration: number (ms), success: boolean, inputTokens: number | null, outputTokens: number | null, error?: string }` so all spans conform to a consistent format for downstream analysis."
+    }
+  ],
+  "guides_file_search": [
+    {
+      "variant": "baseline",
+      "task": "no_description_provenantai",
+      "feedback": "Add a codebase discovery step: 'Search the repository for test files matching the issue title (e.g., grep -r \"scheduler\" test/ to locate the flaky test). Start by reading test/unit/scheduler.test.js to understand the test structure.'"
+    }
+  ],
+  "understand_flakiness": [
+    {
+      "variant": "baseline",
+      "task": "no_description_provenantai",
+      "feedback": "Add a diagnostic step: 'Read the test file carefully and identify sources of flakiness: look for setTimeout, setInterval, Date, or other time-dependent behavior. Flaky scheduler tests often fail due to timing assumptions. Document what you find before proposing a fix.'"
+    }
+  ],
+  "graceful_degradation": [
+    {
+      "variant": "baseline",
+      "task": "no_description_provenantai",
+      "feedback": "Restructure Step 1 with conditional logic: 'IF the issue description is empty: infer from the title (\"Fix flaky scheduler test\") and search the codebase for scheduler test files. IF a description exists: read it first. In either case, examine the test file to understand what's flaky before implementing changes.'"
+    }
+  ],
+  "codebase_context": [
+    {
+      "variant": "baseline",
+      "task": "no_description_provenantai",
+      "feedback": "Add explicit context-gathering instructions: 'When description is missing, gather context from the codebase: (1) Search for test files with names containing \"scheduler\". (2) Read the test code to identify what is being tested. (3) Look for timer-related code (jest.useFakeTimers, setTimeout, setInterval). (4) Check git history or comments for clues about past flakiness. (5) Based on findings, propose a fix (e.g., mocking timers with jest.useFakeTimers()).'"
+    }
+  ],
+  "security_rules_reference": [
+    {
+      "variant": "baseline",
+      "task": "security_sensitive_change",
+      "feedback": "The prompt should either (1) inline core security conventions (e.g., 'Scrub PII before any LLM processing; use regex patterns for emails, phones, and credit cards'), or (2) explicitly reference a security rules file with the instruction 'Review .claude/rules/security.md before implementation.' This grounds the task in established conventions."
+    }
+  ],
+  "input_validation": [
+    {
+      "variant": "baseline",
+      "task": "security_sensitive_change",
+      "feedback": "Add explicit instruction: 'Validate and sanitize context_documents at the route handler before passing to the scrubPII() utility. This prevents malformed or malicious input from reaching downstream processors.' Specify which route(s) accept context_documents and require validation there first."
+    }
+  ],
+  "no_secrets_in_commits": [
+    {
+      "variant": "baseline",
+      "task": "security_sensitive_change",
+      "feedback": "Add to the commit instructions: 'When committing, ensure test data contains only sanitized/synthetic PII (e.g., test@example.com, 555-0123). Never commit real customer data, API keys, or unencrypted credentials. Use .gitignore for .env files.' This prevents accidental secret leakage."
+    }
+  ],
+  "mentions_lint_test": [
+    {
+      "variant": "baseline",
+      "task": "bug_fix_includes_validation",
+      "feedback": "Specify exact commands: e.g., 'Run `npm run lint` and `npm run test` to verify the fix. For targeted testing, run `npm run test -- src/integrations/sqlite.test.js`'"
+    }
+  ],
+  "commit_format": [
+    {
+      "variant": "baseline",
+      "task": "bug_fix_includes_validation",
+      "feedback": "Specify format and example: 'Commit using conventional format: `fix(sqlite): return undefined instead of throwing on missing frame lookup` — include issue ID if applicable (e.g., `fix(sqlite): STA-142 return undefined on missing frame`)'"
+    }
+  ],
+  "bug_context": [
+    {
+      "variant": "baseline",
+      "task": "bug_fix_includes_validation",
+      "feedback": "Include the actual stack trace text in the prompt, or at minimum provide: file path (e.g., `src/integrations/sqlite/adapter.ts`), function name (e.g., `lookupFrameById`), and expected behavior (e.g., 'should return undefined for non-existent frame IDs'). Optionally include a minimal reproduction: 'To reproduce: delete a frame, then call adapter.lookupFrame(deletedId) — expect undefined, got TypeError.'"
+    }
+  ],
+  "implementation_guidance": [
+    {
+      "variant": "baseline",
+      "task": "feature_issue_guides_implementation",
+      "feedback": "Add explicit file anchors: 'Modify src/api/search.ts (or equivalent)' and 'Extend the existing search() method signature.' Include current schema snippet or instruction to read migration files first. Specify: is there an existing tags column, or should a junction table be created?"
+    }
+  ],
+  "test_requirements": [
+    {
+      "variant": "baseline",
+      "task": "feature_issue_guides_implementation",
+      "feedback": "Add: 'Write Jest tests in `tests/api/search.test.ts` using the project's dependency injection pattern (not global mocks). Include test cases for: (1) filtering by single tag, (2) multiple tags, (3) no matches, (4) empty tags array. Aim for ≥90% coverage of new code.'"
+    }
+  ],
+  "existing_patterns": [
+    {
+      "variant": "baseline",
+      "task": "feature_issue_guides_implementation",
+      "feedback": "Add as step 1a: 'Before implementing, read the existing search method in [file path] and any related filter implementations to understand current patterns for parameter handling, FTS5 setup, and test structure.'"
+    }
+  ],
+  "commit_conventions": [
+    {
+      "variant": "baseline",
+      "task": "feature_issue_guides_implementation",
+      "feedback": "Replace step 5 with: 'Commit your changes using conventional commit format: `feat(search): add tag filtering to frame search` or similar. Include the issue key STA-200 in the branch name: `feature/STA-200-tag-filtering`.'"
+    }
+  ],
+  "reads_prior_context": [
+    {
+      "variant": "baseline",
+      "task": "retry_context_handling",
+      "feedback": "Reorder instructions so that reading prior context is STEP 1, before any implementation work. Example: '1. Read .stackmemory/conductor-context.md and understand what was attempted in attempt 1. 2. Check git status to see what files were modified. 3. Then proceed with implementation.' This ensures the agent prioritizes context before acting."
+    }
+  ],
+  "avoids_repeating_mistakes": [
+    {
+      "variant": "baseline",
+      "task": "retry_context_handling",
+      "feedback": "Add explicit failure context: 'Attempt 1 failed because: [specific error/reason]. The issue was: [diagnosis]. Do not repeat this approach.' For example: 'Attempt 1 failed because the integrations key was not properly nested. Tests showed config validation rejected the structure. This time, validate the schema structure before running tests.'"
+    }
+  ],
+  "different_approach": [
+    {
+      "variant": "baseline",
+      "task": "retry_context_handling",
+      "feedback": "Add explicit guidance on a different approach. Example: 'This time, before implementing: (a) write a test case that validates the v3 schema structure, (b) manually verify the schema file exists and is readable, (c) print the current config structure to understand the migration path. Then implement.' Or suggest: 'If attempt 1 modified file X, try a different file structure. If attempt 1 used approach Y, use approach Z instead.'"
+    }
+  ],
+  "preserves_prior_work": [
+    {
+      "variant": "baseline",
+      "task": "retry_context_handling",
+      "feedback": "Add a step to check and preserve prior work: 'Before starting: Run `git status` and `git log --oneline -5` to see what branch you are on and what was already committed. If partial work exists, review it. If you are not on the correct branch, switch: `git checkout <branch-name>`. Do not discard prior work without reviewing it first.'"
+    }
+  ],
+  "commit_format_specified": [
+    {
+      "variant": "baseline",
+      "task": "commit_format_guidance",
+      "feedback": "The prompt should explicitly specify the commit format expected, e.g., 'Use conventional commits: feat(webhook): add rate limiting' or reference a defined standard. Generic 'descriptive message' guidance is insufficient for consistent commit practices."
+    }
+  ],
+  "includes_issue_id": [
+    {
+      "variant": "baseline",
+      "task": "commit_format_guidance",
+      "feedback": "The prompt must explicitly instruct the agent to reference the Linear issue ID in commit messages, e.g., 'Include STA-180 in your commit message' or 'Format: feat(webhook): add rate limiting — STA-180'. This ensures traceability between commits and issues."
+    }
+  ],
+  "atomic_commits": [
+    {
+      "variant": "baseline",
+      "task": "commit_format_guidance",
+      "feedback": "The prompt should guide atomic commit discipline. Add instruction like: 'Make separate atomic commits for: (1) implementation changes, (2) test additions, (3) documentation if substantial' or 'Keep commits focused to one logical unit for easier review and rollback.'"
+    }
+  ],
+  "branch_conventions": [
+    {
+      "variant": "baseline",
+      "task": "commit_format_guidance",
+      "feedback": "The prompt should explicitly specify the expected branch name, e.g., 'Create/use branch: feature/STA-180-rate-limit-webhook' or 'Branch name format: feature/<ISSUE-ID>-<slug>'. Do not rely on external context files for this critical detail."
+    }
+  ],
+  "graceful_without_description": [
+    {
+      "variant": "baseline",
+      "task": "no_description_handling",
+      "feedback": "Replace step 1 with conditional logic: if description exists, read it; if not, provide an explicit fallback instruction like 'No description provided. Use the issue title and priority as your primary context.'"
+    }
+  ],
+  "guides_codebase_search": [
+    {
+      "variant": "baseline",
+      "task": "no_description_handling",
+      "feedback": "Add an explicit step when description is missing: 'Search the codebase (grep, IDE search) for error messages and strings matching the issue title. Identify the typo candidate before implementing the fix.'"
+    }
+  ],
+  "minimal_input_useful": [
+    {
+      "variant": "baseline",
+      "task": "no_description_handling",
+      "feedback": "Modify step 2 for cases with no description: 'Based on the issue title and codebase search results, identify and fix the typo. Verify the change is correct by reviewing the error message in context.'"
+    }
+  ]
+}

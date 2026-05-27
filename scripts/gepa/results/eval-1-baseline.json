@@ -1,0 +1,882 @@
+{
+  "variant": "baseline",
+  "generation": 1,
+  "results": [
+    {
+      "taskId": "eval-001",
+      "taskName": "simple_function",
+      "weight": 1,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "has_function": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "handles_edge_cases": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "is_tested": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 15455,
+      "output": "```typescript\nfunction isPalindrome(s: string): boolean {\n  const cleaned = s.toLowerCase().replace(/[^a-z0-9]/g, '');\n  return cleaned === cleaned.split('').reverse().join('');\n}\n```\n"
+    },
+    {
+      "taskId": "eval-002",
+      "taskName": "refactor_code",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "uses_async": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "preserves_behavior": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_nested_callbacks": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 41210,
+      "output": "Please approve the write permission. Key changes:\n\n- `fetchUserData` becomes `async`, drops the `callback` param — errors propagate via rejected promises instead\n- 4 levels of nesting → 4 sequential `await` calls\n- Mock functions return `Promise.resolve(...)` instead of invoking `cb`\n- Callers use `try/catch` or `.catch()` for error handling\n"
+    },
+    {
+      "taskId": "eval-003",
+      "taskName": "fix_bug",
+      "weight": 1.2,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "bug_fixed": {
+          "passed": false,
+          "quote": "The fix is on line 6: `<=` → `<`.",
+          "reason": "The AI output describes a fix but does not show actual corrected code. It only mentions the change needed (operator swap) without providing the fixed code block or the complete corrected loop. To satisfy 'bug_fixed,' the output must contain the actual corrected code, not just a description of what should be changed.",
+          "feedback": "Provide the complete corrected code block showing the loop with the `<` operator in place, not just a description of the fix. For example, show the entire fixed loop with line numbers or context."
+        },
+        "no_new_bugs": {
+          "passed": true,
+          "quote": "`i <= items.length` iterates indices `0..3` for a 3-element array, hitting `items[3]` which is `undefined`, crashing on `.toUpperCase()`.",
+          "reason": "The suggested fix (changing `<=` to `<`) is mathematically sound and prevents out-of-bounds access. For a 3-element array with valid indices 0-2, using `i < items.length` correctly stops iteration before accessing index 3. This fix is minimal and introduces no new bugs.",
+          "feedback": ""
+        },
+        "explains_fix": {
+          "passed": true,
+          "quote": "`i <= items.length` iterates indices `0..3` for a 3-element array, hitting `items[3]` which is `undefined`, crashing on `.toUpperCase()`.",
+          "reason": "The output clearly explains the problem (the `<=` condition causes iteration beyond array bounds), identifies the consequence (accessing undefined and calling `.toUpperCase()` on it), and implies the solution (use `<` instead). The explanation traces cause to effect logically.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 37922,
+      "output": "The fix is on line 6: `<=` → `<`.\n\n`i <= items.length` iterates indices `0..3` for a 3-element array, hitting `items[3]` which is `undefined`, crashing on `.toUpperCase()`.\n\nPlease approve the edit to apply it.\n"
+    },
+    {
+      "taskId": "eval-004",
+      "taskName": "add_feature",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.5,
+      "criteria": {
+        "has_pagination": {
+          "passed": true,
+          "quote": "Response shape: `{ data: User[], pagination: { page, limit, total, totalPages } }`",
+          "reason": "The output explicitly describes a pagination object with page and totalPages fields, which constitutes pagination functionality.",
+          "feedback": ""
+        },
+        "has_limit": {
+          "passed": true,
+          "quote": "`?page=1&limit=20` query params (defaults: page=1, limit=20, max limit=100)",
+          "reason": "The output clearly specifies a limit parameter with a default value of 20 and maximum of 100.",
+          "feedback": ""
+        },
+        "has_offset": {
+          "passed": false,
+          "quote": "`?page=1&limit=20` query params (defaults: page=1, limit=20, max limit=100)",
+          "reason": "The output describes page-based pagination but does not mention offset. Page-based and offset-based pagination are different approaches. The criterion explicitly requires 'has_offset', which is not present in the described implementation. Offset is typically used as an alternative to page numbers for cursor-based or absolute position-based pagination.",
+          "feedback": "Either add an offset parameter to the query params (e.g., `?offset=0&limit=20`) or clarify that offset can be calculated from page (offset = (page - 1) * limit). The current implementation only supports page-based pagination, not offset-based pagination."
+        },
+        "backwards_compatible": {
+          "passed": false,
+          "quote": "`?page=1&limit=20` query params (defaults: page=1, limit=20, max limit=100)",
+          "reason": "The output does not explain how existing calls to the endpoint without pagination parameters will be handled. While defaults are mentioned, there is no assurance that old requests without `?page` and `?limit` parameters will continue to work as before, or confirmation that the response shape change (wrapping data in a `data` field) is backwards compatible with existing clients.",
+          "feedback": "Explicitly state how backwards compatibility is maintained. For example: confirm that requests without pagination parameters will default to page=1&limit=20, or describe a compatibility mode. Also clarify whether the response shape change (from direct array to `{ data: [], pagination: {} }`) breaks existing clients and if so, recommend versioning the endpoint (e.g., `/api/v2/endpoint`) or feature-flagging the change."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 34823,
+      "output": "It seems write permission wasn't granted. Please approve the edit to `api-endpoint.ts`, or let me know if you'd like a different approach.\n\nThe change adds:\n- `?page=1&limit=20` query params (defaults: page=1, limit=20, max limit=100)\n- Response shape: `{ data: User[], pagination: { page, limit, total, totalPages } }`\n"
+    },
+    {
+      "taskId": "eval-005",
+      "taskName": "code_review",
+      "weight": 1.3,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "identifies_security_issue": {
+          "passed": true,
+          "quote": "**1. SQL Injection (line 10) — CRITICAL**\n```diff\n- db.query('SELECT * FROM users WHERE email = $1', [email])\n+ db.query(`SELECT * FROM users WHERE email = '${email}'`)\n```\nParameterized queries removed.",
+          "reason": "The output explicitly identifies and labels five distinct security vulnerabilities (SQL injection, plaintext password storage, credential logging, forgeable tokens, missing cookie flags) with specific line numbers and code diffs. Each issue is correctly classified as a security problem with clear explanation of the attack vector.",
+          "feedback": ""
+        },
+        "identifies_performance_issue": {
+          "passed": false,
+          "quote": "",
+          "reason": "The output focuses entirely on security vulnerabilities and does not identify, analyze, or mention any performance-related issues (e.g., query inefficiency, N+1 problems, unnecessary computations, memory leaks, etc.). The task asks to identify issues broadly, and performance is a common category of code review concerns that should be addressed if present.",
+          "feedback": "If performance issues exist in the PR, they should be identified and explained. For example, check for: missing database indexes that could slow queries, N+1 query patterns, inefficient loops, or unnecessary database round-trips. If no performance issues exist, explicitly state that the review found no performance concerns."
+        },
+        "actionable_feedback": {
+          "passed": true,
+          "quote": "Parameterized queries removed. `email` is user-supplied input — direct interpolation allows full SQL injection. Revert to `$1` parameterization.",
+          "reason": "Each identified issue includes specific, actionable guidance: (1) SQL injection — revert to parameterization; (2) password hashing — use bcrypt.compare; (3) logging — remove the console.log; (4) tokens — use crypto.randomBytes + HMAC or JWT; (5) cookies — add httpOnly, secure, sameSite flags. The final summary provides a clear blocking recommendation with a specific action (full revert).",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 42610,
+      "output": "Critical issues — do not merge:\n\n**1. SQL Injection (line 10) — CRITICAL**\n```diff\n- db.query('SELECT * FROM users WHERE email = $1', [email])\n+ db.query(`SELECT * FROM users WHERE email = '${email}'`)\n```\nParameterized queries removed. `email` is user-supplied input — direct interpolation allows full SQL injection. Revert to `$1` parameterization.\n\n**2. Password stored/compared in plaintext (line 14) — CRITICAL**\n```diff\n- bcrypt.compare(password, user.passwordHash)\n+ password === user.passwordHash\n```\nBypasses bcrypt entirely. Either passwords are now stored plaintext, or this comparison always fails for legitimate bcrypt hashes. Either way, authentication is broken or insecure.\n\n**3. Credentials logged (line 22) — CRITICAL**\n```ts\nconsole.log(`Login: ${email} / ${password}`);\n```\nLogs plaintext passwords to stdout/log files. Immediate PII/secrets exposure. Must be removed.\n\n**4. Trivially forgeable session token (lines 18-19)**\n```ts\nconst token = email + ':' + Date.now();\nres.cookie('session', token);\n```\nToken is predictable (`email:timestamp`), not signed, not cryptographically random. Trivial to forge or enumerate. Use `crypto.randomBytes` + HMAC or a proper JWT library.\n\n**5. Cookie missing security flags**\n`res.cookie('session', token)` — no `httpOnly`, `secure`, or `sameSite` flags. Vulnerable to XSS cookie theft and CSRF.\n\n---\n\n**Summary:** This PR introduces SQL injection, removes password hashing, logs credentials in plaintext, and uses a forgeable session token. Block and request full revert.\n"
+    },
+    {
+      "taskId": "pa-001",
+      "taskName": "express_route_bug_fix",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.2,
+      "criteria": {
+        "reads_existing_code": {
+          "passed": false,
+          "quote": "Step 1 says \"read the issue description\" — not the source file. `src/routes/query.js` is named but not instructed to be read before editing.",
+          "reason": "The prompt lists 'Read the issue description carefully' as step 1, but does not explicitly instruct the agent to read src/routes/query.js or src/core/errors.js before making modifications. Naming a file is not the same as instructing the agent to study it first. An agent following this prompt could begin editing without understanding the existing structure, leading to hallucinated code or incompatible changes.",
+          "feedback": "Add explicit step: 'First, read src/routes/query.js and src/core/errors.js to understand the current route structure and error pattern.' Place this before the implementation steps."
+        },
+        "apperror_pattern": {
+          "passed": true,
+          "quote": "Use AppError from src/core/errors.js with ErrorCodes.VALIDATION.",
+          "reason": "The prompt explicitly names AppError, specifies the import path (src/core/errors.js), and identifies the correct error code (ErrorCodes.VALIDATION). This is sufficient guidance for an agent to locate and use the pattern correctly.",
+          "feedback": ""
+        },
+        "test_commands": {
+          "passed": false,
+          "quote": "Step 4 says \"run lint and tests\" but omits exact commands. Given `npm test` is long-running (background process required per CLAUDE.md), the omission matters.",
+          "reason": "The prompt uses vague language ('run lint and tests') without specifying the exact npm commands to execute. An agent may guess or use non-standard commands. Additionally, the prompt does not mention that npm test is long-running and requires special handling (background process), which per context is critical knowledge.",
+          "feedback": "Specify exact commands: 'Run: `npm run lint` then `npm test` (note: npm test is long-running; run it in the background or in a separate terminal).'"
+        },
+        "supertest_pattern": {
+          "passed": false,
+          "quote": "Step 3 is \"write or update tests as needed\" — no mention of Supertest, no `app` vs `server` distinction (a known footgun per CLAUDE.md).",
+          "reason": "The prompt instructs writing tests but provides zero guidance on the testing framework or pattern. It does not mention Supertest, does not clarify that the route requires passing `app` (not `server`), and does not explain how to instantiate the route for testing. This is a critical gap because the distinction between `app` and `server` is explicitly called out as a common failure mode.",
+          "feedback": "Add guidance: 'Write tests using Supertest. Pass the route factory an injected `app` object (not `server`). Example: `const route = createQueryRoute(deps); route(app);` then test with `request(app).get(...)`'"
+        },
+        "di_factory_pattern": {
+          "passed": false,
+          "quote": "Not mentioned at all.",
+          "reason": "The prompt makes no reference to the DI factory pattern (createRouter, dependency injection, factory functions, etc.). Since the task involves modifying a route file in a codebase that uses dependency injection, an agent unfamiliar with this pattern will either bypass DI entirely, write tests that fail to instantiate the route correctly, or require global mocks (which are forbidden). This is a complete gap.",
+          "feedback": "Add guidance: 'The route uses a createRouter(deps) factory pattern for dependency injection. When writing tests, instantiate the route by passing a mocked dependencies object to this factory, then attach it to the test app.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 42457,
+      "output": "**Prompt Evaluation: STA-600 Bug Fix**\n\n| Criterion | Pass? | Notes |\n|---|---|---|\n| Guide reading route file first | FAIL | Step 1 says \"read the issue description\" — not the source file. `src/routes/query.js` is named but not instructed to be read before editing. |\n| AppError pattern mentioned | PASS | Specifies `AppError` from `src/core/errors.js` + `ErrorCodes.VALIDATION` — sufficient. |\n| `npm run lint` + `npm test` commands | PARTIAL | Step 4 says \"run lint and tests\" but omits exact commands. Given `npm test` is long-running (background process required per CLAUDE.md), the omission matters. |\n| Supertest for route testing | FAIL | Step 3 is \"write or update tests as needed\" — no mention of Supertest, no `app` vs `server` distinction (a known footgun per CLAUDE.md). |\n| DI factory pattern for routes | FAIL | Not mentioned at all. Without this, an agent will likely write tests that bypass DI, either failing or requiring global mocks (explicitly forbidden). |\n\n**Summary:** 1.5/5 criteria met. The three gaps that will most likely cause agent failure:\n\n1. No instruction to read the file before editing → agent may hallucinate the existing structure\n2. No Supertest/`app` guidance → test boilerplate will be wrong\n3. No DI factory mention → tests won't match the route's actual constructor signature\n\n**Suggested additions:**\n```\n- Read src/routes/query.js and src/core/errors.js before making changes\n- Tests must use Supertest with `app` (not `server`); inject deps via the route factory\n- Run: `npm run lint` then `npm test` (run test in background — it's long-running)\n```\n"
+    },
+    {
+      "taskId": "pa-002",
+      "taskName": "jest_test_conventions",
+      "weight": 1.8,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "no_jest_globals_import": {
+          "passed": false,
+          "quote": "The prompt is a generic issue-to-task template that carries zero project-specific testing conventions.",
+          "reason": "The original prompt template contains no warnings or guidance against importing from @jest/globals. While the AI output's evaluation correctly identifies this as missing, the actual prompt given to the agent lacks this critical convention entirely. The agent would have no instruction to avoid @jest/globals and would likely import destructured test functions from it, causing redeclaration errors.",
+          "feedback": "The prompt template must explicitly state: 'Do NOT import from @jest/globals. Use the global jest object and global describe/it/expect instead.' Add this to the Instructions section before step 1."
+        },
+        "clear_all_mocks_warning": {
+          "passed": false,
+          "quote": "Set up mocks once and not reset them → flaky tests after `clearAllMocks()`",
+          "reason": "The original prompt contains no guidance about jest.clearAllMocks() behavior or the need to re-set mockReturnValue in beforeEach hooks. The AI output correctly identifies this omission, but the actual prompt template given to the agent provides zero warning about this critical mock lifecycle issue, leading to potentially flaky, order-dependent tests.",
+          "feedback": "Add to Instructions: 'In beforeEach hooks, re-set all mock return values after jest.clearAllMocks(), as clearAllMocks() wipes mockReturnValue but not the mock itself. Example: jest.clearAllMocks(); mockFn.mockReturnValue(defaultValue);'"
+        },
+        "eslint_catch_pattern": {
+          "passed": false,
+          "quote": "Write `catch (_err) {}` → ESLint failures that block the pre-commit hook",
+          "reason": "The original prompt template contains no ESLint rules or guidance on catch block patterns. The AI output correctly notes this will cause ESLint failures, but the actual prompt given to the agent says nothing about using `catch {}` instead of `catch (_err) {}`, so the agent would write code that fails linting validation.",
+          "feedback": "Add to Instructions: 'Use `catch {}` not `catch (_err) {}` per ESLint rules. Unused catch bindings must be omitted or will fail pre-commit validation.'"
+        },
+        "check_existing_patterns": {
+          "passed": false,
+          "quote": "Invent test structure instead of matching the repo's existing patterns",
+          "reason": "The original prompt template instruction #1 is 'Read the issue description carefully' but contains no directive to inspect existing test patterns in the repository's __tests__/ directory before writing new tests. This guarantees the agent will invent its own patterns rather than conform to repo conventions.",
+          "feedback": "Add to Instructions before step 2: 'First, review existing test files in src/**/__tests__/ to understand the project's test structure, naming conventions, assertion patterns, and mock setup style. Match those patterns when writing new tests.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 34636,
+      "output": "The prompt fails all four checks:\n\n| Convention | Present? |\n|---|---|\n| Do NOT import from `@jest/globals` (global `jest` only) | No |\n| `jest.clearAllMocks()` resets `mockReturnValue` — re-set in `beforeEach` | No |\n| Use `catch {}` not `catch (_err) {}` | No |\n| Check existing test patterns in `__tests__/` | No |\n\nThe prompt is a generic issue-to-task template that carries zero project-specific testing conventions. An agent following it verbatim will likely:\n\n1. Import `{ describe, it, expect }` from `@jest/globals` → redeclaration errors\n2. Set up mocks once and not reset them → flaky tests after `clearAllMocks()`\n3. Write `catch (_err) {}` → ESLint failures that block the pre-commit hook\n4. Invent test structure instead of matching the repo's existing patterns\n\n**Fix:** The prompt template (or the issue skill that generates it) needs to inject the Testing Rules and ESLint Rules sections from CLAUDE.md. Specifically add to the Instructions:\n\n```\nBefore writing tests:\n- Check existing patterns in src/**/__tests__/\n- Do NOT import from @jest/globals — use global jest/describe/it/expect\n- Re-set all mock return values in beforeEach (jest.clearAllMocks() wipes them)\n- Use catch {} not catch (_err) {} (ESLint rule)\n- Run tests in background: npm test is long-running\n```\n"
+    },
+    {
+      "taskId": "pa-003",
+      "taskName": "database_migration",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "migration_naming": {
+          "passed": false,
+          "quote": "Migration file naming pattern (`NNN_description.sql`) | **No** | No mention of naming convention or format",
+          "reason": "The AI output explicitly states that the migration naming pattern is not present in the prompt template. The task description does not specify that migrations should follow the `NNN_description.sql` format in the `src/db/migrations/` directory. Without this guidance, an agent would not know how to name the migration file correctly.",
+          "feedback": "The prompt template should include explicit instruction such as: 'Create a migration file in `src/db/migrations/` following the naming pattern `NNN_description.sql` (e.g., `001_add_prompt_version_to_queries.sql`) where NNN is a zero-padded sequential number.' This ensures the agent creates files in the correct location with the correct naming convention."
+        },
+        "check_latest_number": {
+          "passed": false,
+          "quote": "Check latest migration number | **No** | Agent has no guidance on how to sequence the file",
+          "reason": "The AI output identifies that the prompt provides no instruction to check existing migrations before numbering a new one. Without guidance to query the latest migration file or check the migrations directory, an agent could create a migration with a duplicate or incorrect sequence number, causing conflicts.",
+          "feedback": "The prompt should include a step such as: 'Before creating the migration file, check `src/db/migrations/` to determine the latest migration number, then increment it by one. For example, if the latest file is `005_some_change.sql`, create `006_add_prompt_version_to_queries.sql`.' This prevents numbering conflicts."
+        },
+        "nullable_column": {
+          "passed": true,
+          "quote": "Column should be nullable (existing rows won't have it) — correct intent, but framed as a feature requirement rather than an explicit migration convention rule",
+          "reason": "The task description does specify that the column should be nullable and explains the reason (existing rows won't have it). While the AI output notes this is framed as a feature requirement rather than an explicit migration convention, the nullable guidance is present in the text and would lead an agent to make the column nullable. This satisfies the criterion even if the framing could be improved.",
+          "feedback": ""
+        },
+        "auto_migration_startup": {
+          "passed": false,
+          "quote": "Auto-migration on startup | **No** | No mention that `npm run migrate` / startup applies migrations automatically",
+          "reason": "The prompt contains no guidance on how migrations are applied to the database. An agent might not understand whether to run migrations manually, via a command, or if they apply automatically. The lack of clarity could lead to the migration being created but never executed, or confusion about the deployment process.",
+          "feedback": "The prompt should clarify: 'Migrations in this repository are applied automatically on application startup. After creating the migration file, no manual execution is required; the system will detect and apply it when deployed. For local testing, you can manually run migrations with `npm run migrate` if needed.' This sets correct expectations about the migration lifecycle."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 52378,
+      "output": "Evaluating the prompt template against the five ProvenantAI migration convention criteria:\n\n| Convention | Present? | Notes |\n|---|---|---|\n| Migration file naming pattern (`NNN_description.sql`) | **No** | No mention of naming convention or format |\n| Check latest migration number | **No** | Agent has no guidance on how to sequence the file |\n| Nullable column for backwards compatibility | **Partial** | Description says \"Column should be nullable (existing rows won't have it)\" — correct intent, but framed as a feature requirement rather than an explicit migration convention rule |\n| Auto-migration on startup | **No** | No mention that `npm run migrate` / startup applies migrations automatically |\n| `postgres.railway.internal` only reachable from Railway | **No** | No warning; an agent attempting to run `migrate` locally would hit a connection failure with no context |\n\n**Summary:** 1/5 conventions covered (partially). The prompt is missing four pieces of procedural knowledge that would cause an agent to either produce a wrong migration file, fail silently on numbering, or block on a connection error during local verification. Recommend injecting a `## Migration Conventions` section before the instructions block covering all five points.\n"
+    },
+    {
+      "taskId": "pa-004",
+      "taskName": "recipe_template_addition",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "read_existing_templates": {
+          "passed": false,
+          "quote": "References `028_expanded_recipe_templates.sql` by name but doesn't instruct agent to **read it first** before writing",
+          "reason": "The AI output identifies that the prompt mentions the migration file by name, but notes this is only a reference, not an instruction. The original prompt says 'Follow the existing template pattern in src/db/migrations/028_expanded_recipe_templates.sql' which is passive guidance. The criterion requires the prompt to actively instruct reading existing templates first as a prerequisite step. The AI correctly flags this as 'Partial' because the prompt does not use imperative language like 'Read src/db/migrations/028_expanded_recipe_templates.sql first' or 'Before implementing, study the existing template structure.'",
+          "feedback": "The prompt should include an explicit step like 'Read src/db/migrations/028_expanded_recipe_templates.sql and identify the exact INSERT structure, field names, and JSON shape used in existing recipe templates before writing the new #035 template.' This ensures the agent understands the requirement is to study existing patterns before implementing, not just follow them implicitly."
+        },
+        "step_runner_stages": {
+          "passed": false,
+          "quote": "No mention of trigger → enrich → transform → output stage model",
+          "reason": "The original prompt states 'Steps: enrichment (LLM summarize + Clearbit company lookup), output to Slack channel' which describes only two stages informally. The criterion requires explicit reference to the step-runner pipeline model with its formal stages: input/trigger, enrichment, transformation, and output. The prompt does not mention 'step-runner', does not enumerate the pipeline stages formally, and does not clarify the order or structure of the steps JSON that the recipe service expects.",
+          "feedback": "The prompt should explicitly state: 'The recipe steps must follow the step-runner pipeline model: trigger (webhook input) → enrich (LLM + Clearbit) → transform (format data) → output (Slack channel). Each stage maps to a step in the steps JSON array with type and config fields.' This clarifies the expected structure and order."
+        },
+        "enrichment_cjs": {
+          "passed": false,
+          "quote": "Says 'LLM summarize + Clearbit lookup' but doesn't point to the enrichment service path or flag CJS requirement",
+          "reason": "The original prompt mentions 'enrichment (LLM summarize + Clearbit company lookup)' as a functional requirement but provides no guidance on how or where to implement it. The criterion requires the prompt to reference the enrichment service location and explicitly note that it is CommonJS (CJS) not ESM, meaning require() not import. The prompt lacks both the file path to the enrichment service and any module system guidance, which could lead the agent to use incorrect import syntax.",
+          "feedback": "Add: 'Enrichment is handled by the enrichment service at src/enrichment/service.js (CommonJS). Use require() syntax, not import statements. Ensure the agent knows to call the enrichment service's LLM and Clearbit lookup methods within the enrich step definition.'"
+        },
+        "recipe_service_path": {
+          "passed": false,
+          "quote": "Not referenced; agent may create ad-hoc structure",
+          "reason": "The original prompt does not mention src/recipes/service.js at all. The criterion requires explicit reference to this file as the location where recipe registration and lifecycle management occurs. Without this guidance, an agent might register the recipe template in the wrong file or structure, leading to the recipe not being discoverable or properly instantiated by the recipe service.",
+          "feedback": "The prompt should state: 'Register the recipe template in src/recipes/service.js. Ensure the template is exported from the recipe service and follows the service's registration pattern. Reference the service to understand how templates are loaded, validated, and made available to the pipeline.' This prevents ad-hoc implementation and ensures correct integration."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 51117,
+      "output": "The working directory only contains `CLAUDE.md` — no source files exist. I can only evaluate the prompt against what the issue states and general ProvenantAI/recipe pipeline conventions from the CLAUDE.md context.\n\n---\n\n**Evaluation: STA-615 prompt vs. ProvenantAI recipe conventions**\n\n| Check | Status | Notes |\n|---|---|---|\n| Guides reading existing template migrations first | Partial | References `028_expanded_recipe_templates.sql` by name but doesn't instruct agent to **read it first** before writing |\n| Mentions step-runner pipeline stages | Missing | No mention of trigger → enrich → transform → output stage model |\n| References enrichment service (CJS not ESM) | Missing | Says \"LLM summarize + Clearbit lookup\" but doesn't point to the enrichment service path or flag CJS requirement |\n| Mentions tier enforcement | Missing | No mention of checking/enforcing tier gates on recipe execution |\n| Specifies recipe service at `src/recipes/service.js` | Missing | Not referenced; agent may create ad-hoc structure |\n\n**Verdict: 1/5 checks pass.** The prompt is underspecified for an agent working in this codebase.\n\n---\n\n**Recommended additions to the prompt:**\n\n```\n## Before implementing\n1. Read src/db/migrations/028_expanded_recipe_templates.sql to match the exact INSERT shape and field conventions.\n2. Read src/recipes/service.js — all recipe registration goes through this service.\n\n## Implementation requirements\n- Step-runner pipeline stages: trigger → enrich → transform → output (in that order in the steps JSON)\n- Enrichment service is CJS (`require()`), not ESM — do not use `import`\n- Add tier enforcement: check `recipe.tier_required` against `org.tier` before enqueueing\n- Template number is #035; ensure no collision with existing IDs in the migration\n```\n"
+    },
+    {
+      "taskId": "pa-005",
+      "taskName": "stripe_integration_change",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "no_hardcoded_stripe_ids": {
+          "passed": false,
+          "quote": "Use the v2 product IDs from Railway env vars",
+          "reason": "The prompt mentions using env vars but does not explicitly warn against hardcoding. A strict interpretation of 'warn against' requires an explicit cautionary statement (e.g., 'Do not hardcode', 'Never embed', 'Avoid putting directly in code'). The current phrasing is instructive but not a warning.",
+          "feedback": "Add explicit warning language: 'Do NOT hardcode Stripe product IDs directly in code — always reference them from Railway environment variables (e.g., process.env.STRIPE_PRODUCT_STARTER_V2). Hardcoding breaks portability and increases security risk.'"
+        },
+        "v2_products": {
+          "passed": true,
+          "quote": "existing Stripe products (Starter/Growth/Scale)\" and \"Use the v2 product IDs from Railway env vars\"",
+          "reason": "The prompt explicitly names all three v2 product tiers (Starter, Growth, Scale) and references 'v2 product IDs' in the same sentence. This clearly satisfies the criterion that v2 product tier names must be present.",
+          "feedback": ""
+        },
+        "check_billing_routes": {
+          "passed": false,
+          "quote": "Update the billing routes to handle annual subscription creation",
+          "reason": "The prompt says 'Update the billing routes' but does not instruct the agent to read or check existing billing route patterns first. The verb 'Update' implies modification without the prerequisite step of understanding the current implementation. A strict reading of 'guide checking' requires an explicit instruction to inspect before modifying.",
+          "feedback": "Revise to: 'Review the existing billing routes (check for subscription creation patterns, payment method handling, and error handling). Then update the routes to support annual subscription creation while maintaining consistency with existing patterns.'"
+        },
+        "test_vs_live_keys": {
+          "passed": false,
+          "quote": "",
+          "reason": "The entire prompt contains no mention of test mode, live keys, test key prefixes (sk_test_ vs sk_live_), or any warning about key safety in development. This criterion is completely absent from the output.",
+          "feedback": "Add test/live key safeguard: 'Before testing, verify that STRIPE_SECRET_KEY is a test-mode key (begins with sk_test_). Never use live keys (sk_live_) in development or staging environments. If testing webhook handlers, use the X-Test-Mode: true header to avoid charging real cards.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 28189,
+      "output": "Evaluating the prompt against ProvenantAI billing conventions:\n\n| Check | Present? | Notes |\n|-------|----------|-------|\n| Warn against hardcoding Stripe product IDs (use env vars) | Partial | Says \"Use the v2 product IDs from Railway env vars\" — mentions env vars but doesn't explicitly *warn* against hardcoding |\n| Mentions v2 products (Starter/Growth/Scale) | Yes | \"existing Stripe products (Starter/Growth/Scale)\" + \"v2 product IDs\" both present |\n| Guide checking existing billing routes | Weak | Says \"Update the billing routes\" but doesn't say *read/check them first* before modifying |\n| Test mode vs live keys warning | No | Not mentioned at all |\n| Clerk webhook creates tenant + seeds CoA | No | Not mentioned |\n\n**Verdict: 2/5 fully met, 2/5 partial/weak, 1/5 missing entirely.**\n\nGaps to fix in the template:\n1. Add explicit warning: \"Do not hardcode product IDs — reference only from `process.env`\"\n2. Instruct agent to read existing billing routes before modifying\n3. Add test/live key warning: \"Verify `STRIPE_SECRET_KEY` is a test key (`sk_test_...`) before running; never use live keys in dev\"\n4. Document Clerk webhook behavior: \"The Clerk `user.created` webhook handler is responsible for creating the tenant record and seeding the Chart of Accounts — do not duplicate this logic in billing routes\"\n"
+    },
+    {
+      "taskId": "pa-006",
+      "taskName": "auth_middleware_handling",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "auth_middleware_reference": {
+          "passed": false,
+          "quote": "Names `authenticateAny` middleware but gives no file path",
+          "reason": "The prompt mentions 'authenticateAny middleware' in the description but does not reference the specific file path 'src/auth/auth.middleware.js'. An AI agent would need to discover this location independently, creating risk of using the wrong middleware file or location.",
+          "feedback": "The prompt should explicitly state: 'Use the authenticateAny middleware from src/auth/auth.middleware.js to protect this endpoint.' This removes ambiguity and ensures the agent applies the correct middleware from the correct file."
+        },
+        "three_auth_modes": {
+          "passed": false,
+          "quote": "Lists Clerk + API key; test mode omitted",
+          "reason": "The prompt specifies 'must work with both Clerk auth and API key auth (authenticateAny middleware)' but completely omits test mode as a third authentication path. For a high-priority auth feature, failing to mention test mode creates a security gap: the agent may not implement proper guards to prevent test-mode requests from rotating production keys.",
+          "feedback": "The prompt should explicitly state: 'Support all three authentication modes: Clerk JWT, API key auth, and test mode. Ensure test mode requests are rejected or handled with appropriate restrictions to prevent test credentials from affecting production key rotation.'"
+        },
+        "tenant_isolation": {
+          "passed": false,
+          "quote": "Says 'for the authenticated tenant' — implies it but never says `tenant_id` scoping explicitly",
+          "reason": "The phrase 'for the authenticated tenant' is vague and uses implicit language. An agent might interpret this as scoping by user_id or might assume the user object carries tenant context without explicit verification. Multi-tenant isolation requires explicit, unambiguous guidance on filtering: 'scope all DB queries by tenant_id.'",
+          "feedback": "The prompt should explicitly state: 'Scope all database operations by tenant_id. Retrieve the tenant_id from the authenticated request context and use it as the primary filter when querying and updating API keys. Never scope by user_id alone.' This removes ambiguity and prevents accidental cross-tenant key exposure."
+        },
+        "credential_encryption": {
+          "passed": false,
+          "quote": "Not mentioned at all",
+          "reason": "The prompt contains zero mention of encryption, KMS, or credential storage security. When generating a new API key, the agent must know how to store it safely. Without explicit guidance on AES-256-GCM encryption, the agent will likely store the key in plaintext or with an inadequate cipher, violating security best practices for credential storage.",
+          "feedback": "The prompt should explicitly state: 'Encrypt the new API key at rest using AES-256-GCM before persisting to the database. Use the KMS module to handle encryption/decryption. Never store API keys in plaintext.' This ensures the agent implements cryptographically sound credential storage."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 44146,
+      "output": "The repo has no source files — only `CLAUDE.md`. Evaluating the prompt text directly against the four criteria:\n\n| Convention | Present? | Notes |\n|---|---|---|\n| `src/auth/auth.middleware.js` reference | **No** | Names `authenticateAny` middleware but gives no file path |\n| Three auth modes (Clerk + API key + **test mode**) | **Partial** | Lists Clerk + API key; test mode omitted |\n| Multi-tenant isolation (`scope by tenant_id`) | **Partial** | Says \"for the authenticated tenant\" — implies it but never says `tenant_id` scoping explicitly |\n| AES-256-GCM for credential encryption | **No** | Not mentioned at all |\n\n**Verdict: fails 2 checks outright, 2 partial.**\n\nThe prompt is thin on operational specifics an agent would need to implement this safely:\n- No file path → agent must discover the middleware location itself, risking wrong file\n- Test mode gap → agent may not guard the rotate-key endpoint against test-mode bypass\n- Implicit tenancy → agent may filter by user ID instead of tenant ID\n- No encryption guidance → new key likely stored plaintext or with a weaker scheme\n\nFor a high-priority auth feature, these gaps are meaningful. The prompt should add:\n- `Use authenticateAny from src/auth/auth.middleware.js`\n- `All three modes must be handled: Clerk JWT, API key, and test mode`\n- `Scope all DB operations by tenant_id, never by user_id alone`\n- `Encrypt the new key at rest using AES-256-GCM before persisting`\n"
+    },
+    {
+      "taskId": "pa-007",
+      "taskName": "dashboard_component",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "vite_base_path": {
+          "passed": false,
+          "quote": "Vite `base='/app/'` + `BrowserRouter basename` | **NO** | Not mentioned",
+          "reason": "The AI output explicitly states that Vite base='/app/' and BrowserRouter basename configuration is not mentioned anywhere in the prompt template. The evaluation table confirms this convention is absent.",
+          "feedback": "The prompt should include explicit instructions: 'Ensure vite.config.js maintains base: \"/app/\" and BrowserRouter is configured with basename=\"/app\"' to preserve routing consistency in the dashboard application."
+        },
+        "design_system": {
+          "passed": false,
+          "quote": "Design system (`docs/STYLE.md`) | **NO** | Not referenced",
+          "reason": "The AI output clearly identifies that the design system documentation is not referenced in the prompt. No mention of docs/STYLE.md or docs/CONTROL_PLANE_STYLE.md appears in the template.",
+          "feedback": "The prompt should reference the design system by adding: 'Follow component patterns and styling conventions in docs/STYLE.md when implementing the bar chart component.'"
+        },
+        "build_command": {
+          "passed": false,
+          "quote": "Build command: `cd dashboard-app && npx vite build` | **NO** | Prompt says nothing about build",
+          "reason": "The AI output notes that the prompt template contains no build command specification. The instructions section lists generic steps (lint, tests, commit) but omit the dashboard-specific Vite build command.",
+          "feedback": "Add to the Instructions section: 'Build the dashboard with: cd dashboard-app && npx vite build' to ensure developers use the correct build process for this Vite-based application."
+        },
+        "product_gating": {
+          "passed": false,
+          "quote": "Product-gating (CMO/CFO/COO) | **Partial** | Mentions COO dashboard page, but gives no gating instructions",
+          "reason": "While the prompt mentions 'COO dashboard page', it provides no guidance on how to handle product-gating rules or role-based access control. The mention is merely a location reference, not an instruction about gating mechanics or role checks.",
+          "feedback": "The prompt should include: 'The COO dashboard is product-gated. Verify that the feature flag and role-based access control for COO-level users are preserved and tested before deployment.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 39683,
+      "output": "The repo only has `CLAUDE.md` — no `dashboard-app/`, no `docs/STYLE.md`, no vite config, no router setup, no product-gating code to inspect.\n\n**Evaluation result — 4 convention checks:**\n\n| Convention | Present in prompt? | Notes |\n|---|---|---|\n| Vite `base='/app/'` + `BrowserRouter basename` | **NO** | Not mentioned |\n| Design system (`docs/STYLE.md`) | **NO** | Not referenced |\n| Build command: `cd dashboard-app && npx vite build` | **NO** | Prompt says nothing about build |\n| Product-gating (CMO/CFO/COO) | **Partial** | Mentions COO dashboard page, but gives no gating instructions |\n\n**Verdict: 0/4 conventions met** (COO is named but only as a location, not as a gating concern).\n\nThe prompt template is missing all four ProvenantAI dashboard conventions. A corrected version should add:\n- `vite.config.js` must keep `base: '/app/'` and `BrowserRouter` must use `basename=\"/app\"`\n- Reference `docs/STYLE.md` for component/design patterns\n- Specify build with `cd dashboard-app && npx vite build`\n- Note that the COO dashboard is product-gated and the feature flag/role check must be preserved\n"
+    },
+    {
+      "taskId": "pa-008",
+      "taskName": "llm_adapter_change",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "model_tiers": {
+          "passed": false,
+          "quote": "Not mentioned; relevant when adding budget checks since thresholds likely differ by tier",
+          "reason": "The AI output correctly identifies that model tiers (fast/balanced/deep) are absent from the prompt. The evaluation notes this is a gap, but the original prompt being evaluated does not reference tiers at all. Since the criterion asks whether the prompt should reference this system, and it demonstrably does not, this fails.",
+          "feedback": "The prompt should explicitly instruct: 'Check the tenant's model tier (fast/balanced/deep) before comparing token usage against budget thresholds, as budget limits and cost multipliers vary by tier.' This ensures the agent considers tier-specific budget rules."
+        },
+        "anthropic_native": {
+          "passed": false,
+          "quote": "No mention of Anthropic SDK or native adapter shape",
+          "reason": "The original prompt makes no mention of Anthropic-native patterns, the Anthropic SDK, or whether the adapter is Anthropic-specific vs. multi-provider. The evaluation correctly flags this absence. Without this context, the agent may implement generic logging without conforming to Anthropic-specific conventions.",
+          "feedback": "The prompt should state: 'This adapter uses Anthropic-native SDK patterns. Ensure token usage recording follows the Anthropic Messages API shape (input_tokens, output_tokens) before checking budget thresholds.' This grounds the implementation in the correct SDK."
+        },
+        "read_adapter_first": {
+          "passed": false,
+          "quote": "Says 'LLM adapter at src/llm/adapter.js records usage' but doesn't explicitly instruct *read first*",
+          "reason": "The original prompt references src/llm/adapter.js as the location to add the check, but does not instruct the agent to read and understand the existing adapter code structure first. The evaluation correctly identifies this as 'Partial' — the file is mentioned but not with a directive to study it beforehand.",
+          "feedback": "The prompt should include as step 0: 'Before implementing, read src/llm/adapter.js to understand the current usage recording pattern, hook points, and token field names. This ensures the budget check integrates cleanly without duplicating logic.'"
+        },
+        "trace_logger": {
+          "passed": false,
+          "quote": "Says 'warning log' — unspecified logger; trace-logger pattern missing",
+          "reason": "The original prompt uses generic 'warning log' language and does not mention trace-logger for structured observability. The evaluation correctly notes that the logger is unspecified and structured observability pattern is missing. This is a clear absence from the prompt.",
+          "feedback": "The prompt should specify: 'Use trace-logger to emit structured alerts with fields: {tenant_id, model_tier, tokens_used, budget_threshold, exceeded_by}. This ensures observability integrates with ProvenantAI's centralized tracing system rather than ad-hoc logging.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 45192,
+      "output": "This is a prompt evaluation task — no codebase to inspect. Evaluating the prompt purely against the stated conventions:\n\n---\n\n**STA-635 Prompt Evaluation**\n\n| Convention | Present? | Notes |\n|---|---|---|\n| Model tiers (fast/balanced/deep) | **No** | Not mentioned; relevant when adding budget checks since thresholds likely differ by tier |\n| Anthropic-native adapter pattern | **No** | No mention of Anthropic SDK or native adapter shape |\n| Read `src/llm/adapter.js` first | **Partial** | Says \"LLM adapter at src/llm/adapter.js records usage\" but doesn't explicitly instruct *read first* |\n| trace-logger for structured observability | **No** | Says \"warning log\" — unspecified logger; trace-logger pattern missing |\n| Cost estimation pattern | **No** | No mention of how to compute cost from tokens (model-rate table, token→$ formula, etc.) |\n\n---\n\n**Summary:** 1/5 conventions covered (partially). The prompt tells the agent *where* to add the check but not *how* to do it in conformance with ProvenantAI patterns. Key gaps:\n\n- Should specify: emit via `trace-logger` with structured fields (tenant_id, model, tokens, budget, tier)\n- Should specify: check tier before comparing budget (fast/balanced/deep have different rate multipliers)\n- Should instruct: read `src/llm/adapter.js` and the cost-estimation utility before writing\n- Should reference: Anthropic-native adapter shape if this runs on Claude models\n"
+    },
+    {
+      "taskId": "pa-009",
+      "taskName": "integration_connector",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.5,
+      "criteria": {
+        "pipedream_connect": {
+          "passed": true,
+          "quote": "Use Pipedream Connect for OAuth (src/integrations/pipedream/pipedream-connect.js)",
+          "reason": "The prompt explicitly references Pipedream Connect as the OAuth mechanism and provides the exact file path. This directly satisfies the criterion that the prompt should reference Pipedream Connect for managed OAuth.",
+          "feedback": ""
+        },
+        "existing_connector_patterns": {
+          "passed": true,
+          "quote": "Follow the pattern of existing connectors (Stripe, Salesforce, QuickBooks)",
+          "reason": "The prompt instructs the agent to follow existing connector patterns and names three concrete examples (Stripe, Salesforce, QuickBooks). This satisfies the criterion that the prompt should instruct reading existing connector implementations.",
+          "feedback": ""
+        },
+        "fixture_pattern": {
+          "passed": false,
+          "quote": "",
+          "reason": "The prompt contains no mention of src/__fixtures__/ or test fixture data patterns. The instruction 'Write or update tests as needed' is generic and does not reference the specific fixture convention. The AI output's own evaluation correctly identifies this gap.",
+          "feedback": "Add explicit guidance to the prompt: 'Use test fixtures from src/__fixtures__/ (follow existing connector fixture patterns for mock HubSpot data)' to ensure the agent creates fixtures in the correct location rather than using inline mocks."
+        },
+        "integration_test_path": {
+          "passed": false,
+          "quote": "",
+          "reason": "The prompt says 'Write or update tests as needed' but does not specify the test path convention of src/integrations/. Without this guidance, the agent may place tests in root-level __tests__/ directories or other non-standard locations.",
+          "feedback": "Add specific test path guidance to the prompt: 'Place integration tests in src/integrations/ following the naming pattern of existing connectors (e.g., hubspot.integration.test.js)' to enforce path consistency."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 39607,
+      "output": "The repo only has `CLAUDE.md` — no source files to verify against. Evaluating based on the prompt template alone:\n\n---\n\n**Evaluation: STA-640 prompt vs ProvenantAI integration conventions**\n\n| Convention | Present? | Notes |\n|---|---|---|\n| Pipedream Connect for managed OAuth | ✅ | Explicitly cites `src/integrations/pipedream/pipedream-connect.js` |\n| Read existing connector patterns (Stripe/SF/QB) | ✅ | \"Follow the pattern of existing connectors (Stripe, Salesforce, QuickBooks)\" |\n| Fixture pattern at `src/__fixtures__/` | ❌ | Not mentioned |\n| Integration test path `src/integrations/` | ❌ | Says \"Write or update tests\" but doesn't specify where |\n\n**Missing from the prompt:**\n1. No mention of `src/__fixtures__/` for test fixture data — agent may write inline mocks instead\n2. No explicit test path guidance — agent may place tests in wrong location (e.g. `__tests__/` root vs `src/integrations/`)\n\n**Verdict:** Partially compliant. Core OAuth and pattern-following conventions are covered, but fixture and test path conventions are absent. Add these two lines to the instructions:\n\n```\n5. Use fixture data from src/__fixtures__/ (add HubSpot fixtures there)\n6. Place integration tests under src/integrations/ following the existing connector test naming pattern\n```\n"
+    },
+    {
+      "taskId": "pa-010",
+      "taskName": "webhook_handler",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "hmac_verification": {
+          "passed": true,
+          "quote": "Verify HMAC-SHA256 signature before the idempotency check",
+          "reason": "The prompt explicitly instructs verification of HMAC-SHA256 signature and specifies the correct ordering (before idempotency check). This directly addresses the criterion requirement.",
+          "feedback": ""
+        },
+        "webhook_signature_module": {
+          "passed": false,
+          "quote": "",
+          "reason": "The prompt mentions 'Verify HMAC-SHA256 signature' as a requirement but does not reference the existing webhook-signature.js module. Without this reference, the agent is likely to implement signature verification from scratch rather than reuse the existing module, violating DRY principles and potentially introducing inconsistencies.",
+          "feedback": "Add explicit instruction: 'Use the webhook-signature.js module to verify HMAC-SHA256 signatures' or 'Import and use src/recipes/webhook-signature.js for signature verification.' This prevents reimplementation and ensures consistency with existing security patterns."
+        },
+        "parameterized_queries": {
+          "passed": false,
+          "quote": "",
+          "reason": "The prompt instructs the agent to 'check the webhook_idempotency table' and work with the migration, but contains no explicit guidance on using parameterized queries or avoiding string interpolation. This is a critical security gap when inserting webhook data into the database.",
+          "feedback": "Add explicit security instruction: 'Use parameterized queries (e.g., $1, $2 placeholders) for all database operations. Do not use string interpolation or template literals when constructing SQL queries to prevent SQL injection attacks.' This ensures data from untrusted webhook sources is safely escaped."
+        },
+        "service_registry": {
+          "passed": false,
+          "quote": "",
+          "reason": "The prompt does not mention the service registry singleton pattern. Without this guidance, the agent may instantiate a new database client connection directly in the route handler instead of retrieving it from the service registry, violating the singleton contract and creating resource leaks.",
+          "feedback": "Add instruction: 'Retrieve the database client from the service registry singleton rather than instantiating a new connection. Use the existing service registry pattern to access database and configuration services.' This ensures proper resource management and maintains architectural consistency."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 24361,
+      "output": "**Evaluation: ProvenantAI Webhook Conventions**\n\n| Check | Present | Notes |\n|---|---|---|\n| HMAC-SHA256 signature verification | ✅ | \"Verify HMAC-SHA256 signature before the idempotency check\" |\n| `webhook-signature.js` module reference | ❌ | Not mentioned — agent may reimplement from scratch |\n| Instruct reading idempotency migration | ❌ | Says \"use migration 066\" but doesn't say to read it first |\n| Parameterized queries for DB access | ❌ | No mention — SQL injection risk |\n| Service registry singleton pattern | ❌ | Not mentioned — agent may instantiate services ad-hoc |\n\n**Score: 1/5**\n\nThe prompt correctly orders signature verification before idempotency, but is missing four conventions:\n\n1. **`webhook-signature.js`** — without this, the agent will likely write its own HMAC verification instead of reusing the existing module.\n2. **Read migration before writing** — agent needs to see the actual table schema (column names, constraints) to write correct queries.\n3. **Parameterized queries** — critical gap; DB writes from webhook data without this is a direct injection vector.\n4. **Service registry** — agent will probably `new` a db client directly instead of pulling from the registry, breaking the singleton contract.\n"
+    },
+    {
+      "taskId": "pa-011",
+      "taskName": "context_graph_feature",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "ctx_schema": {
+          "passed": false,
+          "quote": "Mentions \"conflicting content\" and \"nodes\" generically, but never names the schema tables",
+          "reason": "The AI output explicitly states that ctx_nodes/ctx_edges schema references are absent from the prompt. The prompt template only says 'find ctx_nodes with conflicting content' without specifying table structure, column names, or embedding field details. An implementer would lack critical schema knowledge.",
+          "feedback": "The prompt should explicitly list the ctx_nodes schema (id, tenant_id, entity_id, content, embedding, created_at) and ctx_edges schema (id, tenant_id, src_id, dst_id, rel_type). Include example column references so the implementer knows what fields are available for the contradiction_score calculation."
+        },
+        "tenant_scoping": {
+          "passed": false,
+          "quote": "No mention of multi-tenant isolation — critical for a SaaS context graph",
+          "reason": "The prompt contains zero reference to tenant_id scoping or multi-tenant isolation. The instruction 'find ctx_nodes with conflicting content' does not enforce or mention that all queries must be scoped by tenant_id. This is a severe security gap; an agent could write queries that leak data across tenants.",
+          "feedback": "Add an explicit instruction: 'All queries MUST scope by tenant_id. Never query ctx_nodes without WHERE tenant_id = $1. Ensure the function signature accepts tenant_id as a parameter.' This should be highlighted as a non-negotiable constraint."
+        },
+        "existing_service": {
+          "passed": true,
+          "quote": "Instructs reading existing `graph-query.js` | Yes | \"Read the issue description carefully\" + the stub is named explicitly",
+          "reason": "The prompt template includes 'Read the issue description carefully' and explicitly names the stub location as 'src/ctx/graph-query.js'. This satisfies the instruction to read the existing service, though it is somewhat implicit rather than explicit.",
+          "feedback": ""
+        },
+        "graph_service_wrapper": {
+          "passed": false,
+          "quote": "Not mentioned; agents may bypass it and write raw queries",
+          "reason": "The prompt makes no reference to the GraphService wrapper at src/graph/service.ts. Without this guidance, an implementer may write direct database queries or use an incorrect abstraction layer, breaking architectural conventions. The prompt is silent on how to access the graph data layer.",
+          "feedback": "Add explicit instruction: 'Use the GraphService wrapper at src/graph/service.ts for all database access. Do not write raw SQL queries. Review how existing query functions in graph-query.js invoke GraphService to understand the pattern.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 45718,
+      "output": "The repo only contains `CLAUDE.md` — no actual source files exist. Evaluating purely against the prompt template:\n\n**Evaluation: 2/4 conventions missing**\n\n| Convention | Present? | Notes |\n|---|---|---|\n| References `ctx_nodes`/`ctx_edges` schema | No | Mentions \"conflicting content\" and \"nodes\" generically, but never names the schema tables |\n| `tenant_id` scoping | No | No mention of multi-tenant isolation — critical for a SaaS context graph |\n| Instructs reading existing `graph-query.js` | Yes | \"Read the issue description carefully\" + the stub is named explicitly |\n| References `GraphService` wrapper at `src/graph/service.ts` | No | Not mentioned; agents may bypass it and write raw queries |\n\n**Verdict: Fails ProvenantAI conventions.** The prompt is missing 3 of 4 checks:\n\n1. **`ctx_nodes`/`ctx_edges` schema** — absent. An agent implementing `getContradictions()` without schema knowledge may invent column names.\n2. **`tenant_id` scoping** — absent. This is the most dangerous gap; contradiction queries without tenant isolation would leak cross-tenant data.\n3. **`GraphService` wrapper** — absent. Agents will likely write direct DB queries instead of going through the established abstraction layer.\n\n**Recommended additions to the issue instructions:**\n```\n- Schema: ctx_nodes (id, tenant_id, entity_id, content, embedding, created_at), ctx_edges (id, tenant_id, src_id, dst_id, rel_type)\n- All queries MUST scope by tenant_id — never query ctx_nodes without a WHERE tenant_id = $1 clause\n- Use the GraphService wrapper at src/graph/service.ts for DB access, not raw queries\n- Read src/ctx/graph-query.js fully before implementing — note existing query patterns\n```\n"
+    },
+    {
+      "taskId": "pa-012",
+      "taskName": "e2e_test_addition",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "playwright_projects": {
+          "passed": false,
+          "quote": "Prompt says \"API project (not browser)\" but never cites the actual config project names",
+          "reason": "The AI output explicitly notes that while the prompt mentions 'API project (not browser)', it does not reference the specific Playwright config project names: 'api', 'business', or 'chromium'. The prompt uses generic language instead of the concrete project identifiers needed to run tests with `--project=api`.",
+          "feedback": "The prompt template should explicitly state: 'Target the \"api\" Playwright project (defined in playwright.config.ts)' or 'Use the api project from Playwright config projects array (api, business, chromium)' to ensure the generated spec targets the correct project."
+        },
+        "existing_e2e_patterns": {
+          "passed": false,
+          "quote": "References `e2e/fixtures/test-fixtures.ts` but doesn't say to read other specs for patterns",
+          "reason": "The prompt mentions using 'the existing E2E fixtures pattern' but does not instruct the AI to read existing E2E spec files for implementation patterns, naming conventions, or import structure. This is partial compliance at best—fixture reference alone is insufficient guidance.",
+          "feedback": "Add explicit instruction: 'Read existing specs in e2e/specs/ to match their import style, fixture usage, and test structure before writing the new spec.' This ensures pattern consistency across the test suite."
+        },
+        "test_mode_header": {
+          "passed": false,
+          "quote": "`X-Test-Mode` header for test auth | **No** | Not mentioned at all",
+          "reason": "The AI output confirms the prompt contains zero mention of the `X-Test-Mode: true` header. The prompt does not instruct on how to authenticate API requests during E2E tests, leaving room for hardcoded credentials or missing auth entirely.",
+          "feedback": "Add to prompt: 'Authenticate API requests using the X-Test-Mode: true header (not real credentials or tokens)' to ensure test requests are properly authenticated without leaking credentials."
+        },
+        "e2e_api_command": {
+          "passed": false,
+          "quote": "`npm run e2e:api` for API tests | **No** | No run command specified",
+          "reason": "The prompt provides no instruction on which npm script to use to run E2E API tests. Without specifying `npm run e2e:api`, the generated spec will lack context for how it should be executed in CI/CD or locally.",
+          "feedback": "Add instruction: 'Run API E2E tests locally with: npm run e2e:api' to clarify the execution command and ensure developers know how to validate the spec."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 38150,
+      "output": "The repo has no E2E files yet. Evaluating the prompt against the four stated conventions:\n\n---\n\n**Evaluation: ProvenantAI E2E Convention Compliance**\n\n| Check | Present? | Notes |\n|---|---|---|\n| Playwright config project names (`api`, `business`, `chromium`) | **No** | Prompt says \"API project (not browser)\" but never cites the actual config project names |\n| Instructs reading existing E2E specs | **Partial** | References `e2e/fixtures/test-fixtures.ts` but doesn't say to read other specs for patterns |\n| `X-Test-Mode` header for test auth | **No** | Not mentioned at all |\n| `npm run e2e:api` for API tests | **No** | No run command specified |\n\n---\n\n**Verdict: Fails 3 of 4 checks.**\n\nThe prompt will likely produce a spec that:\n- Hardcodes auth tokens instead of using `X-Test-Mode`\n- Won't be runnable via the correct script\n- Won't reference the right Playwright project name, breaking `--project=api` filtering\n\n**Suggested additions to the prompt template:**\n\n```\n- Run API E2E tests with: npm run e2e:api\n- Authenticate using the X-Test-Mode: true header (not real credentials)\n- Target the \"api\" Playwright project (see playwright.config.ts projects array)\n- Read existing specs in e2e/specs/ before writing — match their import and fixture style\n```\n"
+    },
+    {
+      "taskId": "pa-013",
+      "taskName": "observability_addition",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "trace_logger_reference": {
+          "passed": false,
+          "quote": "Mentions \"trace-logger spans\" but never points to the utility file path",
+          "reason": "The prompt says 'Add trace-logger spans' in prose but does not explicitly reference the file path src/utils/trace-logger.js. The evaluator correctly identifies that the prompt omits the canonical utility path, which means an agent would need to discover or invent the correct import path rather than having it provided.",
+          "feedback": "The prompt should explicitly state: 'Use the trace-logger utility at src/utils/trace-logger.js to wrap step execution.' This removes ambiguity and ensures agents use the correct module."
+        },
+        "trace_span_pattern": {
+          "passed": false,
+          "quote": "No code example or usage pattern shown",
+          "reason": "The prompt describes what metadata to capture (step name, duration, success/failure, token counts) but provides zero code example demonstrating the actual traceLogger.traceSpan(name, metadata) API. An agent must guess the correct method signature and parameter structure instead of following a demonstrated pattern.",
+          "feedback": "Include a concrete code example such as: `traceLogger.traceSpan('executeStep', { stepName, duration, success, inputTokens, outputTokens }, async () => { /* step logic */ })` to show the exact pattern agents should replicate."
+        },
+        "no_pii_logging": {
+          "passed": false,
+          "quote": "Not mentioned anywhere",
+          "reason": "The prompt lists metadata fields to capture but contains zero warning or instruction about PII avoidance. Given that recipe steps may process user data, emails, API keys, or sensitive model outputs, the absence of a PII constraint means agents may log dangerous information into traces.",
+          "feedback": "Add a section: 'Do NOT log PII or sensitive data (email addresses, API tokens, credit card numbers, user content) in span metadata. Only log sanitized step identifiers and aggregate metrics.' This aligns with ProvenantAI observability conventions."
+        },
+        "structured_metadata": {
+          "passed": false,
+          "quote": "Lists `step name, duration, success/failure, input/output token counts` — these are structured fields, but no schema/format guidance is given",
+          "reason": "The prompt mentions specific fields but does not define their types, required vs. optional status, or expected value formats. For example, is duration in milliseconds or seconds? Is success a boolean? Are token counts integers? Without a schema, agents may create inconsistent or incompatible metadata structures.",
+          "feedback": "Specify a structured metadata schema, e.g.: `{ stepName: string, duration: number (ms), success: boolean, inputTokens: number | null, outputTokens: number | null, error?: string }` so all spans conform to a consistent format for downstream analysis."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 41829,
+      "output": "The project has no source files — only a `CLAUDE.md`. Evaluating the prompt against the four criteria based solely on what the prompt contains:\n\n| Criterion | Present? | Notes |\n|---|---|---|\n| References `src/utils/trace-logger.js` | **No** | Mentions \"trace-logger spans\" but never points to the utility file path |\n| Shows `traceSpan` pattern | **No** | No code example or usage pattern shown |\n| Instructs not to log PII | **No** | Not mentioned anywhere |\n| Mentions structured spans with metadata | **Partial** | Lists `step name, duration, success/failure, input/output token counts` — these are structured fields, but no schema/format guidance is given |\n\n**Verdict: Fails ProvenantAI observability conventions on 3 of 4 criteria.**\n\nThe prompt tells an agent *what* to add but not *how* — no utility path, no pattern reference, no PII constraint, and only loosely implied structure. An agent following this prompt would likely invent its own tracing approach rather than using the canonical `traceSpan` pattern.\n"
+    },
+    {
+      "taskId": "pa-014",
+      "taskName": "no_description_provenantai",
+      "weight": 1.8,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "guides_file_search": {
+          "passed": false,
+          "quote": "Step 1 (\"Read the issue description carefully\") assumes a description exists — there isn't one. An agent following this would have nothing to act on and no hint to search for scheduler-related test files.",
+          "reason": "The prompt contains generic steps (1-5) with no instruction to search the codebase for scheduler test files. Step 1 directs reading a missing description rather than falling back to filename discovery. The prompt provides zero guidance on where to find `test/unit/scheduler.test.js`.",
+          "feedback": "Add a codebase discovery step: 'Search the repository for test files matching the issue title (e.g., grep -r \"scheduler\" test/ to locate the flaky test). Start by reading test/unit/scheduler.test.js to understand the test structure.'"
+        },
+        "understand_flakiness": {
+          "passed": false,
+          "quote": "Steps 2–4 are generic scaffolding (\"implement changes\", \"write tests\", \"run lint\"). No instruction to read the existing test, understand its structure, or diagnose *why* it's flaky.",
+          "reason": "The prompt offers boilerplate steps without directing the agent to analyze the root cause. It says 'Implement the requested changes' without identifying what makes the test flaky (e.g., timer dependencies, race conditions, non-deterministic ordering). There is no instruction to examine the test code and identify the non-determinism pattern.",
+          "feedback": "Add a diagnostic step: 'Read the test file carefully and identify sources of flakiness: look for setTimeout, setInterval, Date, or other time-dependent behavior. Flaky scheduler tests often fail due to timing assumptions. Document what you find before proposing a fix.'"
+        },
+        "graceful_degradation": {
+          "passed": false,
+          "quote": "This is the most critical gap. The prompt actively points to a missing resource (\"Read the issue description carefully\") without a fallback.",
+          "reason": "The prompt assumes a description exists and directs the agent to read it. When no description is present, the agent hits a dead end at Step 1. There is no fallback logic, conditional path, or recovery instruction. The template fails to degrade gracefully—it actively blocks progress.",
+          "feedback": "Restructure Step 1 with conditional logic: 'IF the issue description is empty: infer from the title (\"Fix flaky scheduler test\") and search the codebase for scheduler test files. IF a description exists: read it first. In either case, examine the test file to understand what's flaky before implementing changes.'"
+        },
+        "codebase_context": {
+          "passed": false,
+          "quote": "A robust template would: Detect/acknowledge the missing description. Fall back to title-based inference (\"Fix flaky scheduler test\" → search for scheduler tests). Enumerate discovery steps: grep for test files, read them, identify non-determinism.",
+          "reason": "The prompt does not instruct the agent to gather context from the codebase when the description is missing. It does not mention searching for files, reading test implementations, or extracting domain knowledge from the code itself. The AI output notes this gap but the original prompt contains no such guidance.",
+          "feedback": "Add explicit context-gathering instructions: 'When description is missing, gather context from the codebase: (1) Search for test files with names containing \"scheduler\". (2) Read the test code to identify what is being tested. (3) Look for timer-related code (jest.useFakeTimers, setTimeout, setInterval). (4) Check git history or comments for clues about past flakiness. (5) Based on findings, propose a fix (e.g., mocking timers with jest.useFakeTimers()).'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 39715,
+      "output": "## Prompt Evaluation: STA-670 \"Fix flaky scheduler test\"\n\nEvaluating against the four criteria:\n\n---\n\n### 1. Guides searching for `test/unit/scheduler.test.js`\n**Fails.** The prompt has no file discovery guidance. Step 1 (\"Read the issue description carefully\") assumes a description exists — there isn't one. An agent following this would have nothing to act on and no hint to search for scheduler-related test files.\n\n### 2. Instructs reading the test to understand timer-dependent flakiness\n**Fails.** Steps 2–4 are generic scaffolding (\"implement changes\", \"write tests\", \"run lint\"). No instruction to read the existing test, understand its structure, or diagnose *why* it's flaky. A competent agent would need to infer this entirely on its own.\n\n### 3. Mentions `jest.useFakeTimers()` as a fix\n**Fails.** Zero technical content. No mention of timer mocking, fake timers, `Date`, `setTimeout`, or any scheduler-specific patterns. The prompt is domain-agnostic and provides no fix hints even though the issue title strongly implies a timer problem.\n\n### 4. Degrades gracefully without a description\n**Fails.** This is the most critical gap. The prompt actively points to a missing resource (\"Read the issue description carefully\") without a fallback. A robust template would:\n- Detect/acknowledge the missing description\n- Fall back to title-based inference (\"Fix flaky scheduler test\" → search for scheduler tests)\n- Enumerate discovery steps: grep for test files, read them, identify non-determinism\n\n---\n\n### Summary\n\n| Criterion | Result |\n|---|---|\n| Guides file search | No |\n| Instructs reading test | No |\n| Suggests `useFakeTimers()` | No |\n| Graceful degradation | No — actively fails |\n\n**Overall: 0/4.** The template is a boilerplate stub that assumes a populated description. It provides no signal for an agent to make progress on an empty issue. A minimal improvement would add: a description-missing branch that instructs the agent to (1) search for files matching the issue title,"
+    },
+    {
+      "taskId": "pa-015",
+      "taskName": "security_sensitive_change",
+      "weight": 2,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "security_rules_reference": {
+          "passed": false,
+          "quote": "Reference `.claude/rules/security.md` | **No** | File doesn't exist in repo; prompt doesn't mention it",
+          "reason": "The evaluation correctly identifies that the prompt does not reference security rules or conventions. While the prompt mentions 'security requirement,' it provides no reference to `.claude/rules/security.md` or any security guidelines document. The evaluator further notes this file doesn't exist, which is a secondary concern, but the primary issue is the prompt itself fails to establish a security convention baseline.",
+          "feedback": "The prompt should either (1) inline core security conventions (e.g., 'Scrub PII before any LLM processing; use regex patterns for emails, phones, and credit cards'), or (2) explicitly reference a security rules file with the instruction 'Review .claude/rules/security.md before implementation.' This grounds the task in established conventions."
+        },
+        "input_validation": {
+          "passed": false,
+          "quote": "Input validation at route boundary | **No** | No mention of validating context_documents at API entry point",
+          "reason": "The prompt describes scrubbing PII from the text field but does not mandate validation at the route/API boundary. It only instructs to 'scrub PII from context_documents before sending to LLM adapter,' which is post-receipt behavior, not boundary validation. A strict security prompt should enforce validation where documents first enter the system.",
+          "feedback": "Add explicit instruction: 'Validate and sanitize context_documents at the route handler before passing to the scrubPII() utility. This prevents malformed or malicious input from reaching downstream processors.' Specify which route(s) accept context_documents and require validation there first."
+        },
+        "no_secrets_in_commits": {
+          "passed": false,
+          "quote": "Warn against committing secrets | **No** | No reminder to avoid committing test PII data or API keys",
+          "reason": "The prompt's commit instruction ('Commit your changes with a descriptive message') contains no guidance about avoiding secrets. Since this task involves PII scrubbing, test data will likely contain synthetic or real PII patterns—the prompt should explicitly forbid committing these or any API keys to version control.",
+          "feedback": "Add to the commit instructions: 'When committing, ensure test data contains only sanitized/synthetic PII (e.g., test@example.com, 555-0123). Never commit real customer data, API keys, or unencrypted credentials. Use .gitignore for .env files.' This prevents accidental secret leakage."
+        },
+        "pii_scrubbing_guidance": {
+          "passed": true,
+          "quote": "Implement the requested changes... scrub PII (emails, phone numbers, credit card numbers) from the text field. Add a scrubPII() utility.",
+          "reason": "The prompt explicitly identifies three PII categories to scrub: emails, phone numbers, and credit card numbers. It names the utility (scrubPII()) and specifies the target field (text field of context_documents). This provides concrete, actionable guidance on what patterns must be handled.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 31698,
+      "output": "Evaluation against ProvenantAI security conventions:\n\n| Convention | Present in prompt? | Notes |\n|---|---|---|\n| Reference `.claude/rules/security.md` | **No** | File doesn't exist in repo; prompt doesn't mention it |\n| Input validation at route boundary | **No** | No mention of validating context_documents at API entry point |\n| Parameterized queries | **No** | Not relevant to this task (PII scrubbing is in-memory), but not mentioned |\n| Warn against committing secrets | **No** | No reminder to avoid committing test PII data or API keys |\n| AES-256-GCM for credentials | **No** | Not mentioned; prompt only covers scrubbing, not encryption of stored data |\n\n**Additional findings:**\n\n1. `.claude/rules/security.md` does not exist in this repo — the prompt references a non-existent security rule file, which is a red flag for prompt reliability.\n2. `src/auth/auth.middleware.js` also does not exist — the cited source file is missing, so the tenant context reference is fabricated or stale.\n3. The prompt does correctly identify this as a \"security requirement\" and scopes the task to PII categories (emails, phones, CCNs), but lacks enforcement guidance.\n\n**Verdict:** The prompt fails 5/5 ProvenantAI security convention checks. The two file references (`security.md`, `auth.middleware.js`) are both broken, undermining the prompt's credibility as a security-enforcing template. A compliant prompt should inline the security rules (or verify they exist), mandate input validation at the route boundary before any LLM dispatch, and specify encryption standards for any PII that must be stored rather than scrubbed.\n"
+    },
+    {
+      "taskId": "cond-001",
+      "taskName": "bug_fix_includes_validation",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "mentions_lint_test": {
+          "passed": false,
+          "quote": "Run lint and tests to verify",
+          "reason": "The prompt mentions running lint and tests as a step, but provides no actual commands (e.g., `npm run lint`, `npm run test`), no specification of which test framework to use, and no guidance on targeting specific tests for this bug. An agent would need to guess the command syntax.",
+          "feedback": "Specify exact commands: e.g., 'Run `npm run lint` and `npm run test` to verify the fix. For targeted testing, run `npm run test -- src/integrations/sqlite.test.js`'"
+        },
+        "commit_format": {
+          "passed": false,
+          "quote": "Commit your changes with a descriptive message",
+          "reason": "The prompt only says 'descriptive message' with no format specification. It does not mention conventional commit format (type(scope): message), no example is given, and no scope guidance for this particular issue is provided.",
+          "feedback": "Specify format and example: 'Commit using conventional format: `fix(sqlite): return undefined instead of throwing on missing frame lookup` — include issue ID if applicable (e.g., `fix(sqlite): STA-142 return undefined on missing frame`)'"
+        },
+        "bug_context": {
+          "passed": false,
+          "quote": "When a frame is deleted and then looked up by ID, the sqlite adapter throws an unhandled null reference instead of returning undefined. Stack trace attached.",
+          "reason": "The description provides the symptom (throws null reference) and trigger (frame deleted, then looked up), but the critical stack trace is claimed to be 'attached' but is not actually included in the prompt. Without the stack trace, the agent cannot locate the exact file, function, or line number where the error occurs, making it difficult to identify and fix the root cause.",
+          "feedback": "Include the actual stack trace text in the prompt, or at minimum provide: file path (e.g., `src/integrations/sqlite/adapter.ts`), function name (e.g., `lookupFrameById`), and expected behavior (e.g., 'should return undefined for non-existent frame IDs'). Optionally include a minimal reproduction: 'To reproduce: delete a frame, then call adapter.lookupFrame(deletedId) — expect undefined, got TypeError.'"
+        },
+        "validation_step": {
+          "passed": true,
+          "quote": "Run lint and tests to verify",
+          "reason": "The prompt includes step 4 'Run lint and tests to verify' which explicitly calls for a validation step after implementation. Although the commands are not specific, the validation step is mentioned as a required part of the workflow.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 29185,
+      "output": "## Prompt Evaluation: STA-142\n\n### Present\n\n| Criterion | Status | Notes |\n|---|---|---|\n| Lint/test commands | Partial | Generic \"run lint and tests\" — no actual commands |\n| Commit format guidance | Partial | \"descriptive message\" only — no format spec |\n| Error handling expectations | Missing | No mention of return-undefined-over-throw pattern |\n| Bug reproduction context | Partial | Describes symptom + trigger, but no stack trace actually attached |\n\n### Missing / Weak\n\n**1. Lint/test commands** — Says \"run lint and tests\" but doesn't specify:\n- `npm run lint` / `npm run test`\n- Jest SWC setup or DI mock requirements\n- Whether to run full suite or targeted test file\n\n**2. Commit format** — Says \"descriptive message\" but the repo requires:\n- `fix(scope): message` format\n- No `Co-Authored-By` lines\n\n**3. Error handling** — Critical for this specific bug: the fix is almost certainly `return undefined` instead of throwing, but the prompt doesn't say:\n- Expected behavior when frame not found (undefined vs null vs throw)\n- The project convention: return undefined over throw\n\n**4. Stack trace** — \"Stack trace attached\" but nothing is actually included. Agent has no idea which file/function throws, what the call path is, or whether the adapter is in `src/integrations/` or `src/core/`.\n\n**5. No file/location hint** — \"sqlite adapter\" could be anywhere. No path like `src/integrations/sqlite/` or function name.\n\n### Recommendation\n\nMinimum additions:\n```\n- Stack trace (actual text, not \"attached\")\n- File path of the throwing code\n- Expected return value: `undefined` when frame not found\n- Commands: `npm run lint && npm run test`\n- Commit format: `fix(frames): return undefined on missing frame lookup`\n```\n"
+    },
+    {
+      "taskId": "cond-002",
+      "taskName": "feature_issue_guides_implementation",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.2,
+      "criteria": {
+        "implementation_guidance": {
+          "passed": false,
+          "quote": "Mentions `tags: string[]` and FTS5 hint, but no file paths, no existing search method to extend, no schema info",
+          "reason": "The prompt states 'Implement the requested changes' and mentions a `tags` parameter and FTS5, but provides no concrete file locations, no reference to where the search method currently lives, no schema context (is there a frames table? where are tags stored?), and no guidance on extending vs. creating new code. An agent would need to explore the codebase to discover these basics, wasting tokens and risking wrong architectural decisions.",
+          "feedback": "Add explicit file anchors: 'Modify src/api/search.ts (or equivalent)' and 'Extend the existing search() method signature.' Include current schema snippet or instruction to read migration files first. Specify: is there an existing tags column, or should a junction table be created?"
+        },
+        "test_requirements": {
+          "passed": false,
+          "quote": "'Write or update tests as needed' — no framework, no coverage expectations, no DI/supertest conventions",
+          "reason": "The prompt includes step 4 'Run lint and tests to verify' and step 3 'Write or update tests as needed,' which acknowledge testing but provide zero specifics. No test framework is named, no file location guidance is given, no convention is enforced (Jest vs. Vitest, global mocks vs. dependency injection), and no coverage threshold is set. An agent could write tests that fail CI due to style/DI violations.",
+          "feedback": "Add: 'Write Jest tests in `tests/api/search.test.ts` using the project's dependency injection pattern (not global mocks). Include test cases for: (1) filtering by single tag, (2) multiple tags, (3) no matches, (4) empty tags array. Aim for ≥90% coverage of new code.'"
+        },
+        "existing_patterns": {
+          "passed": false,
+          "quote": "No instruction to read the current search implementation first",
+          "reason": "The prompt contains no directive to inspect existing code before writing. Step 1 says 'Read the issue description carefully' but does not say 'Read the current search implementation' or 'Check how other filters (e.g., date range) are implemented.' The evaluation notes that 'CLAUDE.md requires reading before writing, but the prompt doesn't reinforce this,' meaning an agent could skip this step and reinvent patterns or violate conventions.",
+          "feedback": "Add as step 1a: 'Before implementing, read the existing search method in [file path] and any related filter implementations to understand current patterns for parameter handling, FTS5 setup, and test structure.'"
+        },
+        "code_quality": {
+          "passed": true,
+          "quote": "Step 4 'Run lint and tests to verify'",
+          "reason": "The prompt explicitly includes step 4 'Run lint and tests to verify,' which mandates checking code quality and linting before completion. This is sufficient minimal guidance for code quality—it tells the agent to validate against the project's lint rules.",
+          "feedback": ""
+        },
+        "commit_conventions": {
+          "passed": false,
+          "quote": "Step 5 says 'descriptive message' but doesn't enforce `type(scope): message` from CLAUDE.md",
+          "reason": "Step 5 instructs 'Commit your changes with a descriptive message,' which is vague. It does not reference or enforce any commit convention (e.g., conventional commits format like `feat(search): add tag filtering`). The evaluation correctly notes that CLAUDE.md likely specifies a convention that is not restated here, so an agent following only this prompt could write `git commit -m 'fixed stuff'` and pass the prompt's requirement.",
+          "feedback": "Replace step 5 with: 'Commit your changes using conventional commit format: `feat(search): add tag filtering to frame search` or similar. Include the issue key STA-200 in the branch name: `feature/STA-200-tag-filtering`.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 33956,
+      "output": "**Evaluation of STA-200 prompt**\n\n| Criterion | Rating | Notes |\n|-----------|--------|-------|\n| Implementation guidance | Weak | Mentions `tags: string[]` and FTS5 hint, but no file paths, no existing search method to extend, no schema info |\n| Test requirements | Minimal | \"Write or update tests as needed\" — no framework, no coverage expectations, no DI/supertest conventions |\n| Code quality expectations | Missing | No style, complexity, or error-handling guidance |\n| Commit conventions | Partial | Step 5 says \"descriptive message\" but doesn't enforce `type(scope): message` from CLAUDE.md |\n| Check existing patterns | Missing | No instruction to read the current search implementation first |\n\n**Key gaps:**\n\n1. **No file anchors** — agent must guess where search lives (`src/api`? `src/features`?). Will likely waste tokens exploring.\n2. **No schema context** — tags stored where? Column on frames table? Junction table? FTS5 virtual table? Agent may invent a schema.\n3. **No \"read first\" gate** — the project CLAUDE.md requires reading before writing, but the prompt doesn't reinforce this, so an agent following only the prompt may write without reading.\n4. **Test conventions omitted** — Jest+SWC, DI over global mocks, `app` not `server` for supertest — none of this is in the prompt. Agent will likely write wrong tests.\n5. **No branch name** — CLAUDE.md requires `feature/` prefix; prompt doesn't mention it.\n6. **\"Use FTS5\"** is a bare directive with no context — is FTS5 already set up? New virtual table needed? This will either cause hallucination or unnecessary scaffolding.\n\n**Verdict:** Adequate for orientation, insufficient for reliable execution. An agent following this prompt alone has ~40% chance of writing tests that violate project conventions and a high chance of inventing schema rather than extending existing patterns.\n\n**Suggested additions:**\n- Point to the existing search file(s) explicitly\n- Include current `frames` table schema (or tell agent to read migr"
+    },
+    {
+      "taskId": "cond-003",
+      "taskName": "retry_context_handling",
+      "weight": 2,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "reads_prior_context": {
+          "passed": false,
+          "quote": "Check .stackmemory/conductor-context.md for context from prior attempts.",
+          "reason": "The prompt mentions the context file exists, but it's buried in the preamble as a passive suggestion ('Check...'), not as an explicit first step. The actual numbered instructions (1-5) do not include 'Read prior context' as step 1. A strict evaluation requires that reading prior context be mandatory and sequenced first, not optional or subordinate to other tasks.",
+          "feedback": "Reorder instructions so that reading prior context is STEP 1, before any implementation work. Example: '1. Read .stackmemory/conductor-context.md and understand what was attempted in attempt 1. 2. Check git status to see what files were modified. 3. Then proceed with implementation.' This ensures the agent prioritizes context before acting."
+        },
+        "avoids_repeating_mistakes": {
+          "passed": false,
+          "quote": "This is attempt 2. Check .stackmemory/conductor-context.md for context from prior attempts.",
+          "reason": "The prompt identifies that this is attempt 2 but provides zero explanation of what failed. It does not state: the error message, the test/lint failure, which step broke, or what the specific problem was. Without explicit failure diagnosis, the agent cannot understand what mistake to avoid. It must infer everything from an external file that may be incomplete or unavailable.",
+          "feedback": "Add explicit failure context: 'Attempt 1 failed because: [specific error/reason]. The issue was: [diagnosis]. Do not repeat this approach.' For example: 'Attempt 1 failed because the integrations key was not properly nested. Tests showed config validation rejected the structure. This time, validate the schema structure before running tests.'"
+        },
+        "different_approach": {
+          "passed": false,
+          "quote": "1. Read the issue description carefully\n2. Implement the requested changes\n3. Write or update tests as needed\n4. Run lint and tests to verify\n5. Commit your changes with a descriptive message",
+          "reason": "Steps 1-5 are generic and identical to what a first-attempt prompt would contain. There is no conditional logic, no mention of trying an alternative method, no suggestion to validate assumptions differently, no instruction to debug or verify intermediate steps differently. The agent will mechanically repeat the same process that failed.",
+          "feedback": "Add explicit guidance on a different approach. Example: 'This time, before implementing: (a) write a test case that validates the v3 schema structure, (b) manually verify the schema file exists and is readable, (c) print the current config structure to understand the migration path. Then implement.' Or suggest: 'If attempt 1 modified file X, try a different file structure. If attempt 1 used approach Y, use approach Z instead.'"
+        },
+        "preserves_prior_work": {
+          "passed": false,
+          "quote": "Work in the current directory. All changes will be on a dedicated branch.",
+          "reason": "The prompt states changes are on a 'dedicated branch' but does not instruct the agent to check: (1) what branch is currently checked out, (2) whether files were already partially modified, (3) whether commits were already made, (4) whether to reset, merge, or continue from the prior branch state. Without explicit state-checking instructions, the agent may create duplicate work, overwrite changes, or create conflicting branches.",
+          "feedback": "Add a step to check and preserve prior work: 'Before starting: Run `git status` and `git log --oneline -5` to see what branch you are on and what was already committed. If partial work exists, review it. If you are not on the correct branch, switch: `git checkout <branch-name>`. Do not discard prior work without reviewing it first.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 34174,
+      "output": "This retry prompt has several gaps that weaken its effectiveness for attempt 2:\n\n**What it does right:**\n- References prior context at `.stackmemory/conductor-context.md`\n- Labels it as \"attempt 2\"\n\n**What's missing / weak:**\n\n| Criteria | Assessment |\n|---|---|\n| Read prior context first | Mentioned but not enforced — buried in description, not step 1 |\n| Explains what went wrong | Missing entirely — no failure reason, error output, or diagnosis |\n| Suggests different approach | No — steps 1-5 are identical to a first attempt |\n| What was already tried | Fully delegated to external file, not summarized inline |\n\n**Specific problems:**\n\n1. **No failure signal** — \"attempt 2\" with no explanation. Did lint fail? Tests fail? Was a file missing? The agent has to infer from a file it may not be able to read.\n\n2. **Context file not guaranteed** — If `.stackmemory/conductor-context.md` wasn't written or is stale, the agent gets zero additional signal.\n\n3. **Step ordering is wrong** — Reading prior context should be **step 1**, not a parenthetical in the preamble. The agent may skip it.\n\n4. **No state awareness** — Was a branch already created? Were files already modified? The agent might duplicate work or conflict with partial changes.\n\n**Recommended improvements:**\n\n```\nThis is attempt 2. Attempt 1 failed because: <actual error/reason here>.\n\nBEFORE writing any code:\n1. Read .stackmemory/conductor-context.md\n2. Check git status and git log --oneline -5 to see what was already committed\n3. Do NOT repeat the same approach that failed\n\nWhat to try differently: <specific guidance based on failure>\n```\n\n**Verdict:** The prompt is minimally better than a first attempt. It will likely result in the same failure unless `.stackmemory/conductor-context.md` contains good diagnostic context AND the agent reads it carefully.\n"
+    },
+    {
+      "taskId": "cond-004",
+      "taskName": "commit_format_guidance",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "commit_format_specified": {
+          "passed": false,
+          "quote": "Only says \"descriptive message\"",
+          "reason": "The AI output explicitly states that the prompt contains no commit message format specification. The prompt only instructs to 'Commit your changes with a descriptive message' without defining any structure like type(scope): message.",
+          "feedback": "The prompt should explicitly specify the commit format expected, e.g., 'Use conventional commits: feat(webhook): add rate limiting' or reference a defined standard. Generic 'descriptive message' guidance is insufficient for consistent commit practices."
+        },
+        "includes_issue_id": {
+          "passed": false,
+          "quote": "Linear issue ID in commit | No | `STA-180` not referenced in commit instructions",
+          "reason": "The AI output clearly identifies that while the issue ID (STA-180) appears in the problem statement, the commit instructions do not explicitly tell the agent to include it in the commit message. The prompt says 'Commit your changes' but never mentions linking back to the issue.",
+          "feedback": "The prompt must explicitly instruct the agent to reference the Linear issue ID in commit messages, e.g., 'Include STA-180 in your commit message' or 'Format: feat(webhook): add rate limiting — STA-180'. This ensures traceability between commits and issues."
+        },
+        "atomic_commits": {
+          "passed": false,
+          "quote": "Atomic commits | No | No mention of one commit per logical change",
+          "reason": "The AI output documents that the prompt contains no guidance on atomic commits. The prompt instruction to 'Run lint and tests to verify / Commit your changes' suggests a single commit at the end, with no mention of breaking work into focused, logical units.",
+          "feedback": "The prompt should guide atomic commit discipline. Add instruction like: 'Make separate atomic commits for: (1) implementation changes, (2) test additions, (3) documentation if substantial' or 'Keep commits focused to one logical unit for easier review and rollback.'"
+        },
+        "branch_conventions": {
+          "passed": false,
+          "quote": "Branch naming convention | No | Says \"dedicated branch\" but no `feature/STA-180-...` pattern",
+          "reason": "The AI output confirms the prompt says 'All changes will be on a dedicated branch' but provides zero specifics about naming. Without explicit branch naming convention in the prompt itself, the agent must infer from external context (CLAUDE.md), which violates self-contained guidance.",
+          "feedback": "The prompt should explicitly specify the expected branch name, e.g., 'Create/use branch: feature/STA-180-rate-limit-webhook' or 'Branch name format: feature/<ISSUE-ID>-<slug>'. Do not rely on external context files for this critical detail."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 22841,
+      "output": "The prompt provides minimal commit guidance. Here's the gap analysis:\n\n| Criterion | Present? | Notes |\n|---|---|---|\n| Commit message format (`type(scope): message`) | No | Only says \"descriptive message\" |\n| Linear issue ID in commit | No | `STA-180` not referenced in commit instructions |\n| Atomic commits | No | No mention of one commit per logical change |\n| Branch naming convention | No | Says \"dedicated branch\" but no `feature/STA-180-...` pattern |\n\nThe project `CLAUDE.md` at `/private/tmp/gepa-eval-xfnzEY/CLAUDE.md` does define these conventions, so an agent with that context loaded *might* follow them — but the prompt itself gives no commit guidance beyond \"make a descriptive commit.\"\n\n**Missing specifics the prompt should include:**\n\n```\n- Branch: feature/STA-180-rate-limit-webhook\n- Commit format: feat(webhook): add rate limiting — STA-180\n- One atomic commit per logical unit (implementation, tests separate if substantial)\n- Do NOT add Co-Authored-By lines\n```\n\n**Verdict:** Inadequate. The prompt relies entirely on the agent inferring conventions from `CLAUDE.md`. A robust prompt should be self-contained for commit guidance, especially the issue ID linkage (not derivable from conventions alone) and atomic commit discipline.\n"
+    },
+    {
+      "taskId": "cond-005",
+      "taskName": "no_description_handling",
+      "weight": 1.8,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "graceful_without_description": {
+          "passed": false,
+          "quote": "Step 1 says \"Read the issue description carefully\" — but there is no description. The instruction is not just useless, it's misleading.",
+          "reason": "The prompt template includes 'Read the issue description carefully' as step 1, but the issue has no description field populated. An agent following this instruction literally will fail or hallucinate. The template does not degrade gracefully—it actively gives contradictory instructions.",
+          "feedback": "Replace step 1 with conditional logic: if description exists, read it; if not, provide an explicit fallback instruction like 'No description provided. Use the issue title and priority as your primary context.'"
+        },
+        "guides_codebase_search": {
+          "passed": false,
+          "quote": "The title 'Fix typo in error message' is the only signal. The agent needs to grep for error strings, find candidates, and identify the typo — but the prompt provides zero guidance to do that.",
+          "reason": "When description is absent, the agent must infer the task from the title alone. The prompt does not instruct the agent to search the codebase for error messages matching the title context. This is a critical gap—without explicit guidance, an agent will not know to search systematically for error strings.",
+          "feedback": "Add an explicit step when description is missing: 'Search the codebase (grep, IDE search) for error messages and strings matching the issue title. Identify the typo candidate before implementing the fix.'"
+        },
+        "handles_empty_labels": {
+          "passed": true,
+          "quote": "Labels: [blank line] ... 'Labels: ' with a trailing space is cosmetically awkward but functionally harmless.",
+          "reason": "The empty labels field renders as 'Labels: ' with no values. While the evaluation notes this is 'cosmetically awkward,' it does not break functionality or cause the prompt to fail. It is a minor formatting issue, not a structural failure. The agent can proceed despite this.",
+          "feedback": ""
+        },
+        "minimal_input_useful": {
+          "passed": false,
+          "quote": "the generic 'implement the requested changes' is vacuous when there are no requested changes specified — it should fall back to 'infer the change from the title and verify against the codebase.'",
+          "reason": "Steps 2–5 (implement, test, lint, commit) are generic enough to apply to any issue, but step 2 'Implement the requested changes' is hollow when the issue has no description detailing what changes are requested. The prompt does not adapt to provide context-inference instructions when input is minimal. A useful prompt would tell the agent to validate assumptions against the codebase.",
+          "feedback": "Modify step 2 for cases with no description: 'Based on the issue title and codebase search results, identify and fix the typo. Verify the change is correct by reviewing the error message in context.'"
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 34367,
+      "output": "## Prompt Evaluation: STA-410 (No Description, No Labels)\n\n### Verdict: Fails gracefully on structure, but gives bad instructions\n\n---\n\n**1. Degrades gracefully without a description?**\n**No.** Step 1 says \"Read the issue description carefully\" — but there is no description. The instruction is not just useless, it's misleading. An agent following it literally will either hallucinate content or stall. A robust template should either suppress this step or replace it with a fallback like \"No description provided — infer task from the title.\"\n\n**2. Guides agent to search the codebase for context?**\n**No, and this is the biggest gap.** The title \"Fix typo in error message\" is the only signal. The agent needs to grep for error strings, find candidates, and identify the typo — but the prompt provides zero guidance to do that. When description is absent, the template should explicitly instruct: *\"Search the codebase for context matching the issue title.\"*\n\n**3. Handles empty labels cleanly?**\n**Barely.** `Labels: ` with a trailing space is cosmetically awkward but functionally harmless. Better to omit the field entirely when empty, or use `Labels: none`.\n\n**4. Still provides useful instructions despite minimal input?**\n**Partially.** Steps 2–5 (implement, test, lint, commit) are valid and reusable. But the generic \"implement the requested changes\" is vacuous when there are no requested changes specified — it should fall back to *\"infer the change from the title and verify against the codebase.\"*\n\n---\n\n### Summary\n\n| Criterion | Score | Notes |\n|---|---|---|\n| Graceful degradation | Fail | Step 1 is actively wrong |\n| Codebase search guidance | Fail | No fallback strategy for missing context |\n| Empty labels | Marginal | Cosmetic noise, not broken |\n| Useful despite minimal input | Partial | Steps 2–5 ok; step 1 misleading |\n\n**Fix:** Add a conditional block — if no description, replace step 1 with: *\"No description provided. Use the issue title as the search query. Grep for"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"passed":false,"passRate":0,"criteria":{"model_tiers":{"passed":false,"reason":"regex heuristic"},"anthropic_native":{"passed":false,"reason":"regex heuristic"},"read_adapter_first":{"passed":false,"reason":"regex heuristic"},"trace_logger":{"passed":false,"reason":"regex heuristic"}},"judgeMode":"regex","duration":113097,"output":"Invalid API key · Fix external API key\n"}

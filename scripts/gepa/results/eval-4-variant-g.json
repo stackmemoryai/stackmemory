@@ -1,0 +1,768 @@
+{
+  "variant": "variant-g",
+  "generation": 4,
+  "results": [
+    {
+      "taskId": "skill-001",
+      "taskName": "start_clean_main",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 0.75,
+      "criteria": {
+        "shows_branch": {
+          "passed": true,
+          "quote": "The repo is clean, on main branch.",
+          "reason": "The task statement explicitly mentions 'on main branch', and the AI output acknowledges this context by referencing the clean state. The branch name (main) is clearly identified in the task preamble that the AI is responding to.",
+          "feedback": ""
+        },
+        "shows_recent_commits": {
+          "passed": false,
+          "quote": "Fresh repo with only `CLAUDE.md`. No commits, no source files yet.",
+          "reason": "While the AI correctly identifies that there are no commits ('No commits'), it does not explicitly show or list any recent commits. The criterion requires 'shows_recent_commits' — the output should demonstrate awareness of the commit history. Since there are no commits, the AI should have explicitly stated something like 'git log shows no commits yet' or 'initial state with 0 commits' to satisfy the criterion of actively showing/examining commit status.",
+          "feedback": "To satisfy this criterion, the output should explicitly reference checking git commit history, even if the conclusion is that none exist. For example: 'Running `git log` shows no commits yet — this is a fresh initialization.' This demonstrates active investigation of recent commits rather than just inferring the state."
+        },
+        "suggests_next_action": {
+          "passed": true,
+          "quote": "What are you working on here? Options:\n1. **Eval task** — running/testing a specific agent prompt or workflow\n2. **New feature** — starting fresh implementation work\n3. **Debugging** — investigating something from the conductor",
+          "reason": "The output provides three concrete next action options with clear descriptions of what each path entails. It concludes with a direct question 'What's the goal?' prompting the user to choose a direction, which is a clear next action recommendation.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "What are you working on here? Options:\n1. **Eval task**\n2. **New feature**\n3. **Debugging**\n\nWhat's the goal?",
+          "reason": "The response asks clarifying questions rather than prescribing complex setup steps, additional tooling, or unnecessary file structures. It acknowledges the GEPA context from CLAUDE.md without over-explaining or adding extraneous guidance. The solution is minimalist and directly addresses the user's query.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 24738,
+      "output": "Fresh repo with only `CLAUDE.md`. No commits, no source files yet.\n\nBased on the CLAUDE.md context, this appears to be a **GEPA eval workspace** (`/tmp/gepa-eval-C3cTsi`). GEPA = Generative Evolutionary Prompt Architecture — the `conductor learn --evolve` feature from StackMemory.\n\nWhat are you working on here? Options:\n1. **Eval task** — running/testing a specific agent prompt or workflow\n2. **New feature** — starting fresh implementation work\n3. **Debugging** — investigating something from the conductor\n\nWhat's the goal?\n"
+    },
+    {
+      "taskId": "skill-002",
+      "taskName": "start_dirty_feature",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.5,
+      "criteria": {
+        "shows_branch": {
+          "passed": false,
+          "quote": "I don't have permission to run git commands in `~/Dev/stackmemory` from this session",
+          "reason": "The AI output acknowledges it cannot access the git repository to retrieve branch information. While it mentions the directory path, it never actually displays the current branch name (e.g., `git branch --show-current` or similar output showing 'feature/xyz'). The criterion requires showing the branch, not just explaining why it can't be shown.",
+          "feedback": "The output should either: (1) successfully execute `git branch --show-current` and display the branch name, or (2) ask the user to manually provide the branch name if permissions are truly unavailable. Simply stating inability to run commands without showing the branch fails this criterion."
+        },
+        "shows_uncommitted": {
+          "passed": false,
+          "quote": "I don't have permission to run git commands in `~/Dev/stackmemory` from this session",
+          "reason": "Similar to the branch criterion, the output explains it cannot run git commands but provides no actual information about uncommitted changes (e.g., output from `git status` or `git diff`). The user asked 'what's my status?' expecting to see uncommitted file information, which is not provided.",
+          "feedback": "The output should display uncommitted changes, either by successfully running `git status` or `git diff`, or by asking the user to provide this information directly. Explaining inability without fallback information fails this criterion."
+        },
+        "suggests_continue_or_commit": {
+          "passed": true,
+          "quote": "Two options:\n1. **Switch to the right directory** — open a new Claude Code session in `~/Dev/stackmemory`\n2. **Approve the commands** — the git commands above need your approval to run from this context",
+          "reason": "The AI provides two concrete next actions to resolve the situation and continue work: either switch directories or approve git command execution. These are actionable suggestions for how to proceed.",
+          "feedback": ""
+        },
+        "no_hallucination": {
+          "passed": true,
+          "quote": "I don't have permission to run git commands in `~/Dev/stackmemory` from this session (cwd is `/private/tmp/gepa-eval-QNy5uc`, not a git repo)",
+          "reason": "The AI honestly describes its limitations: working directory is not the target repo, and it accurately explains the constraint. It does not invent branch names, fake commit messages, or pretend to have access it doesn't have. All statements are grounded in the actual technical constraint.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 26314,
+      "output": "I don't have permission to run git commands in `~/Dev/stackmemory` from this session (cwd is `/private/tmp/gepa-eval-QNy5uc`, not a git repo).\n\nTwo options:\n1. **Switch to the right directory** — open a new Claude Code session in `~/Dev/stackmemory`\n2. **Approve the commands** — the git commands above need your approval to run from this context\n\nWhich would you prefer? Or if you can share the branch name / diff directly, I can work from that.\n"
+    },
+    {
+      "taskId": "skill-003",
+      "taskName": "stop_with_work",
+      "weight": 1.2,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "captures_context": {
+          "passed": true,
+          "quote": "This session appears to have been very short — no code changes or significant work occurred. There's nothing substantive to capture for tomorrow.",
+          "reason": "The AI acknowledges the current state and provides context about what has (or hasn't) happened in the session. It also mentions a specific project path `/Users/jwu/Dev/stackmemory` which grounds the response in the user's actual environment.",
+          "feedback": ""
+        },
+        "suggests_commit": {
+          "passed": true,
+          "quote": "If you do have work in progress in `/Users/jwu/Dev/stackmemory`, run this directly in your terminal: ```bash stackmemory capture ``` That will commit any staged changes and generate a handoff prompt for tomorrow's session.",
+          "reason": "The output explicitly suggests a concrete command to capture/commit progress. It explains that `stackmemory capture` will commit staged changes and generate a handoff prompt, which satisfies the intent of suggesting a commit action for tomorrow's continuation.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "This session appears to have been very short — no code changes or significant work occurred. There's nothing substantive to capture for tomorrow. If you do have work in progress..., run this directly in your terminal: stackmemory capture",
+          "reason": "The response is minimal and practical. It doesn't suggest unnecessary abstractions, multiple steps, or complex workflows. It acknowledges there's nothing to save, then provides a single, straightforward command if there is work. No defensive coding patterns or over-preparation for edge cases.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 32464,
+      "output": "This session appears to have been very short — no code changes or significant work occurred. There's nothing substantive to capture for tomorrow.\n\nIf you do have work in progress in `/Users/jwu/Dev/stackmemory`, run this directly in your terminal:\n\n```bash\nstackmemory capture\n```\n\nThat will commit any staged changes and generate a handoff prompt for tomorrow's session.\n"
+    },
+    {
+      "taskId": "skill-004",
+      "taskName": "stop_done",
+      "weight": 1.2,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "captures_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_clear": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 22999,
+      "output": "## Session Close\n\n**What was done:**\n- No active work this session — session was opened and immediately closed\n\n**Captured:** skipped (capture denied)\n\n**Updates needed:** Nothing to update\n\n---\n\nSession complete. No open work, no uncommitted changes, no blockers.\n\nSuggest: `/clear` to wipe context.\n"
+    },
+    {
+      "taskId": "skill-005",
+      "taskName": "learn_after_changes",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "reviews_session": {
+          "passed": true,
+          "quote": "I just finished a session where I created 3 new files, fixed a bug, and discovered a gotcha about ESM imports. What should be updated?",
+          "reason": "The AI explicitly acknowledges all three session outputs: the 3 new files, the bug fix, and the ESM import discovery. It then evaluates each for memory worthiness.",
+          "feedback": ""
+        },
+        "identifies_memory_update": {
+          "passed": true,
+          "quote": "The ESM import gotcha — if it's non-obvious (e.g. specific to this project's setup, a weird edge case), it's worth a `feedback` memory so future sessions don't repeat it",
+          "reason": "The AI correctly identifies that the ESM gotcha is the only item worth saving to memory and specifies the criterion: it must be project-specific or non-obvious. It explicitly recommends the memory type (`feedback`) and reasoning (to prevent repetition).",
+          "feedback": ""
+        },
+        "structured_output": {
+          "passed": true,
+          "quote": "**Save to memory:** ... **Skip:** ... What was the ESM gotcha specifically?",
+          "reason": "The output uses clear categorical headers (Save vs. Skip), bullet points for each item, and explicit reasoning for why each belongs in its category. It concludes with a clarifying question.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "file paths/structure are derivable from the code ... the fix is in the code; git history has context",
+          "reason": "The AI explicitly avoids recommending that redundant information (file structure, bug fixes already in code) be saved to memory. It acknowledges that version control and code itself are the source of truth for these items.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 19744,
+      "output": "Nothing saved yet. Here's what's worth capturing vs. what to skip:\n\n**Save to memory:**\n- The ESM import gotcha — if it's non-obvious (e.g. specific to this project's setup, a weird edge case), it's worth a `feedback` memory so future sessions don't repeat it\n\n**Skip:**\n- The 3 new files — file paths/structure are derivable from the code\n- The bug fix — the fix is in the code; git history has context\n\nWhat was the ESM gotcha specifically? If it's just \"add `.js` to relative imports\" that's already in your global CLAUDE.md. If it's something project-specific (e.g. a particular config quirk, a module resolution issue unique to this setup), that's worth saving.\n"
+    },
+    {
+      "taskId": "skill-006",
+      "taskName": "learn_nothing_new",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "concise_output": {
+          "passed": true,
+          "quote": "Nothing to update — typo fixes don't warrant memory changes.",
+          "reason": "The response is a single, focused sentence that directly answers the question without unnecessary elaboration or verbose explanation.",
+          "feedback": ""
+        },
+        "says_nothing_needed": {
+          "passed": true,
+          "quote": "Nothing to update",
+          "reason": "The output explicitly states that nothing needs to be updated, which directly satisfies the criterion's requirement to communicate that no action is needed.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "Nothing to update — typo fixes don't warrant memory changes.",
+          "reason": "The response provides a minimal, straightforward answer without unnecessary abstractions, complex suggestions, or defensive reasoning. It simply states the conclusion with a brief rationale.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 12302,
+      "output": "Nothing to update — typo fixes don't warrant memory changes.\n"
+    },
+    {
+      "taskId": "skill-007",
+      "taskName": "summary_multi_task",
+      "weight": 1,
+      "passed": false,
+      "passRate": 0.5,
+      "criteria": {
+        "lists_actions": {
+          "passed": true,
+          "quote": "- Fixed auth bug\n- Added pagination\n- Updated tests",
+          "reason": "The output explicitly lists all three actions mentioned in the task in a clear bulleted format under 'What was done:'. All actions from the input are captured.",
+          "feedback": ""
+        },
+        "lists_files": {
+          "passed": false,
+          "quote": "**Files changed:** none tracked in this session",
+          "reason": "The criterion requires listing files, but the output only states that no files were tracked. The task input provides no file information, and the output makes an assumption ('none tracked in this session') rather than acknowledging that file data was not provided in the input. This is a claim without grounding.",
+          "feedback": "Remove the 'Files changed:' section entirely, or reword it to 'Files changed: not specified' or 'Files changed: not provided in input'. Do not assert 'none tracked' without evidence from the actual session data."
+        },
+        "concise_output": {
+          "passed": true,
+          "quote": "Entire output is approximately 10 lines with focused sections",
+          "reason": "The output is well-structured with clear sections, no redundant sentences, and concise bullet points. It directly addresses the summary request without unnecessary elaboration or verbose prose.",
+          "feedback": ""
+        },
+        "no_hallucination": {
+          "passed": false,
+          "quote": "**Files changed:** none tracked in this session\n**Status:** complete\n**Next steps:** none indicated",
+          "reason": "The output makes several claims not grounded in the input: (1) 'Files changed: none tracked' invents tracking status information, (2) 'Status: complete' assumes completion status without input confirmation, (3) 'Next steps: none indicated' is an interpretation rather than a fact from the input. These add speculative information beyond what was provided.",
+          "feedback": "Only reflect what is directly stated in the input. Remove inferred metadata like status, file tracking, and next steps unless explicitly provided. Output should strictly summarize: 'Fixed auth bug, added pagination, updated tests' without adding interpretive sections."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 18019,
+      "output": "## Session Summary\n\n**What was done:**\n- Fixed auth bug\n- Added pagination\n- Updated tests\n\n**Files changed:** none tracked in this session\n\n**Status:** complete\n\n**Next steps:** none indicated\n"
+    },
+    {
+      "taskId": "skill-008",
+      "taskName": "next_with_pr_open",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "identifies_ci_fix": {
+          "passed": false,
+          "quote": "It seems I can't run commands from this working directory (`/private/tmp/gepa-eval-dd565T`). The primary project is at `/Users/jwu/Dev/stackmemory` — can you approve commands run from there, or share the PR number/URL so I can check the CI failures directly?",
+          "reason": "The AI output does not identify what CI failures need to be fixed. Instead, it deflects by asking for permissions or asking the user to provide a PR number/URL. The AI should have proactively suggested steps to investigate CI failures (e.g., 'check the CI logs', 'review recent commits', 'run tests locally') rather than asking the user for information.",
+          "feedback": "The output should identify actionable CI debugging steps regardless of environment constraints. Suggest: examining CI logs in the PR, running tests locally to reproduce failures, checking recent git history, or reviewing error messages. Do not ask the user to provide basic information that you should be helping them discover."
+        },
+        "actionable_suggestion": {
+          "passed": false,
+          "quote": "can you approve commands run from there, or share the PR number/URL so I can check the CI failures directly?",
+          "reason": "The output makes requests of the user rather than providing actionable suggestions. Asking for approval, PR numbers, and URLs is not actionable guidance for fixing CI failures. An actionable suggestion would be concrete steps the user can take immediately, like 'run `npm test`' or 'check the error logs in the GitHub Actions tab'.",
+          "feedback": "Provide concrete, immediately executable suggestions instead of asking clarifying questions. For example: 'Run the test suite locally with `npm test` or `make test` to reproduce the failures', 'Review the CI output logs for the specific failing tests', or 'Check the most recent commits for syntax errors or breaking changes'."
+        },
+        "presents_options": {
+          "passed": true,
+          "quote": "can you approve commands run from there, or share the PR number/URL so I can check the CI failures directly?",
+          "reason": "The AI does present two options: (1) approve commands run from the correct directory, or (2) share the PR number/URL. While these options are not ideal solutions to the core problem, they do technically present multiple paths forward rather than a single rigid response.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 26572,
+      "output": "It seems I can't run commands from this working directory (`/private/tmp/gepa-eval-dd565T`). The primary project is at `/Users/jwu/Dev/stackmemory` — can you approve commands run from there, or share the PR number/URL so I can check the CI failures directly?\n"
+    },
+    {
+      "taskId": "skill-009",
+      "taskName": "start_stale_branch",
+      "weight": 1.3,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "suggests_rebase_or_merge": {
+          "passed": true,
+          "quote": "git rebase origin/main\n\nRebase is preferred over merge — keeps linear history and replays your commits on top of the 12 new ones.\n\n**When to use merge instead of rebase:** if the branch is shared with others or already has a PR open",
+          "reason": "The output explicitly suggests both rebase and merge as options, with clear guidance on when to use each. Rebase is presented as the default with rationale (linear history), and merge is mentioned as an alternative for shared branches or open PRs.",
+          "feedback": ""
+        },
+        "checks_conflicts": {
+          "passed": true,
+          "quote": "**3. Resolve conflicts if any**\n```bash\ngit status          # see conflicted files\n# fix conflicts, then:\ngit add <file>\ngit rebase --continue\n```",
+          "reason": "The output includes a dedicated section for conflict resolution with concrete commands (git status, git add, git rebase --continue) and guidance on how to handle conflicted files during the rebase process.",
+          "feedback": ""
+        },
+        "suggests_next_action": {
+          "passed": true,
+          "quote": "**5. Validate**\n```bash\nnpm run lint && npm run test:run && npm run build\n```",
+          "reason": "After the rebase workflow, the output suggests a concrete next action: validating the code by running linting, tests, and build commands. This provides a clear follow-up step beyond just rebasing.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "**1. Check your state first\n**2. Fetch + rebase onto main\n**3. Resolve conflicts if any\n**4. Restore stash if needed\n**5. Validate",
+          "reason": "The solution is a straightforward 5-step workflow with no unnecessary abstractions, helper scripts, or defensive code. It covers the essential operations (stash, fetch, rebase, conflict resolution, validation) without introducing extra complexity or tools beyond standard git commands and basic npm scripts.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 22307,
+      "output": "Without running git commands, here's the standard playbook:\n\n**1. Check your state first**\n```bash\ngit status          # any uncommitted changes?\ngit stash           # if yes, stash them\n```\n\n**2. Fetch + rebase onto main**\n```bash\ngit fetch origin\ngit rebase origin/main\n```\n\nRebase is preferred over merge — keeps linear history and replays your commits on top of the 12 new ones.\n\n**3. Resolve conflicts if any**\n```bash\ngit status          # see conflicted files\n# fix conflicts, then:\ngit add <file>\ngit rebase --continue\n```\n\n**4. Restore stash if needed**\n```bash\ngit stash pop\n```\n\n**5. Validate**\n```bash\nnpm run lint && npm run test:run && npm run build\n```\n\n**When to use merge instead of rebase:** if the branch is shared with others or already has a PR open — rebase rewrites history and forces a push.\n"
+    },
+    {
+      "taskId": "skill-010",
+      "taskName": "start_empty_repo",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "checks_readme": {
+          "passed": true,
+          "quote": "Only a `CLAUDE.md` here — no package.json or source files yet.",
+          "reason": "The AI output explicitly checks for and mentions the README-like file (CLAUDE.md) present in the repo, demonstrating awareness of documentation.",
+          "feedback": ""
+        },
+        "suggests_setup": {
+          "passed": true,
+          "quote": "```bash\nnpm install          # install deps\nnpm run build        # verify compilation\nnpm run test:run     # run tests\n```",
+          "reason": "The output provides concrete setup commands (npm install, build, test) that represent standard next steps for getting started with a Node/TS project.",
+          "feedback": ""
+        },
+        "concise_output": {
+          "passed": true,
+          "quote": "Only a `CLAUDE.md` here — no package.json or source files yet. This looks like an empty/stub repo.\n\nFor a typical Node/TS project... the standard flow would be:",
+          "reason": "The response is focused and direct, quickly identifying the issue (empty repo), providing context, and offering relevant commands without unnecessary verbosity or tangential information.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "npm install\nnpm run build\nnpm run test:run\n\nIs there more context on what this repo is supposed to contain",
+          "reason": "The solution is minimal—just three standard npm commands plus diagnostic checks (git remote -v, git log). No unnecessary abstractions, extra setup files, or overly defensive configurations are suggested.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 18132,
+      "output": "Only a `CLAUDE.md` here — no package.json or source files yet. This looks like an empty/stub repo.\n\nFor a typical Node/TS project (which this one is based on the CLAUDE.md), the standard flow would be:\n\n```bash\nnpm install          # install deps\nnpm run build        # verify compilation\nnpm run test:run     # run tests\n```\n\nIs there more context on what this repo is supposed to contain, or did the clone succeed correctly? You might want to verify the remote:\n\n```bash\ngit remote -v\ngit log --oneline -5\n```\n"
+    },
+    {
+      "taskId": "skill-011",
+      "taskName": "stop_merge_conflict",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "warns_about_conflict": {
+          "passed": true,
+          "quote": "Check the state first, then decide:\n```bash\ngit status          # see conflicted files\ngit diff            # see conflict markers\n```",
+          "reason": "The output explicitly acknowledges the unresolved merge conflict state and provides diagnostic commands to inspect conflict markers. This directly addresses the warning about being in a conflict state.",
+          "feedback": ""
+        },
+        "suggests_resolution_or_stash": {
+          "passed": true,
+          "quote": "**Options:**\n1. **Resolve it** — edit files, remove `<<<<<<<`/`=======`/`>>>>>>>` markers, then:\n```bash\ngit add <file>\ngit commit\n```\n\n2. **Abort the merge** — go back to pre-merge state:\n```bash\ngit merge --abort\n```\n\n3. **Stash and come back** — not possible mid-conflict; abort first, then stash.\n\n4. **Accept one side entirely:**",
+          "reason": "The output provides multiple concrete options: (1) resolve the conflict manually, (2) abort the merge, (3) explains why stashing mid-conflict isn't possible, and (4) accept one side entirely. These cover the main paths forward for someone needing to stop work.",
+          "feedback": ""
+        },
+        "captures_context": {
+          "passed": true,
+          "quote": "**To safely stop:** `git merge --abort` returns you to the state before the merge started — nothing is lost.\n\nWhat were you merging? That'll help narrow down the best path.",
+          "reason": "The output asks a contextual follow-up question ('What were you merging?') to understand the user's situation better. It also captures the key context that the user needs to stop but has a conflict, and addresses that specific tension by explaining the safest stopping point.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 16161,
+      "output": "Check the state first, then decide:\n\n```bash\ngit status          # see conflicted files\ngit diff            # see conflict markers\n```\n\n**Options:**\n\n1. **Resolve it** — edit files, remove `<<<<<<<`/`=======`/`>>>>>>>` markers, then:\n   ```bash\n   git add <file>\n   git commit\n   ```\n\n2. **Abort the merge** — go back to pre-merge state:\n   ```bash\n   git merge --abort\n   ```\n\n3. **Stash and come back** — not possible mid-conflict; abort first, then stash.\n\n4. **Accept one side entirely:**\n   ```bash\n   git checkout --ours <file>    # keep your version\n   git checkout --theirs <file>  # keep incoming version\n   git add <file>\n   ```\n\n**To safely stop:** `git merge --abort` returns you to the state before the merge started — nothing is lost.\n\nWhat were you merging? That'll help narrow down the best path.\n"
+    },
+    {
+      "taskId": "skill-012",
+      "taskName": "learn_refactor_session",
+      "weight": 1.2,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "identifies_pattern_change": {
+          "passed": true,
+          "quote": "After a camelCase→kebab-case file rename + import update, check these: 1. **Barrel/index files** — `index.ts` re-exports that reference old filenames 2. **tsconfig.json** — `paths` aliases or `include`/`exclude` globs with specific filenames",
+          "reason": "The output correctly identifies the core pattern change (camelCase to kebab-case) and systematically lists places where this naming convention propagates. It demonstrates understanding that renaming files affects multiple interconnected surfaces (imports, exports, config, docs).",
+          "feedback": ""
+        },
+        "suggests_convention_doc": {
+          "passed": false,
+          "quote": "",
+          "reason": "The output provides no reference to documenting or establishing this as a project convention. It treats the rename as a one-time task cleanup rather than suggesting that a style guide, CONTRIBUTING.md, or naming convention document be updated to prevent future inconsistency.",
+          "feedback": "Add a suggestion to update project documentation (CONTRIBUTING.md, style guide, or README) to document that the project uses kebab-case for filenames. This prevents team members from reverting to camelCase in the future and makes the convention explicit."
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "Quick way to find stragglers: grep -r \"oldCamelCaseName\" src/ --include=\"*.ts\" -l",
+          "reason": "The solution is minimal and practical. It provides a straightforward grep command to validate completeness rather than proposing unnecessary tooling, custom scripts, or complex validation frameworks. The checklist items are direct and focused on real places changes are needed.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 22632,
+      "output": "After a camelCase→kebab-case file rename + import update, check these:\n\n1. **Barrel/index files** — `index.ts` re-exports that reference old filenames\n2. **tsconfig.json** — `paths` aliases or `include`/`exclude` globs with specific filenames\n3. **Build config** — `esbuild` entry points in `package.json` scripts or build scripts\n4. **Test files** — test filenames themselves (e.g., `myModule.test.ts` → `my-module.test.ts`) and their imports\n5. **`package.json`** — `main`, `exports`, `types` fields pointing to specific files\n6. **Docs/comments** — any hardcoded paths in `docs/` or `CLAUDE.md`\n7. **Hook/script references** — `scripts/` files that `require`/import by path\n\nQuick way to find stragglers:\n\n```bash\n# Search for any remaining camelCase references to the old filenames\ngrep -r \"oldCamelCaseName\" src/ --include=\"*.ts\" -l\n```\n\nMost critical: **barrel `index.ts` files** and **`package.json` exports** are the most commonly missed.\n"
+    },
+    {
+      "taskId": "skill-013",
+      "taskName": "learn_new_integration",
+      "weight": 1.3,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "identifies_memory_update": {
+          "passed": true,
+          "quote": "Saved: Slack integration needs ngrok locally because Slack can't reach localhost for webhook delivery.",
+          "reason": "The output explicitly begins with 'Saved:' which is a clear signal that information is being recorded/memorized. The statement is formatted as a memory item to be retained.",
+          "feedback": ""
+        },
+        "captures_setup_gotcha": {
+          "passed": true,
+          "quote": "Slack integration needs ngrok locally because Slack can't reach localhost for webhook delivery.",
+          "reason": "The output identifies the key gotcha: Slack webhooks cannot reach localhost directly during local development. It explains both the problem (localhost not reachable) and the solution (ngrok needed). This is the critical setup gotcha developers encounter with Slack webhooks.",
+          "feedback": ""
+        },
+        "structured_output": {
+          "passed": false,
+          "quote": "Saved: Slack integration needs ngrok locally because Slack can't reach localhost for webhook delivery.",
+          "reason": "The output is presented as a single prose sentence. 'Structured output' typically means organized information with clear sections (e.g., bullet points, key-value pairs, headings, or explicit categories). The current format is a continuous narrative rather than a visually organized structure.",
+          "feedback": "Restructure the memory to use clear formatting. Example: 'Saved:\\n- Tool: ngrok\\n- Why: Slack webhooks cannot reach localhost\\n- Use case: Local development testing' or similar structured format with distinct sections."
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 23244,
+      "output": "Saved: Slack integration needs ngrok locally because Slack can't reach localhost for webhook delivery.\n"
+    },
+    {
+      "taskId": "skill-014",
+      "taskName": "next_all_green",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "checks_todo_queue": {
+          "passed": true,
+          "quote": "On clean main after a merge — time to pull the next task from the queue or start a new feature.\n\nA) **Run `stackmemory conductor start`** to let the orchestrator pick the next Linear issue",
+          "reason": "The output explicitly references checking the task queue (Linear backlog in option B) and proposes an automated queue-checking mechanism (option A with conductor start). It acknowledges the need to retrieve the next task.",
+          "feedback": ""
+        },
+        "suggests_next_action": {
+          "passed": true,
+          "quote": "A) **Run `stackmemory conductor start`** to let the orchestrator pick the next Linear issue and spin up a worktree agent automatically\nB) **Check Linear backlog** — pull the highest-priority unstarted issue and start a feature branch manually\nC) **Run `stackmemory conductor learn --evolve`**",
+          "reason": "Three concrete, actionable next steps are presented with specific commands and clear outcomes. Each option is a real action the user can take immediately.",
+          "feedback": ""
+        },
+        "presents_options": {
+          "passed": true,
+          "quote": "A) **Run `stackmemory conductor start`**...\nB) **Check Linear backlog**...\nC) **Run `stackmemory conductor learn --evolve`**...",
+          "reason": "The output explicitly presents three distinct options (A, B, C) with different approaches: automated orchestration, manual backlog check, and prompt evolution. This gives the user choice rather than a single prescriptive path.",
+          "feedback": ""
+        },
+        "concise_output": {
+          "passed": true,
+          "quote": "## Next up\n\nOn clean main after a merge — time to pull the next task from the queue or start a new feature.\n\nA) **Run `stackmemory conductor start`**...\nB) **Check Linear backlog**...\nC) **Run `stackmemory conductor learn --evolve`**...",
+          "reason": "The response is focused on the immediate next steps without extraneous explanation. It uses a brief heading, 1-2 sentence context, then three clearly formatted options. No unnecessary elaboration or off-topic discussion.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 30602,
+      "output": "No memory files yet and the eval environment is isolated from the main repo. Based on the context you gave me (PR merged, branch clean on main):\n\n## Next up\n\nOn clean main after a merge — time to pull the next task from the queue or start a new feature.\n\nA) **Run `stackmemory conductor start`** to let the orchestrator pick the next Linear issue and spin up a worktree agent automatically\nB) **Check Linear backlog** — pull the highest-priority unstarted issue and start a feature branch manually\nC) **Run `stackmemory conductor learn --evolve`** — post-merge is a good time to analyze recent agent outcomes and evolve the GEPA prompt template\n"
+    },
+    {
+      "taskId": "skill-015",
+      "taskName": "next_blocked_by_review",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "suggests_parallel_work": {
+          "passed": true,
+          "quote": "Work on something else — pick the next Linear issue or unblock another task",
+          "reason": "The output explicitly recommends continuing with other work rather than blocking. This directly addresses parallel work while waiting for review.",
+          "feedback": ""
+        },
+        "presents_options": {
+          "passed": true,
+          "quote": "While waiting for your teammate's review, you can: 1. **Self-review**... 2. **Run all validation**... 3. **Add context**... 4. **Check for blockers**... 5. **Work on something else**... If it's urgent, ask another teammate to cover the review.",
+          "reason": "The output presents 5 distinct actionable options plus a fallback escalation path. Each option is independent and the user can choose based on their situation.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "Self-review — re-read your own diff with fresh eyes; you'll often catch issues. Run all validation — npm run lint && npm run test:run && npm run build. Add context — improve the PR description, add inline comments explaining non-obvious decisions.",
+          "reason": "The suggestions are straightforward, practical activities that don't introduce unnecessary complexity. They're standard development practices (linting, testing, documentation) without proposing elaborate workflows, new tools, or defensive measures.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 12808,
+      "output": "While waiting for your teammate's review, you can:\n\n1. **Self-review** — re-read your own diff with fresh eyes; you'll often catch issues\n2. **Run all validation** — `npm run lint && npm run test:run && npm run build`\n3. **Add context** — improve the PR description, add inline comments explaining non-obvious decisions\n4. **Check for blockers** — does anything downstream depend on this PR?\n5. **Work on something else** — pick the next Linear issue or unblock another task\n\nIf it's urgent, ask another teammate to cover the review.\n"
+    },
+    {
+      "taskId": "skill-016",
+      "taskName": "summary_single_fix",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "concise_output": {
+          "passed": true,
+          "quote": "Fixed typo in README.md.",
+          "reason": "The output is a single, focused sentence that directly addresses the task without unnecessary elaboration or verbose explanation. It conveys the essential information efficiently.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "Fixed typo in README.md.",
+          "reason": "The response provides a straightforward summary without introducing unnecessary abstractions, extra complexity, or defensive language. It matches the simplicity of the task itself.",
+          "feedback": ""
+        },
+        "no_hallucination": {
+          "passed": true,
+          "quote": "Fixed typo in README.md.",
+          "reason": "The output makes no claims about specific code, functions, or implementations that go beyond what was stated in the task. It directly restates the given information without inventing details about what the typo was or creating references to non-existent elements.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 13005,
+      "output": "Fixed typo in README.md.\n"
+    },
+    {
+      "taskId": "skill-017",
+      "taskName": "summary_complex_session",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "lists_actions": {
+          "passed": true,
+          "quote": "**Debugged** memory leak in daemon → traced to unclosed file descriptors in watcher\n**Fixed** the leak + added regression test\n**Updated** CLAUDE.md with the gotcha\n**Created** PR",
+          "reason": "The output lists all five actions from the task: debugged, found root cause, fixed, added test, updated docs, and created PR. Each action is explicitly stated with bold formatting for clarity.",
+          "feedback": ""
+        },
+        "structured_output": {
+          "passed": true,
+          "quote": "Session summary:\n\n**Debugged** memory leak in daemon → traced to unclosed file descriptors in watcher\n**Fixed** the leak + added regression test\n**Updated** CLAUDE.md with the gotcha\n**Created** PR",
+          "reason": "The output uses a clear structure with a labeled header ('Session summary:'), bold formatting for action items, and arrow notation (→) to show cause-effect relationships. Information is organized logically and scannable.",
+          "feedback": ""
+        },
+        "captures_key_finding": {
+          "passed": true,
+          "quote": "traced to unclosed file descriptors in watcher",
+          "reason": "The root cause of the memory leak (unclosed file descriptors in the watcher component) is explicitly captured. This is the critical debugging insight from the task.",
+          "feedback": ""
+        },
+        "no_hallucination": {
+          "passed": true,
+          "quote": "**Debugged** memory leak in daemon → traced to unclosed file descriptors in watcher\n**Fixed** the leak + added regression test\n**Updated** CLAUDE.md with the gotcha\n**Created** PR",
+          "reason": "Every claim in the output is directly grounded in the task statement. No invented file names, functions, or details are mentioned that weren't in the original summary. All referenced items (daemon, watcher, CLAUDE.md, regression test, PR) are explicitly mentioned in the task.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 14807,
+      "output": "Session summary:\n\n**Debugged** memory leak in daemon → traced to unclosed file descriptors in watcher\n**Fixed** the leak + added regression test\n**Updated** CLAUDE.md with the gotcha\n**Created** PR\n"
+    },
+    {
+      "taskId": "skill-018",
+      "taskName": "start_with_handoff",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 0.75,
+      "criteria": {
+        "reads_handoff": {
+          "passed": false,
+          "quote": "I can't locate the handoff file automatically. Could you share the handoff file content, or tell me where it's located?",
+          "reason": "The AI states it cannot locate the handoff file and asks the user to provide it. However, the task explicitly states there IS a handoff file from yesterday's session. The AI should have attempted to read or acknowledge the existence of this file rather than claiming it cannot be located automatically. The task presents the handoff as a given fact, not something to be verified.",
+          "feedback": "The AI should acknowledge that a handoff file exists from yesterday's session on STA-590 and attempt to work with the information provided (2 failing tests). Instead of deflecting, it should ask for specific details about those tests or their locations if unclear, while demonstrating it has registered the handoff information."
+        },
+        "identifies_continuation": {
+          "passed": true,
+          "quote": "Once I have the handoff content, I can pick up exactly where yesterday left off on STA-590.",
+          "reason": "The AI explicitly identifies STA-590 from the task description and signals intent to continue from that point. It demonstrates understanding that this is a continuation session rather than a fresh start.",
+          "feedback": ""
+        },
+        "suggests_next_action": {
+          "passed": true,
+          "quote": "you can run: stackmemory restore to pull up the last captured session state",
+          "reason": "The AI provides a concrete next action (the stackmemory restore command) that the user can execute immediately. This is a specific, actionable recommendation.",
+          "feedback": ""
+        },
+        "no_hallucination": {
+          "passed": true,
+          "quote": "I can't locate the handoff file automatically. Could you share the handoff file content, or tell me where it's located?",
+          "reason": "The AI does not invent details about the handoff file, the tests, or their specifics. It honestly states limitations and asks for clarification rather than making up information about STA-590 or the failing tests. The stackmemory restore command is presented as a suggested tool, not as a guaranteed solution.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 43890,
+      "output": "I can't locate the handoff file automatically. Could you share the handoff file content, or tell me where it's located? Alternatively, you can run:\n\n```bash\nstackmemory restore\n```\n\nto pull up the last captured session state. Once I have the handoff content, I can pick up exactly where yesterday left off on STA-590.\n"
+    },
+    {
+      "taskId": "skill-019",
+      "taskName": "stop_with_failing_tests",
+      "weight": 1.3,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "warns_about_tests": {
+          "passed": true,
+          "quote": "A few options: 1. **Create a task/note** — document the 3 failing tests so you can pick up where you left off",
+          "reason": "The AI explicitly acknowledges the problem (3 failing tests) and warns that stopping without addressing them requires documentation/tracking. This demonstrates awareness of the risk.",
+          "feedback": ""
+        },
+        "captures_context": {
+          "passed": true,
+          "quote": "Which do you prefer, and do you know which tests are failing?",
+          "reason": "The AI asks clarifying questions to understand the user's situation better—whether they prefer documentation, fixing now, or WIP commit. It also asks which tests are failing to gather more context.",
+          "feedback": ""
+        },
+        "suggests_commit_wip_or_stash": {
+          "passed": true,
+          "quote": "3. **Branch + commit WIP** — commit current state with a `wip:` prefix so nothing is lost, fix tests next session",
+          "reason": "Option 3 explicitly suggests committing with a `wip:` prefix, which is a standard practice for saving work-in-progress state without losing code.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "Can't run tests directly. A few options: 1. **Create a task/note**... 2. **Fix them now**... 3. **Branch + commit WIP**...",
+          "reason": "The response offers three straightforward, practical options without unnecessary complexity. No extra abstractions, frameworks, or defensive coding for edge cases. The solution is minimal and directly addresses the user's need.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 20629,
+      "output": "Can't run tests directly. A few options:\n\n1. **Create a task/note** — document the 3 failing tests so you can pick up where you left off\n2. **Fix them now** — tell me which tests are failing and I can help resolve them before you stop\n3. **Branch + commit WIP** — commit current state with a `wip:` prefix so nothing is lost, fix tests next session\n\nWhich do you prefer, and do you know which tests are failing?\n"
+    },
+    {
+      "taskId": "skill-020",
+      "taskName": "adversarial_empty_input",
+      "weight": 1,
+      "passed": false,
+      "duration": 7122,
+      "error": "Error: Input must be provided either through stdin or as a prompt argument when using --print\n"
+    },
+    {
+      "taskId": "skill-021",
+      "taskName": "adversarial_conflicting_state",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "addresses_both_issues": {
+          "passed": true,
+          "quote": "This is a common situation. Here's the priority order: **1. Fix the failing CI first** — it blocks merging and others may be waiting on it. **2. Then return to main work**",
+          "reason": "The output explicitly identifies and addresses both problems: (1) failing CI on feature branch, and (2) uncommitted changes on main. It provides a sequential approach to handle both.",
+          "feedback": ""
+        },
+        "prioritizes_correctly": {
+          "passed": true,
+          "quote": "**1. Fix the failing CI first** — it blocks merging and others may be waiting on it.",
+          "reason": "The output correctly prioritizes fixing CI failures before returning to main work, with a clear justification (blocking merging, others waiting). This is the right priority because unmerged PRs with failing CI are blocking concerns. The secondary priority of restoring main work is also correct.",
+          "feedback": ""
+        },
+        "presents_options": {
+          "passed": true,
+          "quote": "**Key considerations:** - If your uncommitted main changes are **related** to the PR failures, bring them to the feature branch instead of stashing. - If CI is failing on something unrelated to your changes (flaky test, infra issue), re-run the job first before spending time debugging.",
+          "reason": "The output presents multiple conditional options based on different scenarios: related vs. unrelated changes, flaky tests vs. real failures. It doesn't assume a one-size-fits-all solution and acknowledges context-dependent decision-making.",
+          "feedback": ""
+        },
+        "no_overengineering": {
+          "passed": true,
+          "quote": "git stash / git checkout <feature-branch> / git checkout main / git stash pop",
+          "reason": "The solution uses standard, minimal git commands (stash/pop/checkout) without unnecessary complexity. No extra abstractions, aliases, or defensive measures are introduced. The approach is straightforward and directly solves the stated problem.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 27717,
+      "output": "This is a common situation. Here's the priority order:\n\n**1. Fix the failing CI first** — it blocks merging and others may be waiting on it.\n\n```bash\ngit stash        # save uncommitted work on main\ngit checkout <feature-branch>\n# fix CI failures, commit, push\n```\n\n**2. Then return to main work**\n\n```bash\ngit checkout main\ngit stash pop    # restore your uncommitted changes\n```\n\n**Key considerations:**\n\n- If your uncommitted main changes are **related** to the PR failures, bring them to the feature branch instead of stashing.\n- If CI is failing on something unrelated to your changes (flaky test, infra issue), re-run the job first before spending time debugging.\n- Never leave a PR with failing CI unattended if you're the author — it signals abandonment to reviewers.\n\n**If you're unsure what's failing:**\n\n```bash\ngh pr checks <PR-number>   # see which checks failed\ngh run view <run-id> --log-failed  # see the actual error\n```\n\nWhat's failing in CI? I can help you fix it if you share the error.\n"
+    },
+    {
+      "taskId": "skill-022",
+      "taskName": "adversarial_vague_request",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "asks_clarification": {
+          "passed": true,
+          "quote": "What's \"the thing\"?",
+          "reason": "The AI output directly asks a clarifying question about the vague task. The task given was 'Do the thing' which is ambiguous, and the AI appropriately seeks clarification rather than making assumptions.",
+          "feedback": ""
+        },
+        "no_hallucination": {
+          "passed": true,
+          "quote": "No memory for this session yet.",
+          "reason": "The AI makes only grounded claims: it acknowledges the lack of session context and asks about 'the thing'. It does not invent or reference any non-existent files, functions, or information.",
+          "feedback": ""
+        },
+        "concise_output": {
+          "passed": true,
+          "quote": "No memory for this session yet. What's \"the thing\"?",
+          "reason": "The output is brief and focused. It consists of two sentences that convey the essential information (no context available) and the clarification request without unnecessary elaboration or verbosity.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 16722,
+      "output": "No memory for this session yet. What's \"the thing\"?\n"
+    },
+    {
+      "taskId": "skill-023",
+      "taskName": "learn_security_fix",
+      "weight": 1.5,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "identifies_security_pattern": {
+          "passed": true,
+          "quote": "Stored XSS: if webhook data is persisted to DB and rendered later, sanitize on render (or both)",
+          "reason": "The output explicitly identifies the XSS security pattern, distinguishes between stored and reflected XSS, and discusses the render boundary as a critical control point. This demonstrates understanding of the underlying vulnerability pattern.",
+          "feedback": ""
+        },
+        "suggests_memory_update": {
+          "passed": true,
+          "quote": "Add the XSS vectors as permanent regression cases so the same vuln can't re-land",
+          "reason": "The output suggests adding permanent test cases to prevent regression. This is a form of institutional memory update—embedding the fix knowledge into the test suite so future changes won't reintroduce the vulnerability.",
+          "feedback": ""
+        },
+        "identifies_security_issue": {
+          "passed": true,
+          "quote": "Add a test that sends a payload with `<script>`, `\"><img onerror=...`, and other XSS vectors",
+          "reason": "The output clearly identifies XSS as the security issue and provides concrete examples of malicious payloads (`<script>`, `onerror` attributes). It also references both reflected and stored XSS variants.",
+          "feedback": ""
+        },
+        "structured_output": {
+          "passed": true,
+          "quote": "**Tests (highest priority)** ... **Audit related input paths** ... **Verify the fix scope** ... **Security test regression**",
+          "reason": "The output uses clear hierarchical sections with bold headers, bullet points, and logical grouping. Information is organized by concern (tests, audit, scope, regression) making it easy to parse and actionable.",
+          "feedback": ""
+        }
+      },
+      "judgeMode": "llm",
+      "duration": 30762,
+      "output": "This is an empty eval environment — no source files to inspect. Based on a typical XSS fix in a webhook handler, here's what to update:\n\n**Tests (highest priority)**\n- Add a test that sends a payload with `<script>`, `\"><img onerror=...`, and other XSS vectors\n- Verify sanitized output, not just \"no crash\"\n- Place in `src/**/__tests__/` per project conventions\n\n**Audit related input paths**\n- Any other webhook handlers or form inputs that render user-controlled data\n- Check for the same pattern: unsanitized interpolation into HTML/templates\n\n**Verify the fix scope**\n- Confirm sanitization happens at the render boundary, not just one input\n- Stored XSS: if webhook data is persisted to DB and rendered later, sanitize on render (or both)\n\n**Security test regression**\n- Add the XSS vectors as permanent regression cases so the same vuln can't re-land\n\nIf you share the patched file I can give specific line-level recommendations.\n"
+    },
+    {
+      "taskId": "skill-024",
+      "taskName": "next_multiple_prs",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "prioritizes_correctly": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "actionable_suggestion": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "presents_options": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 33558,
+      "output": "Can't run gh commands in this environment. Based on what you've described:\n\n**Priority order:**\n\n1. **Approved PR** — merge it now. It's done, blocking your branch history from diverging further.\n2. **Review comments PR** — address the feedback. Reviewers are engaged; respond while context is fresh.\n3. **Needs rebase PR** — last, since it requires your active work but has no external blockers. Do it after the others are resolved to minimize rebase conflicts.\n\nIf the approved PR has a merge conflict too, flip 1 and 3. Want me to pull up the actual PR state?\n"
+    }
+  ]
+}
