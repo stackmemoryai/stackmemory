@@ -28,7 +28,7 @@ const SESSIONS_DIR = path.join(RESULTS_DIR, 'sessions');
 const STATE_PATH = path.join(GEPA_DIR, 'state.json');
 const HOOK_STATE_PATH = path.join(GEPA_DIR, '.hook-state.json');
 
-const THRESHOLD = parseInt(process.env.GEPA_AUTO_THRESHOLD || '10');
+const THRESHOLD = parseInt(process.env.GEPA_AUTO_THRESHOLD || '50');
 const DISABLED = process.env.GEPA_AUTO_DISABLE === '1';
 
 // Ensure directories
@@ -132,22 +132,22 @@ function triggerOptimization(hookState) {
   `;
 
   // Fire and forget — don't block the session end
+  // Redirect all output to log file so it never clobbers the TUI
+  const logPath = path.join(RESULTS_DIR, 'auto-optimize.log');
+  const logFd = fs.openSync(logPath, 'a');
   const child = spawn('node', ['--input-type=module', '-e', script], {
     detached: true,
-    stdio: ['pipe', 'ignore', 'inherit'],
+    stdio: ['pipe', logFd, logFd],
     env: { ...process.env, GEPA_DIR },
   });
 
   child.unref();
+  fs.closeSync(logFd);
 
   // Update hook state
   hookState.sessionsSinceLastOptimize = 0;
   hookState.lastOptimizeTime = new Date().toISOString();
   saveHookState(hookState);
-
-  process.stderr.write(
-    `[GEPA] Auto-optimization triggered (${THRESHOLD} sessions accumulated)\n`
-  );
 }
 
 // Main
