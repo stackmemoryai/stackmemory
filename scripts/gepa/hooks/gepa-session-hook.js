@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+
+// Skip in subprocess mode (e.g., claude --print from CliBrowserAgent)
+if (process.env.DISABLE_HOOKS === '1') process.exit(0);
+
 /**
  * GEPA Session Hook — Auto-wires into Claude Code Stop event.
  *
