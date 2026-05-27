@@ -55,6 +55,7 @@ import {
   resolveToolAlias,
   resolveParamAliases,
 } from '../tool-alias-registry.js';
+import { handleWorkflowTool } from '../../../features/browser/workflow-mcp-tools.js';
 
 // Combined dependencies interface
 export interface MCPHandlerDependencies
@@ -253,6 +254,13 @@ export class MCPHandlerFactory {
       case 'cloud_sync_status':
         return this.cloudSyncHandlers.handleStatus.bind(this.cloudSyncHandlers);
 
+      // Workflow handlers
+      case 'workflow_list':
+      case 'workflow_get':
+      case 'workflow_replay':
+      case 'workflow_benchmarks':
+        return (args: any) => handleWorkflowTool(canonicalName, args);
+
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -312,6 +320,12 @@ export class MCPHandlerFactory {
       'cloud_sync_push',
       'cloud_sync_pull',
       'cloud_sync_status',
+
+      // Workflow tools
+      'workflow_list',
+      'workflow_get',
+      'workflow_replay',
+      'workflow_benchmarks',
     ];
   }
 
