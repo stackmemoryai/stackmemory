@@ -8,71 +8,32 @@
       "weight": 1,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "has_function": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "handles_edge_cases": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "is_tested": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 69262,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 13983,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrK9yo6nnMFHopzPazv\"}\n"
     },
     {
       "taskId": "eval-002",
       "taskName": "refactor_code",
       "weight": 1.5,
       "passed": false,
-      "passRate": 0.3333333333333333,
-      "criteria": {
-        "uses_async": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "preserves_behavior": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "no_nested_callbacks": {
-          "passed": true,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 63971,
-      "output": "Invalid API key · Fix external API key\n"
+      "passRate": 0,
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 16333,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrLLtuG7F3H1pCNpYGA\"}\n"
     },
     {
       "taskId": "eval-003",
       "taskName": "fix_bug",
       "weight": 1.2,
       "passed": false,
-      "passRate": 0.3333333333333333,
-      "criteria": {
-        "bug_fixed": {
-          "passed": true,
-          "reason": "regex heuristic"
-        },
-        "no_new_bugs": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "explains_fix": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 67288,
-      "output": "Invalid API key · Fix external API key\n"
+      "passRate": 0,
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 15094,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrMSjAqRiLjqsjvABeV\"}\n"
     },
     {
       "taskId": "eval-004",
@@ -80,27 +41,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "has_pagination": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "has_limit": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "has_offset": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "backwards_compatible": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 63569,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 17399,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrNe64T7Xw5f9PTR6WV\"}\n"
     },
     {
       "taskId": "eval-005",
@@ -108,23 +52,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "identifies_security_issue": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "identifies_performance_issue": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "actionable_feedback": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 66935,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 20105,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrQ9qW1gUPDJb4rwcyL\"}\n"
     },
     {
       "taskId": "pa-001",
@@ -155,7 +86,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 62140,
+      "duration": 16426,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -183,7 +114,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 71040,
+      "duration": 14880,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -211,7 +142,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 67333,
+      "duration": 15560,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -239,7 +170,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 14731,
+      "duration": 17517,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -267,7 +198,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13379,
+      "duration": 16737,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -295,7 +226,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 20894,
+      "duration": 15655,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -323,7 +254,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12348,
+      "duration": 20126,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -351,7 +282,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10561,
+      "duration": 36029,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -379,7 +310,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10678,
+      "duration": 23541,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -407,7 +338,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 8651,
+      "duration": 18769,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -435,7 +366,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9330,
+      "duration": 13960,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -463,7 +394,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9060,
+      "duration": 16871,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -491,7 +422,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9428,
+      "duration": 17723,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -519,7 +450,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9705,
+      "duration": 15888,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -547,7 +478,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9186,
+      "duration": 13298,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -575,7 +506,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9167,
+      "duration": 15334,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -607,7 +538,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9289,
+      "duration": 11465,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -635,7 +566,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11403,
+      "duration": 12649,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -663,7 +594,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13532,
+      "duration": 8728,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -691,7 +622,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11151,
+      "duration": 10299,
       "output": "Invalid API key · Fix external API key\n"
     }
   ]
