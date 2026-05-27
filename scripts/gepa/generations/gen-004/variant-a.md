@@ -87,13 +87,6 @@ stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrat
 stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
 stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
 stackmemory conductor status   # Live agent status dashboard
-
-# GEPA Optimizer (scripts/gepa/optimize.js)
-node scripts/gepa/optimize.js run [gens] [--auto-apply]  # Full optimization loop
-node scripts/gepa/optimize.js score [--auto-apply]        # Score variants, select best
-node scripts/gepa/optimize.js run --target skill:start     # Optimize specific target
-node scripts/gepa/optimize.js mutate --auto-phase          # Auto-detect worst phase
-# Flags: --auto-apply (deploy winner), --no-cache (fresh eval), --target <name>, --phase <name>
 stackmemory conductor monitor  # Real-time TUI with phase tracking
 stackmemory conductor finalize # Clean up dead/stale agents
 stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
@@ -110,19 +103,20 @@ stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias:
 
 ## Validation
 
-Verify each step after code changes — pre-commit hooks catch 80% of CI failures locally:
-1. `npm run lint` - fix any errors AND warnings
-2. `npm run test:run` - verify no regressions
-3. `npm run build` - ensure compilation
-4. Run code to verify it works
+Run these steps in order after every code change. Pre-commit hooks catch 80% of CI failures locally — catching failures here avoids broken builds on push:
 
-Test coverage:
-- New features require tests in `src/**/__tests__/`
-- Maintain or improve coverage (no untested code paths)
-- Critical paths: context management, handoff, Linear sync
+1. `npm run lint` — fix ALL errors and warnings (warnings become errors in CI)
+2. `npm run test:run` — confirm no regressions before proceeding
+3. `npm run build` — verify compilation succeeds
+4. Run the code directly to confirm it works end-to-end
 
-Testing rules:
-- Run `npm run test:run` via subagent or background task — never inline (blocks context)
+Test coverage requirements:
+- Every new feature needs tests in `src/**/__tests__/`
+- Maintain or improve coverage — do not add code paths with no test coverage
+- Critical paths requiring tests: context management, handoff, Linear sync
+
+Testing rules (violations cause flaky or hanging tests):
+- Run `npm run test:run` via subagent or background task — running it inline blocks the main context window
 - ESLint: use `catch {}` not `catch (_err) {}` (lint rule)
 - `vi.clearAllMocks()` resets `mockReturnValue` — re-set mocks in `beforeEach`
 - Pre-commit hook runs: lint + parallel vitest + build — fix issues before commit, never skip

@@ -1,7 +1,8 @@
+Invalid API key · Fix external API key
+
 # StackMemory - Project Configuration
 
 ## Project Structure
-
 ```
 src/
   cli/             # CLI commands and entry point
@@ -36,7 +37,6 @@ docs/              # Documentation
 ```
 
 ## Key Files
-
 - Entry: src/cli/index.ts
 - MCP Server: src/integrations/mcp/server.ts
 - Frame Manager: src/core/context/frame-manager.ts
@@ -50,7 +50,6 @@ docs/              # Documentation
 - Shared Utils: src/core/utils/{git,text,fs}.ts
 
 ## Detailed Guides
-
 Quick reference (agent_docs/):
 - linear_integration.md - Linear sync
 - mcp_server.md - MCP tools
@@ -66,7 +65,6 @@ Full documentation (docs/):
 - SETUP.md - Installation
 
 ## Commands
-
 ```bash
 npm run build          # Compile TypeScript (esbuild)
 npm run lint           # ESLint check
@@ -87,13 +85,6 @@ stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrat
 stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
 stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
 stackmemory conductor status   # Live agent status dashboard
-
-# GEPA Optimizer (scripts/gepa/optimize.js)
-node scripts/gepa/optimize.js run [gens] [--auto-apply]  # Full optimization loop
-node scripts/gepa/optimize.js score [--auto-apply]        # Score variants, select best
-node scripts/gepa/optimize.js run --target skill:start     # Optimize specific target
-node scripts/gepa/optimize.js mutate --auto-phase          # Auto-detect worst phase
-# Flags: --auto-apply (deploy winner), --no-cache (fresh eval), --target <name>, --phase <name>
 stackmemory conductor monitor  # Real-time TUI with phase tracking
 stackmemory conductor finalize # Clean up dead/stale agents
 stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
@@ -103,13 +94,11 @@ stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias:
 ```
 
 ## Working Directory
-
 - PRIMARY: /Users/jwu/Dev/stackmemory
 - ALLOWED: All subdirectories
 - TEMP: /tmp for temporary operations
 
 ## Validation
-
 Verify each step after code changes — pre-commit hooks catch 80% of CI failures locally:
 1. `npm run lint` - fix any errors AND warnings
 2. `npm run test:run` - verify no regressions
@@ -128,7 +117,6 @@ Testing rules:
 - Pre-commit hook runs: lint + parallel vitest + build — fix issues before commit, never skip
 
 ## Git Rules
-
 The pre-commit hook enforces lint + test + build. Fix the underlying issue rather than bypassing it.
 
 - Do not use `--no-verify` on git push or commit — fix the hook failure instead
@@ -139,13 +127,11 @@ The pre-commit hook enforces lint + test + build. Fix the underlying issue rathe
 - Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
 
 ## Task Management
-
 - Use TodoWrite for 3+ steps or multiple requests
 - Keep one task in_progress at a time
 - Update task status immediately on completion
 
 ## Security
-
 NEVER hardcode secrets - use process.env with dotenv/config
 
 ```javascript
@@ -166,8 +152,8 @@ Environment sources (check in order):
 Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
 
 ## Deploy
-
 ```bash
+
 # npm publish (uses NPM_TOKEN from .env, no OTP needed)
 git stash -- scripts/gepa/           # stash GEPA state (dirties working tree)
 NPM_TOKEN=$(grep '^NPM_TOKEN=' .env | cut -d= -f2) \
@@ -182,7 +168,6 @@ railway up
 ```
 
 ## Conductor (Autonomous Agent Orchestration)
-
 The conductor manages autonomous coding agents via Linear issues:
 
 **Data files** (all under `~/.stackmemory/conductor/`):
@@ -208,7 +193,6 @@ The conductor manages autonomous coding agents via Linear issues:
 **Template variables**: `{{ISSUE_ID}}`, `{{TITLE}}`, `{{DESCRIPTION}}`, `{{LABELS}}`, `{{PRIORITY}}`, `{{ATTEMPT}}`, `{{PRIOR_CONTEXT}}`
 
 ## Task Delegation Model
-
 Route effort by task complexity — not all code changes deserve equal scrutiny:
 
 **AUTOMATE** — Execute immediately, lint+test is sufficient:
@@ -242,14 +226,12 @@ Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't unde
 For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor surrounding code, add abstractions for one-time operations, or create helpers that are used once. Three similar lines of code is better than a premature abstraction.
 
 ## Session Budget
-
 - Max 1 major topic per session — split unrelated work into separate sessions
 - Run /compact or summarize at ~50% context usage to avoid overflow
 - Plan-execute sessions (low interaction, high edits) are most efficient
 - Avoid exploratory marathons with topic-switching — burns 30-40% extra tokens
 
 ## Context Maintenance
-
 **`/update-docs`** — Run weekly or when context feels stale:
 - Audits CLAUDE.md, MEMORY.md, agent_docs/ against git history and codebase
 - Detects stale entries, missing patterns, outdated paths
@@ -279,7 +261,6 @@ For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor
 - End of session → `/learn` (capture what changed, update artifacts)
 
 ## Workflow
-
 - Check .env for API keys before asking
 - Run npm run linear:sync after task completion
 - Use browser MCP for visual testing

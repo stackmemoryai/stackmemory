@@ -87,13 +87,6 @@ stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrat
 stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
 stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
 stackmemory conductor status   # Live agent status dashboard
-
-# GEPA Optimizer (scripts/gepa/optimize.js)
-node scripts/gepa/optimize.js run [gens] [--auto-apply]  # Full optimization loop
-node scripts/gepa/optimize.js score [--auto-apply]        # Score variants, select best
-node scripts/gepa/optimize.js run --target skill:start     # Optimize specific target
-node scripts/gepa/optimize.js mutate --auto-phase          # Auto-detect worst phase
-# Flags: --auto-apply (deploy winner), --no-cache (fresh eval), --target <name>, --phase <name>
 stackmemory conductor monitor  # Real-time TUI with phase tracking
 stackmemory conductor finalize # Clean up dead/stale agents
 stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
@@ -193,23 +186,11 @@ The conductor manages autonomous coding agents via Linear issues:
 - `agents/<issue-id>/output.log` — Agent stdout/stderr
 - `traces.db` — SQLite database with per-turn conversation traces (tool calls, tokens, phases, content previews)
 
-**Intelligence features**:
-- Multi-model routing with difficulty prediction (routes simple tasks to cheaper models)
-- Smart retry with exponential backoff and prior context injection
-- Auto-PR creation on successful agent completion
-- Trace-based evidence: per-turn conversation logging (tools, tokens, phases) to traces.db
-
-**Learning loop**:
-1. Agents run → outcomes logged to `outcomes.jsonl`, traces to `traces.db`
-2. `conductor learn` analyzes patterns (success rate, failure phases, error types)
-3. `conductor learn --evolve` calls Claude to mutate `prompt-template.md` based on failure data
-4. Next agent run uses the improved template → repeat
-
 **Template variables**: `{{ISSUE_ID}}`, `{{TITLE}}`, `{{DESCRIPTION}}`, `{{LABELS}}`, `{{PRIORITY}}`, `{{ATTEMPT}}`, `{{PRIOR_CONTEXT}}`
 
 ## Task Delegation Model
 
-Route effort by task complexity — not all code changes deserve equal scrutiny:
+Route effort by task complexity:
 
 **AUTOMATE** — Execute immediately, lint+test is sufficient:
 - CRUD operations, boilerplate, formatting, simple transforms
@@ -237,46 +218,11 @@ Route effort by task complexity — not all code changes deserve equal scrutiny:
 - Irreversible operations (data migrations, schema drops)
 - Publishing (npm publish, Railway deploy)
 
-Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
-
-For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor surrounding code, add abstractions for one-time operations, or create helpers that are used once. Three similar lines of code is better than a premature abstraction.
-
 ## Session Budget
 
 - Max 1 major topic per session — split unrelated work into separate sessions
 - Run /compact or summarize at ~50% context usage to avoid overflow
 - Plan-execute sessions (low interaction, high edits) are most efficient
-- Avoid exploratory marathons with topic-switching — burns 30-40% extra tokens
-
-## Context Maintenance
-
-**`/update-docs`** — Run weekly or when context feels stale:
-- Audits CLAUDE.md, MEMORY.md, agent_docs/ against git history and codebase
-- Detects stale entries, missing patterns, outdated paths
-- Trigger: start of week, after major refactors, or when sessions feel slow/confused
-
-**`/recover`** — Run when a session goes off the rails:
-- Analyzes traces to find where context drifted from intent
-- Maps drift to specific doc fixes (missing guidance, stale memory, ambiguous instruction)
-- Trigger: user says "this is wrong", "not what I wanted", "off the rails", repeated corrections
-
-**`/next`** — Run at session start or when asking "what's next":
-- Scans git log, TODO files, Linear issues, and memory for actionable items
-- Prioritizes: unfinished work > flagged issues > queued tasks > continuations
-- Trigger: session start, "what's next", "whats next", between tasks
-
-**`/learn`** — Run at session end to capture learnings:
-- Reviews session work, then audits memory, CLAUDE.md, skills, scripts, and wiki
-- Proposes creates/updates/deletes with confirmation before applying
-- Trigger: end of session, after significant work, "what should I update"
-
-**When to use which:**
-- Starting a session or between tasks → `/next` (pick what to work on)
-- Session producing wrong results → `/recover` (diagnose + fix now)
-- Routine maintenance, nothing broken → `/update-docs` (proactive gardening)
-- After publishing a new version → `/update-docs` (catch version/path drift)
-- After conductor failures → `/recover last` (learn from agent traces)
-- End of session → `/learn` (capture what changed, update artifacts)
 
 ## Workflow
 

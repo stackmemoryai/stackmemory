@@ -1,6 +1,36 @@
 # StackMemory - Project Configuration
 
-## Project Structure
+## Critical Constraints
+
+### Security
+NEVER hardcode secrets - use process.env with dotenv/config
+
+```javascript
+import 'dotenv/config';
+const API_KEY = process.env.LINEAR_API_KEY;
+if (!API_KEY) {
+  console.error('LINEAR_API_KEY not set');
+  process.exit(1);
+}
+```
+
+Environment sources (check in order): `.env` → `.env.local` → `~/.zshrc` → process env
+
+Secret patterns to block: `lin_api_*` | `lin_oauth_*` | `sk-*` | `npm_*`
+
+### Git Rules
+The pre-commit hook enforces lint + test + build. Fix the underlying issue — never bypass it.
+
+- Do NOT use `--no-verify` on git push or commit
+- Run `npm run lint && npm run test:run` before pushing
+- Commit format: `type(scope): message`
+- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+
+---
+
+## Project Reference
+
+### Structure
 
 ```
 src/
@@ -35,37 +65,31 @@ scripts/           # Build and utility scripts
 docs/              # Documentation
 ```
 
-## Key Files
+### Key Files
 
-- Entry: src/cli/index.ts
-- MCP Server: src/integrations/mcp/server.ts
-- Frame Manager: src/core/context/frame-manager.ts
-- Database: src/core/database/sqlite-adapter.ts
-- Snapshot: src/core/worktree/capture.ts
-- Preflight: src/core/worktree/preflight.ts
-- Conductor: src/cli/commands/orchestrator.ts (core) + orchestrate.ts (CLI)
-- Conductor Traces: src/cli/commands/conductor-traces.ts
-- Frame Enrichment: src/core/context/frame-enrichment.ts
-- Process Utils: src/utils/process-cleanup.ts
-- Shared Utils: src/core/utils/{git,text,fs}.ts
+- Entry: `src/cli/index.ts`
+- MCP Server: `src/integrations/mcp/server.ts`
+- Frame Manager: `src/core/context/frame-manager.ts`
+- Database: `src/core/database/sqlite-adapter.ts`
+- Snapshot: `src/core/worktree/capture.ts`
+- Preflight: `src/core/worktree/preflight.ts`
+- Conductor: `src/cli/commands/orchestrator.ts` (core) + `orchestrate.ts` (CLI)
+- Conductor Traces: `src/cli/commands/conductor-traces.ts`
+- Frame Enrichment: `src/core/context/frame-enrichment.ts`
+- Process Utils: `src/utils/process-cleanup.ts`
+- Shared Utils: `src/core/utils/{git,text,fs}.ts`
 
-## Detailed Guides
+### Guides
 
-Quick reference (agent_docs/):
-- linear_integration.md - Linear sync
-- mcp_server.md - MCP tools
-- database_storage.md - Storage
-- claude_hooks.md - Hooks
+Quick reference (`agent_docs/`): `linear_integration.md` | `mcp_server.md` | `database_storage.md` | `claude_hooks.md`
 
-Full documentation (docs/):
-- principles.md - Agent programming paradigm
-- architecture.md - Extension model and browser sandbox
-- SPEC.md - Technical specification
-- API_REFERENCE.md - API docs
-- DEVELOPMENT.md - Dev guide
-- SETUP.md - Installation
+Full docs (`docs/`): `principles.md` | `architecture.md` | `SPEC.md` | `API_REFERENCE.md` | `DEVELOPMENT.md` | `SETUP.md`
+
+---
 
 ## Commands
+
+**Working directory**: PRIMARY `/Users/jwu/Dev/stackmemory` | ALLOWED all subdirectories | TEMP `/tmp`
 
 ```bash
 npm run build          # Compile TypeScript (esbuild)
@@ -87,13 +111,6 @@ stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrat
 stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
 stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
 stackmemory conductor status   # Live agent status dashboard
-
-# GEPA Optimizer (scripts/gepa/optimize.js)
-node scripts/gepa/optimize.js run [gens] [--auto-apply]  # Full optimization loop
-node scripts/gepa/optimize.js score [--auto-apply]        # Score variants, select best
-node scripts/gepa/optimize.js run --target skill:start     # Optimize specific target
-node scripts/gepa/optimize.js mutate --auto-phase          # Auto-detect worst phase
-# Flags: --auto-apply (deploy winner), --no-cache (fresh eval), --target <name>, --phase <name>
 stackmemory conductor monitor  # Real-time TUI with phase tracking
 stackmemory conductor finalize # Clean up dead/stale agents
 stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
@@ -102,18 +119,14 @@ stackmemory conductor trace-stats         # Aggregate trace statistics
 stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias: watch)
 ```
 
-## Working Directory
+---
 
-- PRIMARY: /Users/jwu/Dev/stackmemory
-- ALLOWED: All subdirectories
-- TEMP: /tmp for temporary operations
-
-## Validation
+## Validation & Testing
 
 Verify each step after code changes — pre-commit hooks catch 80% of CI failures locally:
-1. `npm run lint` - fix any errors AND warnings
-2. `npm run test:run` - verify no regressions
-3. `npm run build` - ensure compilation
+1. `npm run lint` — fix errors AND warnings
+2. `npm run test:run` — verify no regressions
+3. `npm run build` — ensure compilation
 4. Run code to verify it works
 
 Test coverage:
@@ -127,16 +140,7 @@ Testing rules:
 - `vi.clearAllMocks()` resets `mockReturnValue` — re-set mocks in `beforeEach`
 - Pre-commit hook runs: lint + parallel vitest + build — fix issues before commit, never skip
 
-## Git Rules
-
-The pre-commit hook enforces lint + test + build. Fix the underlying issue rather than bypassing it.
-
-- Do not use `--no-verify` on git push or commit — fix the hook failure instead
-- Fix lint/test errors before pushing
-- If pre-push hooks fail, fix the underlying issue
-- Run `npm run lint && npm run test:run` before pushing
-- Commit message format: `type(scope): message`
-- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+---
 
 ## Task Management
 
@@ -144,26 +148,7 @@ The pre-commit hook enforces lint + test + build. Fix the underlying issue rathe
 - Keep one task in_progress at a time
 - Update task status immediately on completion
 
-## Security
-
-NEVER hardcode secrets - use process.env with dotenv/config
-
-```javascript
-import 'dotenv/config';
-const API_KEY = process.env.LINEAR_API_KEY;
-if (!API_KEY) {
-  console.error('LINEAR_API_KEY not set');
-  process.exit(1);
-}
-```
-
-Environment sources (check in order):
-1. .env file
-2. .env.local
-3. ~/.zshrc
-4. Process environment
-
-Secret patterns to block: lin_api_* | lin_oauth_* | sk-* | npm_*
+---
 
 ## Deploy
 
@@ -180,6 +165,8 @@ railway up
 
 # Pre-publish checks require clean git status — stash GEPA files first
 ```
+
+---
 
 ## Conductor (Autonomous Agent Orchestration)
 
@@ -207,11 +194,13 @@ The conductor manages autonomous coding agents via Linear issues:
 
 **Template variables**: `{{ISSUE_ID}}`, `{{TITLE}}`, `{{DESCRIPTION}}`, `{{LABELS}}`, `{{PRIORITY}}`, `{{ATTEMPT}}`, `{{PRIOR_CONTEXT}}`
 
+---
+
 ## Task Delegation Model
 
-Route effort by task complexity — not all code changes deserve equal scrutiny:
+Route effort by task complexity:
 
-**AUTOMATE** — Execute immediately, lint+test is sufficient:
+**AUTOMATE** — Execute immediately, lint+test sufficient:
 - CRUD operations, boilerplate, formatting, simple transforms
 - Adding a tool handler following existing switch/case pattern
 - Config additions (new env var, feature flag)
@@ -239,7 +228,9 @@ Route effort by task complexity — not all code changes deserve equal scrutiny:
 
 Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
 
-For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor surrounding code, add abstractions for one-time operations, or create helpers that are used once. Three similar lines of code is better than a premature abstraction.
+For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor surrounding code, add abstractions for one-time operations, or create helpers that are used once.
+
+---
 
 ## Session Budget
 
@@ -247,6 +238,8 @@ For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor
 - Run /compact or summarize at ~50% context usage to avoid overflow
 - Plan-execute sessions (low interaction, high edits) are most efficient
 - Avoid exploratory marathons with topic-switching — burns 30-40% extra tokens
+
+---
 
 ## Context Maintenance
 
@@ -271,12 +264,14 @@ For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor
 - Trigger: end of session, after significant work, "what should I update"
 
 **When to use which:**
-- Starting a session or between tasks → `/next` (pick what to work on)
-- Session producing wrong results → `/recover` (diagnose + fix now)
-- Routine maintenance, nothing broken → `/update-docs` (proactive gardening)
-- After publishing a new version → `/update-docs` (catch version/path drift)
-- After conductor failures → `/recover last` (learn from agent traces)
-- End of session → `/learn` (capture what changed, update artifacts)
+- Starting a session or between tasks → `/next`
+- Session producing wrong results → `/recover`
+- Routine maintenance, nothing broken → `/update-docs`
+- After publishing a new version → `/update-docs`
+- After conductor failures → `/recover last`
+- End of session → `/learn`
+
+---
 
 ## Workflow
 
