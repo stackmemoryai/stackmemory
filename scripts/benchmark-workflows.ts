@@ -136,11 +136,24 @@ const WORKFLOWS: WorkflowDefinition[] = [
     playwrightFn: async (page: any) => {
       await page.goto('https://www.npmjs.com/package/@browserbasehq/stagehand');
       await page.waitForLoadState('domcontentloaded');
-      const version = await page
-        .locator('[class*="version"], span:has-text(".")')
-        .first()
-        .textContent()
-        .catch(() => 'unknown');
+      // NPM uses client-side rendering — extract from page title or JSON-LD
+      const version = await page.evaluate(() => {
+        // Try JSON-LD first (most reliable)
+        const ld = document.querySelector('script[type="application/ld+json"]');
+        if (ld) {
+          try {
+            return JSON.parse(ld.textContent || '').version || 'unknown';
+          } catch {}
+        }
+        // Fallback: parse from title "stagehand - npm" or page content
+        const title = document.title;
+        const match = title.match(/(\d+\.\d+\.\d+)/);
+        if (match) return match[1];
+        // Last resort: find version-like string in body text
+        const body = document.body.innerText;
+        const verMatch = body.match(/Version\s*[\n:]*\s*(\d+\.\d+\.\d+)/i);
+        return verMatch ? verMatch[1] : 'unknown';
+      });
       return { version };
     },
   },
