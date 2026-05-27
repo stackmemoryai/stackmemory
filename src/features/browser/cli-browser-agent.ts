@@ -359,23 +359,30 @@ export class CliBrowserAgent {
       });
 
       proc.on('close', (code) => {
-        if (code !== 0 && !stdout) {
-          reject(new Error(`CLI exited ${code}: ${stderr.slice(0, 300)}`));
+        // Accept output even on non-zero exit — Claude Code hook failures
+        // (exit 143) still produce valid stdout from --print
+        const text = stdout.trim();
+        if (!text) {
+          reject(
+            new Error(
+              `CLI exited ${code} with no output: ${stderr.slice(0, 300)}`
+            )
+          );
           return;
         }
 
-        let text = stdout;
+        let finalText = text;
         if (this.config.provider === 'codex') {
           try {
-            const parsed = JSON.parse(stdout);
-            text = parsed.message || parsed.output || stdout;
+            const parsed = JSON.parse(text);
+            finalText = parsed.message || parsed.output || text;
           } catch {
             /* use raw */
           }
         }
 
-        const tokens = Math.ceil((prompt.length + text.length) / 4);
-        resolve({ text: text.trim(), tokens });
+        const tokens = Math.ceil((prompt.length + finalText.length) / 4);
+        resolve({ text: finalText, tokens });
       });
 
       proc.on('error', (err) => {
