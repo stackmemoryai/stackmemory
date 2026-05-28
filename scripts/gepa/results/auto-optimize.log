@@ -214,3 +214,11 @@ Usage:
   node reflect.js reflect    Generate reflection insights
 
 [GEPA] Auto-optimize failed: spawnSync /bin/sh ETIMEDOUT
+
+GEPA Reflection Engine
+
+Usage:
+  node reflect.js analyze    Analyze session patterns
+  node reflect.js reflect    Generate reflection insights
+
+[GEPA] Auto-optimize failed: spawnSync /bin/sh ETIMEDOUT
