@@ -10,8 +10,8 @@
       "passRate": 0,
       "criteria": {},
       "judgeMode": "llm",
-      "duration": 13983,
-      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrK9yo6nnMFHopzPazv\"}\n"
+      "duration": 10265,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcJP3x7xNaBFZS4UbTB\"}\n"
     },
     {
       "taskId": "eval-002",
@@ -21,8 +21,8 @@
       "passRate": 0,
       "criteria": {},
       "judgeMode": "llm",
-      "duration": 16333,
-      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrLLtuG7F3H1pCNpYGA\"}\n"
+      "duration": 9943,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcK53G6yicK6RevJ1vm\"}\n"
     },
     {
       "taskId": "eval-003",
@@ -32,8 +32,8 @@
       "passRate": 0,
       "criteria": {},
       "judgeMode": "llm",
-      "duration": 15094,
-      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrMSjAqRiLjqsjvABeV\"}\n"
+      "duration": 10023,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcKuQbd39yhMSCkoqcd\"}\n"
     },
     {
       "taskId": "eval-004",
@@ -43,8 +43,8 @@
       "passRate": 0,
       "criteria": {},
       "judgeMode": "llm",
-      "duration": 17399,
-      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrNe64T7Xw5f9PTR6WV\"}\n"
+      "duration": 10088,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcLXs5yV1tiF9zt7TBz\"}\n"
     },
     {
       "taskId": "eval-005",
@@ -54,8 +54,8 @@
       "passRate": 0,
       "criteria": {},
       "judgeMode": "llm",
-      "duration": 20105,
-      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbTrQ9qW1gUPDJb4rwcyL\"}\n"
+      "duration": 10933,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcMHJkq9Fa3dUr2i5nz\"}\n"
     },
     {
       "taskId": "pa-001",
@@ -63,31 +63,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "reads_existing_code": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "apperror_pattern": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "test_commands": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "supertest_pattern": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "di_factory_pattern": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 16426,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 15569,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcNQ9ny4FaQNWxBKJAB\"}\n"
     },
     {
       "taskId": "pa-002",
@@ -95,27 +74,10 @@
       "weight": 1.8,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "no_jest_globals_import": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "clear_all_mocks_warning": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "eslint_catch_pattern": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "check_existing_patterns": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 14880,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 11429,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcPGAr9YNiHhUs51GYy\"}\n"
     },
     {
       "taskId": "pa-003",
@@ -123,27 +85,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "migration_naming": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "check_latest_number": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "nullable_column": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "auto_migration_startup": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 15560,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 10502,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcQ8pMtmFPnqH1hNJwq\"}\n"
     },
     {
       "taskId": "pa-004",
@@ -151,27 +96,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "read_existing_templates": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "step_runner_stages": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "enrichment_cjs": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "recipe_service_path": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 17517,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 9689,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcQvwWbEXzoW3iM38WY\"}\n"
     },
     {
       "taskId": "pa-005",
@@ -179,27 +107,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "no_hardcoded_stripe_ids": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "v2_products": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "check_billing_routes": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "test_vs_live_keys": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 16737,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 9236,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcRajresdrd86Skape2\"}\n"
     },
     {
       "taskId": "pa-006",
@@ -207,27 +118,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "auth_middleware_reference": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "three_auth_modes": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "tenant_isolation": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "credential_encryption": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 15655,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 8567,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcSFaDTd3kq56docd97\"}\n"
     },
     {
       "taskId": "pa-007",
@@ -235,27 +129,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "vite_base_path": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "design_system": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "build_command": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "product_gating": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 20126,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 9913,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcSv3k4aRh95ky5bFtm\"}\n"
     },
     {
       "taskId": "pa-008",
@@ -263,27 +140,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "model_tiers": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "anthropic_native": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "read_adapter_first": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "trace_logger": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 36029,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 10572,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcTiCtD3V48uA5fvrF1\"}\n"
     },
     {
       "taskId": "pa-009",
@@ -291,27 +151,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "pipedream_connect": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "existing_connector_patterns": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "fixture_pattern": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "integration_test_path": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 23541,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 11621,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcUS53pMuv6huJaP6nj\"}\n"
     },
     {
       "taskId": "pa-010",
@@ -319,27 +162,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "hmac_verification": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "webhook_signature_module": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "parameterized_queries": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "service_registry": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 18769,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 9289,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcVGBm7iYvmCURwHJwV\"}\n"
     },
     {
       "taskId": "pa-011",
@@ -347,27 +173,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "ctx_schema": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "tenant_scoping": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "existing_service": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "graph_service_wrapper": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 13960,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 9161,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcVwqUhxMnVVyvGAvNY\"}\n"
     },
     {
       "taskId": "pa-012",
@@ -375,27 +184,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "playwright_projects": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "existing_e2e_patterns": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "test_mode_header": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "e2e_api_command": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 16871,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 10178,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcWctEaizkU4WovvEW5\"}\n"
     },
     {
       "taskId": "pa-013",
@@ -403,27 +195,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "trace_logger_reference": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "trace_span_pattern": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "no_pii_logging": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "structured_metadata": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 17723,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 10398,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcXTkLhhyqX1XcRd4PB\"}\n"
     },
     {
       "taskId": "pa-014",
@@ -431,27 +206,10 @@
       "weight": 1.8,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "guides_file_search": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "understand_flakiness": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "graceful_degradation": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "codebase_context": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 15888,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 8548,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcY6k4b25TZsSFpxdqG\"}\n"
     },
     {
       "taskId": "pa-015",
@@ -459,27 +217,10 @@
       "weight": 2,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "security_rules_reference": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "input_validation": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "no_secrets_in_commits": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "pii_scrubbing_guidance": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 13298,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 11201,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcYrJBaB3LB5CZWUkSJ\"}\n"
     },
     {
       "taskId": "cond-001",
@@ -487,27 +228,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "mentions_lint_test": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "commit_format": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "bug_context": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "validation_step": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 15334,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 9442,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcZcMpLsgWuPsDjEbCm\"}\n"
     },
     {
       "taskId": "cond-002",
@@ -515,31 +239,10 @@
       "weight": 1.5,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "implementation_guidance": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "test_requirements": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "existing_patterns": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "code_quality": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "commit_conventions": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 11465,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 11630,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcaJdF48zacvbW1XzqD\"}\n"
     },
     {
       "taskId": "cond-003",
@@ -547,27 +250,10 @@
       "weight": 2,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "reads_prior_context": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "avoids_repeating_mistakes": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "different_approach": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "preserves_prior_work": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 12649,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 13113,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcbH6k4fqVEgpR7vmZw\"}\n"
     },
     {
       "taskId": "cond-004",
@@ -575,27 +261,10 @@
       "weight": 1.3,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "commit_format_specified": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "includes_issue_id": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "atomic_commits": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "branch_conventions": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 8728,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 12930,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVccKPwHFWx9xy8DrDED\"}\n"
     },
     {
       "taskId": "cond-005",
@@ -603,27 +272,10 @@
       "weight": 1.8,
       "passed": false,
       "passRate": 0,
-      "criteria": {
-        "graceful_without_description": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "guides_codebase_search": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "handles_empty_labels": {
-          "passed": false,
-          "reason": "regex heuristic"
-        },
-        "minimal_input_useful": {
-          "passed": false,
-          "reason": "regex heuristic"
-        }
-      },
-      "judgeMode": "regex",
-      "duration": 10299,
-      "output": "Invalid API key · Fix external API key\n"
+      "criteria": {},
+      "judgeMode": "llm",
+      "duration": 11296,
+      "output": "API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbVcdA7rpSyACbJCstELN\"}\n"
     }
   ]
 }

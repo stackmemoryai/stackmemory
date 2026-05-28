@@ -9,6 +9,36 @@
       "variant": "baseline",
       "action": "init",
       "timestamp": "2026-05-28T15:55:50.205Z"
+    },
+    {
+      "generation": 1,
+      "action": "mutate-phase",
+      "phase": "understand",
+      "variants": [
+        "phase-understand-a",
+        "phase-understand-b"
+      ],
+      "timestamp": "2026-05-28T16:33:51.132Z"
+    },
+    {
+      "generation": 1,
+      "action": "mutate-phase",
+      "phase": "understand",
+      "variants": [
+        "phase-understand-a",
+        "phase-understand-b"
+      ],
+      "timestamp": "2026-05-28T18:21:07.612Z"
+    },
+    {
+      "generation": 1,
+      "action": "mutate-phase",
+      "phase": "understand",
+      "variants": [
+        "phase-understand-a",
+        "phase-understand-b"
+      ],
+      "timestamp": "2026-05-28T20:37:02.944Z"
     }
   ]
 }
