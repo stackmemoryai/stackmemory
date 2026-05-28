@@ -10,10 +10,10 @@ describe('estimateTokens', () => {
     expect(estimateTokens('')).toBe(0);
   });
 
-  it('should estimate tokens as ceil(length / 4)', () => {
+  it('should estimate tokens accurately via tiktoken', () => {
     expect(estimateTokens('abcd')).toBe(1);
     expect(estimateTokens('abcde')).toBe(2);
-    expect(estimateTokens('a'.repeat(100))).toBe(25);
+    expect(estimateTokens('a'.repeat(100))).toBe(13);
   });
 
   it('should handle short strings', () => {
@@ -24,7 +24,7 @@ describe('estimateTokens', () => {
 
   it('should handle long content', () => {
     const content = 'x'.repeat(10000);
-    expect(estimateTokens(content)).toBe(2500);
+    expect(estimateTokens(content)).toBe(1250);
   });
 });
 

@@ -8,7 +8,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { EventEmitter } from 'events';
 
-// Mock child_process.spawn to avoid invoking real claude CLI in tests
+// Mock child_process to avoid invoking real CLI in tests.
+// execSync must throw so isCodexAvailable/isGrokBuildAvailable return false.
 vi.mock('child_process', () => ({
   spawn: vi.fn(() => {
     const proc = new EventEmitter() as any;
@@ -28,6 +29,9 @@ vi.mock('child_process', () => ({
       proc.emit('close', 0);
     }, 50);
     return proc;
+  }),
+  execSync: vi.fn(() => {
+    throw new Error('not found');
   }),
 }));
 
@@ -287,6 +291,11 @@ describe('ClaudeCodeSubagentClient', () => {
 
     beforeEach(() => {
       nonMockClient = new ClaudeCodeSubagentClient(false);
+      // Prevent codex/grok detection from short-circuiting multiProvider routing
+      vi.spyOn(nonMockClient as any, 'isCodexAvailable').mockReturnValue(false);
+      vi.spyOn(nonMockClient as any, 'isGrokBuildAvailable').mockReturnValue(
+        false
+      );
     });
 
     afterEach(async () => {
@@ -492,6 +501,11 @@ describe('ClaudeCodeSubagentClient', () => {
 
     beforeEach(() => {
       nonMockClient = new ClaudeCodeSubagentClient(false);
+      // Prevent codex/grok detection from short-circuiting CLI path
+      vi.spyOn(nonMockClient as any, 'isCodexAvailable').mockReturnValue(false);
+      vi.spyOn(nonMockClient as any, 'isGrokBuildAvailable').mockReturnValue(
+        false
+      );
       mockIsFeatureEnabled.mockReturnValue(true);
       mockGetOptimalProvider.mockReturnValue({
         provider: 'anthropic',

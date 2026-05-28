@@ -68,9 +68,9 @@ describe('ContentCache', () => {
   });
 
   describe('token estimation', () => {
-    it('should estimate tokens as ceil(length / 4)', () => {
+    it('should estimate tokens accurately via tiktoken', () => {
       const entry = cache.put('a'.repeat(100));
-      expect(entry.tokenCount).toBe(25);
+      expect(entry.tokenCount).toBe(13);
     });
   });
 
@@ -89,13 +89,13 @@ describe('ContentCache', () => {
       cache.lookup('abcd'); // hit_count -> 1
       cache.lookup('abcd'); // hit_count -> 2
 
-      cache.put('x'.repeat(8), 'src-b'); // 2 tokens, 0 hits
+      cache.put('x'.repeat(8), 'src-b'); // 1 token (tiktoken), 0 hits
       cache.lookup('x'.repeat(8)); // hit_count -> 1
 
       const stats = cache.getStats();
       expect(stats.totalEntries).toBe(2);
-      // entry1: 2 hits * 1 token = 2, entry2: 1 hit * 2 tokens = 2 => 4
-      expect(stats.totalTokensSaved).toBe(4);
+      // entry1: 2 hits * 1 token = 2, entry2: 1 hit * 1 token = 1 => 3
+      expect(stats.totalTokensSaved).toBe(3);
     });
 
     it('should return topSources sorted by tokens saved', () => {
@@ -231,12 +231,12 @@ describe('ContentCache', () => {
 
     it('should count tokens based on the stored value, not the key', () => {
       const key = 'short-key';
-      const value = 'a'.repeat(400); // 100 tokens
+      const value = 'a'.repeat(400); // 50 tokens (tiktoken)
       cache.putByKey(key, value, 'test');
 
       const result = cache.lookupByKey(key);
       expect(result.hit).toBe(true);
-      expect(result.tokensSaved).toBe(100);
+      expect(result.tokensSaved).toBe(50);
     });
 
     it('should increment hit count on repeated lookupByKey', () => {
@@ -255,12 +255,12 @@ describe('ContentCache', () => {
     });
 
     it('should track savings in getStats', () => {
-      cache.putByKey('tool:search:q1', 'x'.repeat(80), 'tool:search'); // 20 tokens
+      cache.putByKey('tool:search:q1', 'x'.repeat(80), 'tool:search'); // 10 tokens (tiktoken)
       cache.lookupByKey('tool:search:q1'); // hit 1
       cache.lookupByKey('tool:search:q1'); // hit 2
 
       const stats = cache.getStats();
-      expect(stats.totalTokensSaved).toBe(40); // 2 hits × 20 tokens
+      expect(stats.totalTokensSaved).toBe(20); // 2 hits × 10 tokens
     });
   });
 });
