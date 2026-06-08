@@ -54,6 +54,7 @@ import { registerLogoutCommand, registerDbCommands } from './commands/db.js';
 import { createHooksCommand } from './commands/hooks.js';
 import { createDaemonCommand } from './commands/daemon.js';
 import { createSweepCommand } from './commands/sweep.js';
+import { createPortalCommand } from './commands/portal.js';
 import { createShellCommand } from './commands/shell.js';
 import { createAPICommand } from './commands/api.js';
 import { createCleanupProcessesCommand } from './commands/cleanup-processes.js';
@@ -806,6 +807,7 @@ if (isFeatureEnabled('ralph')) {
 }
 program.addCommand(createDaemonCommand());
 program.addCommand(createSweepCommand());
+program.addCommand(createPortalCommand());
 program.addCommand(createShellCommand());
 program.addCommand(createAPICommand());
 program.addCommand(createCleanupProcessesCommand());
