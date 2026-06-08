@@ -37,8 +37,8 @@ describe('BrainStore', () => {
 
     const results = store.recall({ text: 'jitter' });
     expect(results).toHaveLength(1);
-    expect(results[0].conclusion).toBe('errors dropped 60%');
-    expect(results[0].agent).toBe('codex');
+    expect(results[0]?.conclusion).toBe('errors dropped 60%');
+    expect(results[0]?.agent).toBe('codex');
   });
 
   it('does not leak entries across repos by default', () => {

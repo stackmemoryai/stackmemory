@@ -128,8 +128,8 @@ export class VisionLoop {
       };
     }
     const idx = vision.objectives.findIndex((o) => !o.done);
-    if (idx >= 0) {
-      const o = vision.objectives[idx];
+    const o = idx >= 0 ? vision.objectives[idx] : undefined;
+    if (o) {
       return {
         kind: 'objective',
         id: o.id,

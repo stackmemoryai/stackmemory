@@ -207,7 +207,7 @@ export class BrainStore {
 }
 
 function rowToEntry(row: BrainRow): BrainEntry {
-  return {
+  const entry: BrainEntry = {
     entryId: row.entry_id,
     workspaceId: row.workspace_id,
     projectId: row.project_id,
@@ -220,10 +220,11 @@ function rowToEntry(row: BrainRow): BrainEntry {
     refs: safeParse(row.refs),
     confidence: row.confidence,
     status: row.status as BrainEntry['status'],
-    supersededBy: row.superseded_by ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  if (row.superseded_by) entry.supersededBy = row.superseded_by;
+  return entry;
 }
 
 function safeParse(json: string): string[] {

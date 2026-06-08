@@ -57,8 +57,8 @@ describe('parseVision', () => {
     ]);
     expect(v.scope).toEqual(['src/**']);
     expect(v.objectives).toHaveLength(3);
-    expect(v.objectives[1].done).toBe(true);
-    expect(v.objectives[0].done).toBe(false);
+    expect(v.objectives[1]?.done).toBe(true);
+    expect(v.objectives[0]?.done).toBe(false);
     expect(v.limits.maxIterations).toBe(5);
     expect(v.limits.maxConsecutiveFailures).toBe(2);
     expect(v.limits.requireApproval).toBe(false);
@@ -85,6 +85,7 @@ describe('scaffold + toggle', () => {
     writeFileSync(p, SAMPLE);
     const v = parseVision(SAMPLE);
     const target = v.objectives[0];
+    if (!target) throw new Error('expected an objective');
     expect(setObjectiveDone(p, target.id, true)).toBe(true);
     const after = parseVision(readFileSync(p, 'utf-8'));
     expect(after.objectives.find((o) => o.id === target.id)?.done).toBe(true);
@@ -98,7 +99,7 @@ describe('SignalInbox', () => {
     inbox.add({ text: 'critical thing', severity: 'critical' });
     inbox.add({ text: 'medium thing', severity: 'medium' });
     const pending = inbox.pending();
-    expect(pending[0].text).toBe('critical thing');
+    expect(pending[0]?.text).toBe('critical thing');
     expect(pending).toHaveLength(3);
   });
 

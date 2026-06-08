@@ -120,12 +120,12 @@ experiment conclusions so mutual thinking compounds. See docs/guides/BRAIN.md.
       const ctx = openBrain();
       try {
         const q: BrainQuery = {
-          text: query,
           org: !!options.org,
-          agent: options.agent,
-          kind: options.kind as BrainKind | undefined,
           limit: parseInt(options.limit, 10),
           includeSuperseded: !!options.all,
+          ...(query ? { text: query } : {}),
+          ...(options.agent ? { agent: options.agent } : {}),
+          ...(options.kind ? { kind: options.kind as BrainKind } : {}),
         };
         const results = ctx.store.recall(q);
         if (options.json) {
@@ -266,8 +266,8 @@ experiment conclusions so mutual thinking compounds. See docs/guides/BRAIN.md.
   return cmd;
 }
 
-function splitList(v?: string): string[] | undefined {
-  if (!v) return undefined;
+function splitList(v?: string): string[] {
+  if (!v) return [];
   return v
     .split(',')
     .map((s) => s.trim())

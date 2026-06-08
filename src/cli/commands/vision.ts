@@ -177,15 +177,16 @@ limits (maxIterations, maxConsecutiveFailures, …). See docs/guides/VISION.md.
     .action((text, options) => {
       const p = paths(process.cwd());
       const inbox = new SignalInbox(p.signalsPath);
+      const refs = options.refs
+        ? String(options.refs)
+            .split(',')
+            .map((r: string) => r.trim())
+        : undefined;
       const s = inbox.add({
         text,
         severity: options.severity as SignalSeverity,
         source: options.source,
-        refs: options.refs
-          ? String(options.refs)
-              .split(',')
-              .map((r: string) => r.trim())
-          : undefined,
+        ...(refs ? { refs } : {}),
       });
       console.log(
         chalk.green('✓ signal queued'),
@@ -228,15 +229,16 @@ limits (maxIterations, maxConsecutiveFailures, …). See docs/guides/VISION.md.
           )
         );
       }
+      const max = options.once
+        ? 1
+        : options.max
+          ? parseInt(options.max, 10)
+          : undefined;
       await runLoop({
         dryRun,
-        max: options.once
-          ? 1
-          : options.max
-            ? parseInt(options.max, 10)
-            : undefined,
-        delegateCmd: options.delegateCmd,
         timeoutMs: parseInt(options.timeout, 10) * 1000,
+        ...(max !== undefined ? { max } : {}),
+        ...(options.delegateCmd ? { delegateCmd: options.delegateCmd } : {}),
       });
     });
 
@@ -284,7 +286,7 @@ async function runLoop(opts: {
 
     const result = await loop.run({
       dryRun: opts.dryRun,
-      maxIterations: opts.max,
+      ...(opts.max !== undefined ? { maxIterations: opts.max } : {}),
     });
     for (const d of result.decisions) console.log(fmtDecision(d));
 
