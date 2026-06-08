@@ -169,9 +169,18 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
     enabled: true, // opt-out via STACKMEMORY_RESEARCH_STREAM=0
     interval: 360, // every 6 hours
     keywords: [
-      'agent', 'ai', 'llm', 'mcp', 'context', 'memory',
-      'orchestration', 'skill', 'workflow', 'automation',
-      'browser agent', 'coding assistant',
+      'agent',
+      'ai',
+      'llm',
+      'mcp',
+      'context',
+      'memory',
+      'orchestration',
+      'skill',
+      'workflow',
+      'automation',
+      'browser agent',
+      'coding assistant',
     ],
     maxSignalsPerScan: 50,
   },

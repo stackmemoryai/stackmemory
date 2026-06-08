@@ -59,7 +59,10 @@ const DEFAULT_CONFIG: HermesSMConfig = {
 function loadConfig(): HermesSMConfig {
   try {
     if (fs.existsSync(HERMES_CONFIG_PATH)) {
-      return { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(HERMES_CONFIG_PATH, 'utf8')) };
+      return {
+        ...DEFAULT_CONFIG,
+        ...JSON.parse(fs.readFileSync(HERMES_CONFIG_PATH, 'utf8')),
+      };
     }
   } catch {
     // Use defaults
@@ -121,9 +124,13 @@ function ensureDaemon(): void {
 
 function writeSessionHeartbeat(instanceId: string): NodeJS.Timeout {
   const sessionsDir = path.join(SM_DIR, 'sessions');
-  if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
+  if (!fs.existsSync(sessionsDir))
+    fs.mkdirSync(sessionsDir, { recursive: true });
 
-  const heartbeatFile = path.join(sessionsDir, `session-${Date.now()}.heartbeat`);
+  const heartbeatFile = path.join(
+    sessionsDir,
+    `session-${Date.now()}.heartbeat`
+  );
   fs.writeFileSync(heartbeatFile, instanceId);
 
   // Update heartbeat every 60s
@@ -154,7 +161,11 @@ class HermesSM {
     const { instanceId, tracingEnabled, verboseTracing } = this.config;
 
     console.log(chalk.cyan('╭─ hermes-sm ─────────────────────────────╮'));
-    console.log(chalk.cyan(`│ Instance: ${instanceId.slice(0, 8)}                        │`));
+    console.log(
+      chalk.cyan(
+        `│ Instance: ${instanceId.slice(0, 8)}                        │`
+      )
+    );
     console.log(chalk.cyan('╰──────────────────────────────────────────╯'));
 
     // 1. Ensure daemon is running
@@ -193,7 +204,11 @@ class HermesSM {
         const handoff = store.getLatestHandoff(projectId);
         if (handoff) {
           handoffContext = handoff.content || '';
-          console.log(chalk.dim(`  ↳ Restored handoff: ${handoff.summary?.slice(0, 60) || 'previous session'}`));
+          console.log(
+            chalk.dim(
+              `  ↳ Restored handoff: ${handoff.summary?.slice(0, 60) || 'previous session'}`
+            )
+          );
         }
       } catch {
         // No handoff available
@@ -282,7 +297,9 @@ const smConfig = loadConfig();
 
 program
   .name('hermes-smd')
-  .description('Hermes with StackMemory context persistence, daemon auto-start, and desire-path tracking')
+  .description(
+    'Hermes with StackMemory context persistence, daemon auto-start, and desire-path tracking'
+  )
   .argument('[prompt...]', 'Initial prompt for hermes')
   .option('--resume <session>', 'Resume a Hermes session by ID')
   .option('-m, --model <model>', 'Model to use')
