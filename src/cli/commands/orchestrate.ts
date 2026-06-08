@@ -25,6 +25,7 @@ import Database from 'better-sqlite3';
 import { logger } from '../../core/monitoring/logger.js';
 import { isProcessAlive } from '../../utils/process-cleanup.js';
 import { Conductor } from './orchestrator.js';
+import { createVisionCommand } from './vision.js';
 import {
   getAgentStatusDir,
   getOutcomesLogPath,
@@ -902,6 +903,9 @@ export function createConductorCommands(): Command {
       }
       cmd.help();
     });
+
+  // --- vision (meta-loop above the conductor) ---
+  cmd.addCommand(createVisionCommand());
 
   // --- capture ---
   cmd
