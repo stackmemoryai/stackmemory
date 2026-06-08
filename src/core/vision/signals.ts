@@ -41,8 +41,8 @@ export class SignalInbox {
       source: input.source ?? 'manual',
       severity: input.severity ?? 'medium',
       text: input.text,
-      refs: input.refs,
       createdAt: Date.now(),
+      ...(input.refs ? { refs: input.refs } : {}),
     };
     appendFileSync(this.path, JSON.stringify(signal) + '\n');
     return signal;

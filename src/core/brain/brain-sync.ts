@@ -187,12 +187,13 @@ export class BrainSync {
   async sync(): Promise<BrainSyncResult> {
     const pushed = await this.push();
     const pulled = await this.pull();
+    const error = pushed.error ?? pulled.error;
     return {
       success: pushed.success && pulled.success,
       pushed: pushed.pushed,
       pulled: pulled.pulled,
       applied: pulled.applied,
-      error: pushed.error ?? pulled.error,
+      ...(error ? { error } : {}),
     };
   }
 
@@ -229,7 +230,7 @@ function toWireEntry(row: Record<string, unknown>): BrainEntry {
       return [];
     }
   };
-  return {
+  const entry: BrainEntry = {
     entryId: String(row['entry_id']),
     workspaceId: String(row['workspace_id'] ?? ''),
     projectId: String(row['project_id']),
@@ -242,10 +243,11 @@ function toWireEntry(row: Record<string, unknown>): BrainEntry {
     refs: parse(row['refs']),
     confidence: Number(row['confidence'] ?? 0.7),
     status: String(row['status'] ?? 'active') as BrainEntry['status'],
-    supersededBy: (row['superseded_by'] as string | null) ?? undefined,
     createdAt: Number(row['created_at']),
     updatedAt: Number(row['updated_at']),
   };
+  if (row['superseded_by']) entry.supersededBy = String(row['superseded_by']);
+  return entry;
 }
 
 function errMsg(err: unknown): string {
