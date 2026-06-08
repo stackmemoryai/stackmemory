@@ -76,7 +76,7 @@ const RATE_LIMIT_MS = 1100; // 1.1s between requests (safe for GitHub)
 
 /** Sleep for ms. */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Calculate ISO week string (e.g. "2026-W19"). */
@@ -85,12 +85,22 @@ function isoWeek(date: Date): string {
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
   const week1 = new Date(d.getFullYear(), 0, 4);
-  const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  const weekNum =
+    1 +
+    Math.round(
+      ((d.getTime() - week1.getTime()) / 86400000 -
+        3 +
+        ((week1.getDay() + 6) % 7)) /
+        7
+    );
   return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
 }
 
 /** Score relevance of a title against keyword list. Returns 0-1. */
-function scoreRelevance(title: string, keywords: string[]): { score: number; matched: string[] } {
+function scoreRelevance(
+  title: string,
+  keywords: string[]
+): { score: number; matched: string[] } {
   const lower = title.toLowerCase();
   const matched: string[] = [];
 
@@ -103,12 +113,15 @@ function scoreRelevance(title: string, keywords: string[]): { score: number; mat
   if (matched.length === 0) return { score: 0, matched: [] };
 
   // Base score from match count, diminishing returns
-  const score = Math.min(1, 0.3 + (matched.length * 0.2));
+  const score = Math.min(1, 0.3 + matched.length * 0.2);
   return { score, matched };
 }
 
 /** Safe fetch with timeout. Returns null on any error. */
-async function safeFetch(url: string, timeoutMs = 10_000): Promise<unknown | null> {
+async function safeFetch(
+  url: string,
+  timeoutMs = 10_000
+): Promise<unknown | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -162,7 +175,7 @@ export class ResearchStreamService {
   private async fetchHackerNews(): Promise<ResearchSignal[]> {
     const signals: ResearchSignal[] = [];
 
-    const topIds = await safeFetch(HN_TOP_URL) as number[] | null;
+    const topIds = (await safeFetch(HN_TOP_URL)) as number[] | null;
     if (!topIds || !Array.isArray(topIds)) {
       this.onLog('WARN', 'HN top stories fetch failed');
       return signals;
@@ -172,7 +185,7 @@ export class ResearchStreamService {
 
     for (const id of ids) {
       await sleep(200); // gentle rate limit for HN
-      const item = await safeFetch(`${HN_ITEM_URL}/${id}.json`) as {
+      const item = (await safeFetch(`${HN_ITEM_URL}/${id}.json`)) as {
         title?: string;
         url?: string;
         score?: number;
@@ -180,7 +193,10 @@ export class ResearchStreamService {
 
       if (!item || !item.title) continue;
 
-      const { score: relevance, matched } = scoreRelevance(item.title, this.config.keywords);
+      const { score: relevance, matched } = scoreRelevance(
+        item.title,
+        this.config.keywords
+      );
       if (relevance === 0) continue;
 
       signals.push({
@@ -208,7 +224,7 @@ export class ResearchStreamService {
     const url = `${GH_SEARCH_URL}?q=created:>${dateStr}&sort=stars&order=desc&per_page=10`;
 
     await sleep(RATE_LIMIT_MS);
-    const data = await safeFetch(url) as {
+    const data = (await safeFetch(url)) as {
       items?: Array<{
         full_name?: string;
         html_url?: string;
@@ -224,7 +240,10 @@ export class ResearchStreamService {
 
     for (const repo of data.items) {
       const text = `${repo.full_name || ''} ${repo.description || ''}`;
-      const { score: relevance, matched } = scoreRelevance(text, this.config.keywords);
+      const { score: relevance, matched } = scoreRelevance(
+        text,
+        this.config.keywords
+      );
       if (relevance === 0) continue;
 
       signals.push({
@@ -271,11 +290,12 @@ export class ResearchStreamService {
 
       // Deduplicate against existing stream (by URL)
       const existingUrls = this.loadExistingUrls();
-      const newSignals = capped.filter(s => !existingUrls.has(s.url));
+      const newSignals = capped.filter((s) => !existingUrls.has(s.url));
 
       // Append to JSONL
       if (newSignals.length > 0) {
-        const lines = newSignals.map(s => JSON.stringify(s)).join('\n') + '\n';
+        const lines =
+          newSignals.map((s) => JSON.stringify(s)).join('\n') + '\n';
         appendFileSync(STREAM_FILE, lines, 'utf-8');
         this.state.signalsCollected += newSignals.length;
       }
@@ -345,7 +365,9 @@ export class ResearchStreamService {
       if (weekSignals.length === 0) return;
 
       // Sort by relevance, take top 20
-      weekSignals.sort((a, b) => b.relevance - a.relevance || b.score - a.score);
+      weekSignals.sort(
+        (a, b) => b.relevance - a.relevance || b.score - a.score
+      );
       const topSignals = weekSignals.slice(0, 20);
 
       // Extract themes from keyword frequency
@@ -435,8 +457,15 @@ export class ResearchStreamService {
     try {
       if (!existsSync(STREAM_FILE)) return [];
       const lines = readFileSync(STREAM_FILE, 'utf-8').trim().split('\n');
-      return lines.slice(-(this.state.signalsCollected - before))
-        .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      return lines
+        .slice(-(this.state.signalsCollected - before))
+        .map((l) => {
+          try {
+            return JSON.parse(l);
+          } catch {
+            return null;
+          }
+        })
         .filter(Boolean) as ResearchSignal[];
     } catch {
       return [];

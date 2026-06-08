@@ -51,32 +51,37 @@ export interface DesirePathConfig extends DaemonServiceConfig {
 }
 
 export interface ActionEntry {
-  ts: string;       // ISO timestamp
-  sid: string;      // session ID
-  tool: string;     // tool name (Read, Edit, Bash, Grep, etc.)
-  target: string;   // sanitized first arg (file path pattern, command prefix)
-  dur?: number;     // duration ms
+  ts: string; // ISO timestamp
+  sid: string; // session ID
+  tool: string; // tool name (Read, Edit, Bash, Grep, etc.)
+  target: string; // sanitized first arg (file path pattern, command prefix)
+  dur?: number; // duration ms
 }
 
 export interface DetectedPattern {
   id: string;
-  sequence: string[];       // e.g. ["Read:src/runtime/*.js", "Edit:src/runtime/*.js", "Bash:npx jest*"]
-  frequency: number;        // how many times observed
-  sessions: number;         // across how many distinct sessions
-  avg_steps: number;        // average total steps in sessions containing this pattern
-  first_seen: string;       // ISO
-  last_seen: string;        // ISO
-  score: number;            // frequency × sessions (simple ranking)
+  sequence: string[]; // e.g. ["Read:src/runtime/*.js", "Edit:src/runtime/*.js", "Bash:npx jest*"]
+  frequency: number; // how many times observed
+  sessions: number; // across how many distinct sessions
+  avg_steps: number; // average total steps in sessions containing this pattern
+  first_seen: string; // ISO
+  last_seen: string; // ISO
+  score: number; // frequency × sessions (simple ranking)
 }
 
 export interface SkillSuggestion {
   name: string;
   description: string;
-  inputs: Array<{ name: string; type: string; required: boolean; description: string }>;
+  inputs: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    description: string;
+  }>;
   outputs: Array<{ name: string; type: string; description: string }>;
   steps: string[];
   pattern_id: string;
-  confidence: number;       // 0-1 based on pattern strength
+  confidence: number; // 0-1 based on pattern strength
   generated_at: string;
 }
 
@@ -120,7 +125,7 @@ function sanitizeCommand(cmd: string): string {
   const parts = cmd.trim().split(/\s+/);
   const command = parts[0];
   // Keep first meaningful arg (skip flags)
-  const firstArg = parts.slice(1).find(p => !p.startsWith('-'));
+  const firstArg = parts.slice(1).find((p) => !p.startsWith('-'));
   if (firstArg) {
     return `${command} ${firstArg.length > 30 ? firstArg.slice(0, 30) + '*' : firstArg}`;
   }
@@ -145,8 +150,8 @@ export class DaemonDesirePathService {
   private scanTimeout?: NodeJS.Timeout;
   private isRunning = false;
   private onLog: (level: string, message: string, data?: unknown) => void;
-  private lastActivityTime = 0;        // last time an action was logged
-  private consecutiveIdleScans = 0;     // scans with no new actions
+  private lastActivityTime = 0; // last time an action was logged
+  private consecutiveIdleScans = 0; // scans with no new actions
 
   constructor(
     config: DesirePathConfig,
@@ -202,12 +207,20 @@ export class DaemonDesirePathService {
   }
 
   /** Parse a hook event into an ActionEntry. */
-  static parseHookEvent(toolName: string, firstArg: string, sessionId: string, durationMs?: number): ActionEntry {
+  static parseHookEvent(
+    toolName: string,
+    firstArg: string,
+    sessionId: string,
+    durationMs?: number
+  ): ActionEntry {
     let target: string;
 
     if (TOOL_TARGET_SENSITIVE.has(toolName)) {
       target = sanitizeCommand(firstArg);
-    } else if (firstArg && (firstArg.includes('/') || firstArg.includes('\\'))) {
+    } else if (
+      firstArg &&
+      (firstArg.includes('/') || firstArg.includes('\\'))
+    ) {
       target = sanitizePath(firstArg);
     } else {
       target = firstArg ? firstArg.slice(0, 50) : '*';
@@ -233,7 +246,13 @@ export class DaemonDesirePathService {
     try {
       const lines = readFileSync(STREAM_FILE, 'utf-8').trim().split('\n');
       entries = lines
-        .map(line => { try { return JSON.parse(line); } catch { return null; } })
+        .map((line) => {
+          try {
+            return JSON.parse(line);
+          } catch {
+            return null;
+          }
+        })
         .filter(Boolean) as ActionEntry[];
     } catch {
       return [];
@@ -254,7 +273,15 @@ export class DaemonDesirePathService {
     // Extract subsequences from each session
     const maxLen = this.config.maxSequenceLength || 8;
     const minLen = 2;
-    const sequenceCounts = new Map<string, { count: number; sessions: Set<string>; firstSeen: string; lastSeen: string }>();
+    const sequenceCounts = new Map<
+      string,
+      {
+        count: number;
+        sessions: Set<string>;
+        firstSeen: string;
+        lastSeen: string;
+      }
+    >();
 
     for (const [sid, actions] of sessions) {
       const keys = actions.map(actionKey);
@@ -335,7 +362,14 @@ export class DaemonDesirePathService {
 
     // Persist
     try {
-      writeFileSync(PATTERNS_FILE, JSON.stringify({ patterns: topPatterns, updated_at: new Date().toISOString() }, null, 2));
+      writeFileSync(
+        PATTERNS_FILE,
+        JSON.stringify(
+          { patterns: topPatterns, updated_at: new Date().toISOString() },
+          null,
+          2
+        )
+      );
     } catch (err) {
       this.addError(String(err));
     }
@@ -411,7 +445,7 @@ export class DaemonDesirePathService {
       if (suggestion.confidence < threshold) continue;
 
       // Check session count from the pattern
-      const pattern = patterns.find(p => p.id === suggestion.pattern_id);
+      const pattern = patterns.find((p) => p.id === suggestion.pattern_id);
       if (!pattern || pattern.sessions < minSessions) continue;
 
       // Check if already promoted
@@ -436,7 +470,9 @@ export class DaemonDesirePathService {
           dest: destFile,
         });
       } catch (err) {
-        this.addError(`Auto-promote failed for ${suggestion.name}: ${String(err)}`);
+        this.addError(
+          `Auto-promote failed for ${suggestion.name}: ${String(err)}`
+        );
       }
     }
   }
@@ -470,21 +506,28 @@ export class DaemonDesirePathService {
     return null;
   }
 
-  private patternToSuggestion(pattern: DetectedPattern): SkillSuggestion | null {
+  private patternToSuggestion(
+    pattern: DetectedPattern
+  ): SkillSuggestion | null {
     if (pattern.sequence.length < 2) return null;
 
     // Extract dominant tools and targets
-    const tools = pattern.sequence.map(s => {
+    const tools = pattern.sequence.map((s) => {
       const [tool, target] = s.split(':', 2);
       return { tool, target: target || '*' };
     });
 
     // Derive name from tools + dominant target directory
-    const toolNames = [...new Set(tools.map(t => t.tool.toLowerCase()))];
-    const targets = tools.map(t => t.target).filter(t => t !== '*');
-    const dominantDir = targets.length > 0
-      ? targets[0].split('/').slice(0, 3).join('-').replace(/[^a-zA-Z0-9-]/g, '')
-      : '';
+    const toolNames = [...new Set(tools.map((t) => t.tool.toLowerCase()))];
+    const targets = tools.map((t) => t.target).filter((t) => t !== '*');
+    const dominantDir =
+      targets.length > 0
+        ? targets[0]
+            .split('/')
+            .slice(0, 3)
+            .join('-')
+            .replace(/[^a-zA-Z0-9-]/g, '')
+        : '';
     const nameSuffix = dominantDir ? `-${dominantDir}` : '';
     const name = `auto-${toolNames.join('-')}${nameSuffix}`;
 
@@ -502,16 +545,18 @@ export class DaemonDesirePathService {
 
     // Infer outputs from last step
     const lastTool = tools[tools.length - 1];
-    const outputs: SkillSuggestion['outputs'] = [{
-      name: 'result',
-      type: 'string',
-      description: `Output from ${lastTool.tool}`,
-    }];
+    const outputs: SkillSuggestion['outputs'] = [
+      {
+        name: 'result',
+        type: 'string',
+        description: `Output from ${lastTool.tool}`,
+      },
+    ];
 
     // Build steps
     const steps = tools.map((t, i) => `${i + 1}. ${t.tool}: ${t.target}`);
 
-    const confidence = Math.min(1, (pattern.score / 20));
+    const confidence = Math.min(1, pattern.score / 20);
 
     return {
       name,
@@ -526,45 +571,56 @@ export class DaemonDesirePathService {
   }
 
   private renderSkillMarkdown(suggestion: SkillSuggestion): string {
-    const inputsYaml = suggestion.inputs.length > 0
-      ? suggestion.inputs.map(i =>
-        `  - name: ${i.name}\n    type: ${i.type}\n    required: ${i.required}\n    description: "${i.description}"`
-      ).join('\n')
-      : '';
+    const inputsYaml =
+      suggestion.inputs.length > 0
+        ? suggestion.inputs
+            .map(
+              (i) =>
+                `  - name: ${i.name}\n    type: ${i.type}\n    required: ${i.required}\n    description: "${i.description}"`
+            )
+            .join('\n')
+        : '';
 
-    const outputsYaml = suggestion.outputs.map(o =>
-      `  - name: ${o.name}\n    type: ${o.type}\n    description: "${o.description}"`
-    ).join('\n');
+    const outputsYaml = suggestion.outputs
+      .map(
+        (o) =>
+          `  - name: ${o.name}\n    type: ${o.type}\n    description: "${o.description}"`
+      )
+      .join('\n');
 
-    return [
-      '---',
-      `name: ${suggestion.name}`,
-      `description: "${suggestion.description}"`,
-      `status: suggested`,
-      `pattern_id: ${suggestion.pattern_id}`,
-      `confidence: ${suggestion.confidence.toFixed(2)}`,
-      `generated_at: ${suggestion.generated_at}`,
-      suggestion.inputs.length > 0 ? `inputs:\n${inputsYaml}` : '',
-      `outputs:\n${outputsYaml}`,
-      '---',
-      '',
-      `# ${suggestion.name}`,
-      '',
-      '## Auto-Detected Workflow',
-      '',
-      `> This skill was auto-generated from ${suggestion.pattern_id} detected patterns.`,
-      '> Review and edit before promoting to an active skill.',
-      '',
-      '## Steps',
-      '',
-      ...suggestion.steps,
-      '',
-      '## Notes',
-      '',
-      '- Edit this file to refine the workflow',
-      '- Move to your `skills/` directory to activate',
-      `- Confidence: ${(suggestion.confidence * 100).toFixed(0)}%`,
-    ].filter(line => line !== '').join('\n') + '\n';
+    return (
+      [
+        '---',
+        `name: ${suggestion.name}`,
+        `description: "${suggestion.description}"`,
+        `status: suggested`,
+        `pattern_id: ${suggestion.pattern_id}`,
+        `confidence: ${suggestion.confidence.toFixed(2)}`,
+        `generated_at: ${suggestion.generated_at}`,
+        suggestion.inputs.length > 0 ? `inputs:\n${inputsYaml}` : '',
+        `outputs:\n${outputsYaml}`,
+        '---',
+        '',
+        `# ${suggestion.name}`,
+        '',
+        '## Auto-Detected Workflow',
+        '',
+        `> This skill was auto-generated from ${suggestion.pattern_id} detected patterns.`,
+        '> Review and edit before promoting to an active skill.',
+        '',
+        '## Steps',
+        '',
+        ...suggestion.steps,
+        '',
+        '## Notes',
+        '',
+        '- Edit this file to refine the workflow',
+        '- Move to your `skills/` directory to activate',
+        `- Confidence: ${(suggestion.confidence * 100).toFixed(0)}%`,
+      ]
+        .filter((line) => line !== '')
+        .join('\n') + '\n'
+    );
   }
 
   // ─── Lifecycle (adaptive backoff) ──────────────────────────
@@ -573,7 +629,7 @@ export class DaemonDesirePathService {
   // Idle (no actions): backoff 1h → 2h → 4h → 8h → 12h (cap)
   // New activity resets to 1h immediately
 
-  private static readonly BASE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
+  private static readonly BASE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
   private static readonly MAX_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
   private static readonly IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 min = idle
 
@@ -582,13 +638,18 @@ export class DaemonDesirePathService {
     const timeSinceActivity = now - this.lastActivityTime;
 
     // If recent activity, scan hourly
-    if (this.lastActivityTime > 0 && timeSinceActivity < DaemonDesirePathService.IDLE_THRESHOLD_MS) {
+    if (
+      this.lastActivityTime > 0 &&
+      timeSinceActivity < DaemonDesirePathService.IDLE_THRESHOLD_MS
+    ) {
       this.consecutiveIdleScans = 0;
       return DaemonDesirePathService.BASE_INTERVAL_MS;
     }
 
     // Backoff: 1h × 2^idle_scans, capped at 12h
-    const backoff = DaemonDesirePathService.BASE_INTERVAL_MS * Math.pow(2, this.consecutiveIdleScans);
+    const backoff =
+      DaemonDesirePathService.BASE_INTERVAL_MS *
+      Math.pow(2, this.consecutiveIdleScans);
     return Math.min(backoff, DaemonDesirePathService.MAX_INTERVAL_MS);
   }
 
@@ -603,7 +664,10 @@ export class DaemonDesirePathService {
     this.isRunning = true;
     mkdirSync(DP_DIR, { recursive: true });
 
-    this.onLog('INFO', 'Desire-path service started (adaptive backoff: 1h active, up to 12h idle)');
+    this.onLog(
+      'INFO',
+      'Desire-path service started (adaptive backoff: 1h active, up to 12h idle)'
+    );
 
     // First scan after 2 minutes
     this.scanTimeout = setTimeout(() => {
@@ -684,33 +748,37 @@ export class DaemonDesirePathService {
   getSuggestions(): SkillSuggestion[] {
     try {
       if (!existsSync(SUGGESTIONS_DIR)) return [];
-      const files = readdirSync(SUGGESTIONS_DIR).filter(f => f.endsWith('.skill.md'));
-      return files.map(f => {
-        const content = readFileSync(join(SUGGESTIONS_DIR, f), 'utf-8');
-        const match = content.match(/^---\n([\s\S]*?)\n---/);
-        if (!match) return null;
-        try {
-          // Parse frontmatter minimally
-          const lines = match[1].split('\n');
-          const meta: Record<string, string> = {};
-          for (const line of lines) {
-            const kv = line.match(/^(\w[\w_-]*):\s*(.*)/);
-            if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '');
+      const files = readdirSync(SUGGESTIONS_DIR).filter((f) =>
+        f.endsWith('.skill.md')
+      );
+      return files
+        .map((f) => {
+          const content = readFileSync(join(SUGGESTIONS_DIR, f), 'utf-8');
+          const match = content.match(/^---\n([\s\S]*?)\n---/);
+          if (!match) return null;
+          try {
+            // Parse frontmatter minimally
+            const lines = match[1].split('\n');
+            const meta: Record<string, string> = {};
+            for (const line of lines) {
+              const kv = line.match(/^(\w[\w_-]*):\s*(.*)/);
+              if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '');
+            }
+            return {
+              name: meta.name || basename(f, '.skill.md'),
+              description: meta.description || '',
+              pattern_id: meta.pattern_id || '',
+              confidence: parseFloat(meta.confidence || '0'),
+              generated_at: meta.generated_at || '',
+              inputs: [],
+              outputs: [],
+              steps: [],
+            } as SkillSuggestion;
+          } catch {
+            return null;
           }
-          return {
-            name: meta.name || basename(f, '.skill.md'),
-            description: meta.description || '',
-            pattern_id: meta.pattern_id || '',
-            confidence: parseFloat(meta.confidence || '0'),
-            generated_at: meta.generated_at || '',
-            inputs: [],
-            outputs: [],
-            steps: [],
-          } as SkillSuggestion;
-        } catch {
-          return null;
-        }
-      }).filter(Boolean) as SkillSuggestion[];
+        })
+        .filter(Boolean) as SkillSuggestion[];
     } catch {
       return [];
     }

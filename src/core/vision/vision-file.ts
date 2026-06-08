@@ -52,7 +52,7 @@ function splitSections(text: string): {
 
   for (const line of lines) {
     const h2 = line.match(/^##\s+(.+?)\s*$/);
-    if (h2) {
+    if (h2?.[1]) {
       current = { body: [] };
       sections.set(h2[1].toLowerCase(), current);
       continue;
@@ -69,9 +69,8 @@ function splitSections(text: string): {
 
 function bulletLines(body: string[]): string[] {
   return body
-    .map((l) => l.match(/^\s*[-*]\s+(.*\S)\s*$/))
-    .filter((m): m is RegExpMatchArray => !!m)
-    .map((m) => m[1].trim())
+    .map((l) => l.match(/^\s*[-*]\s+(.*\S)\s*$/)?.[1]?.trim())
+    .filter((s): s is string => !!s)
     .filter((s) => !/^\[[ xX]\]/.test(s)); // checklist handled separately
 }
 
@@ -79,12 +78,12 @@ function parseObjectives(body: string[]): Objective[] {
   const objectives: Objective[] = [];
   for (const line of body) {
     const m = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*\S)\s*$/);
-    if (!m) continue;
+    if (!m?.[2]) continue;
     const text = m[2].trim();
     objectives.push({
       id: objectiveId(text),
       text,
-      done: m[1].toLowerCase() === 'x',
+      done: (m[1] ?? '').toLowerCase() === 'x',
     });
   }
   return objectives;
@@ -94,7 +93,7 @@ function parseLimits(body: string[]): VisionLimits {
   const limits: VisionLimits = { ...DEFAULT_LIMITS };
   for (const line of body) {
     const m = line.match(/^\s*([a-zA-Z]+)\s*:\s*(.+?)\s*$/);
-    if (!m) continue;
+    if (!m?.[1] || m[2] === undefined) continue;
     const key = m[1] as keyof VisionLimits;
     const raw = m[2];
     if (!(key in limits)) continue;
@@ -142,10 +141,12 @@ export function setObjectiveDone(
   const lines = readFileSync(path, 'utf-8').split(/\r?\n/);
   let changed = false;
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(\s*[-*]\s+)\[([ xX])\]\s+(.*\S)\s*$/);
-    if (!m) continue;
+    const line = lines[i];
+    if (line === undefined) continue;
+    const m = line.match(/^(\s*[-*]\s+)\[([ xX])\]\s+(.*\S)\s*$/);
+    if (!m?.[3]) continue;
     if (objectiveId(m[3].trim()) === objId) {
-      lines[i] = `${m[1]}[${done ? 'x' : ' '}] ${m[3].trim()}`;
+      lines[i] = `${m[1] ?? ''}[${done ? 'x' : ' '}] ${m[3].trim()}`;
       changed = true;
       break;
     }
