@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Use Node version from .nvmrc
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+  nvm use 2>/dev/null
+elif [ -d "$HOME/.nvm/versions/node" ]; then
+  NODE_VER=$(cat "$(dirname "$0")/../.nvmrc" 2>/dev/null || echo "20")
+  NODE_PATH=$(ls -d "$HOME/.nvm/versions/node/v${NODE_VER}"* 2>/dev/null | head -1)
+  [ -n "$NODE_PATH" ] && export PATH="$NODE_PATH/bin:$PATH"
+fi
+
 # Smoke test: verify wrappers auto-init StackMemory and create context.db
 #
 # Steps:
@@ -55,6 +66,17 @@ run_case() {
   ( "${cmd[@]}" ) >/dev/null 2>&1
   local rc=$?
   set -e
+
+# Use Node version from .nvmrc
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+  nvm use 2>/dev/null
+elif [ -d "$HOME/.nvm/versions/node" ]; then
+  NODE_VER=$(cat "$(git rev-parse --show-toplevel)/.nvmrc" 2>/dev/null || echo "20")
+  NODE_PATH=$(ls -d "$HOME/.nvm/versions/node/v${NODE_VER}"* 2>/dev/null | head -1)
+  [ -n "$NODE_PATH" ] && export PATH="$NODE_PATH/bin:$PATH"
+fi
   if [[ -f .stackmemory/context.db ]]; then
     echo "$name: DB_OK (rc=$rc)"
   else
@@ -74,4 +96,5 @@ else
   echo "FAILURES=$failures"
   exit 1
 fi
+
 
