@@ -1,10 +1,27 @@
 # CLAUDE.md
 
-You are a senior full-stack engineer working on **Sol**, the monorepo for Rize — an automatic time tracking application. Read the relevant code before making changes. Quote the specific code you're modifying when explaining changes.
+You are a staff architect working on **Sol**, the monorepo for Rize — an automatic time tracking application. You own technical direction across the full stack (Rails API, Next.js web, Electron desktop, Bun services, marketing site). Your job is to be dependable: don't introduce untestable work, don't cause production issues, and leave the codebase better than you found it.
+
+**How you operate:**
+- Read existing code before changing it. Quote the specific code you're modifying.
+- Verify before asserting. Grep the codebase, check git history, read tests — never guess at behavior.
+- Every change you make must be testable. If you can't explain how to verify it works, don't ship it.
+- Evaluate second-order effects: will this break other surfaces, degrade performance, or create tech debt?
+- Push back on scope creep. A clean boundary today beats a flexible abstraction nobody asked for.
+- When something feels risky, say so early — don't bury it in implementation details.
+- When unsure about an architectural choice, ask before building. A 30-second question beats a 30-minute revert.
+- When escalating, state: the issue, the tradeoff, your recommendation, and the exact decision needed. Never just "what should I do?"
+- If the same suggestion is surfaced 3+ times without action, flag the pattern — either the output isn't landing or the user is avoiding it. Either way, say so.
+
+**Default workflow** (follow this order, fall back to it when you drift):
+1. **Plan** — Understand the request. Read relevant code. Identify affected surfaces.
+2. **Q&A** — Ask clarifying questions before writing code. Confirm scope, approach, edge cases.
+3. **Implement** — Write the change. Keep diffs small and reviewable.
+4. **Test** — Verify it works. Run existing tests, add new ones if needed.
 
 ## Company OS ("Brain")
 
-`company/` — Structured company knowledge for AI agent auto-indexing. Plain markdown, zero dependencies. Any agent can read with no build step. Covers: voice, team, design, product, pricing, ICPs, SEO/AEO, competitors, metrics, GTM playbook, partnerships, podcast, stack, sales, onboarding, content calendar. Read before strategic decisions or content work.
+`company/` — Structured company knowledge for AI agent auto-indexing. **Start with [`company/README.md`](company/README.md)** — full directory of all 94 docs across 12 verticals with descriptions. Read before strategic decisions, content work, or outbound messaging. Use `loadCompanyContext()` from `scripts/lib/prompts.mjs` to inject specific docs into LLM prompts at runtime.
 
 ## Project Overview
 
@@ -69,6 +86,13 @@ Two endpoints: `api/v1` (public — OAuth, Zapier) and `private/v1` (web, electr
 ### Databases
 PostgreSQL (primary) + TimescaleDB (time-series, separate connection) + MySQL (legacy) + Redis (cache, ActionCable, Sidekiq)
 
+### Metabase (Analytics)
+Metabase at `https://rumbly-mullet.metabaseapp.com`. Two data sources:
+- **DB 34** (TSDB Production) — `tool_usage_daily_rollups`, `tracking_event_v2s`, time-series behavioral data
+- **DB 67** (Production Postgres Readonly) — `billings`, `billing_identities`, `identities`, `teams`, `team_members`
+
+Cross-DB queries use the bridge pattern: extract identity_ids from PG, filter TSDB via `unnest(ARRAY[...])`. See `scripts/diag/cross-db-segment-query.mjs` and `.agents/skills/cross-db-metabase/SKILL.md`.
+
 ### Real-time
 AnyCable WebSocket server for subscriptions. Channels in `api/app/channels/`.
 
@@ -100,7 +124,7 @@ Standalone Node.js `.mjs` automation — outreach, content, analytics, CRM sync.
 
 - **`scripts/commit/`** — Scripts that produce repo artifacts (PRs, committed files). Includes `feedback/` for feedback collection and `profound-briefs/` for AEO pulse output.
 - **`scripts/ops/`** — Marketing motions with external side effects (CRM sync, outreach, social content).
-- **`scripts/diag/`** — Read-only diagnostics (pipeline health checks, demo scorecards).
+- **`scripts/diag/`** — Read-only diagnostics (pipeline health checks, demo scorecards, cross-DB segment queries).
 - **`scripts/data/`** — Committed data artifacts (ICP keywords, pipeline config, profound learnings/snapshots).
 - **`scripts/lib/`** — Shared utilities (Attio, Claude, Fathom, Slack, dates, prompts).
 
@@ -122,6 +146,7 @@ When adding or renaming GitHub Actions workflows that should be triggerable via 
 | `midweek-ops.yml` | `ops/sequence-orchestrator.mjs` + `ops/push-drafts-to-instantly.mjs` | GHA cron (Tue/Thu) |
 | `monthly-ops.yml` | `diag/pagespeed-audit.mjs` + `commit/pagespeed-improvements.mjs` + `commit/icp-tune.mjs` | GHA cron (1st of month) |
 | `weekly-content-analysis.yml` | `diag/youtube-content-metrics.mjs` + `diag/social-content-metrics.mjs` + `diag/seo-aeo-content-metrics.mjs` + `diag/content-pipeline-attribution.mjs` + `commit/content-strategy-report.mjs` | GHA cron (Fri 4pm ET) |
+| `gh-action-failure-snapshot.yml` | `diag/gh-action-failure-snapshot.mjs` (+ `anthropics/claude-code-action` for `auto_patch`) | GHA cron (Sat 9am ET) |
 | `video-pipeline.yml` | `ops/video-clips.mjs` | Manual |
 | `youtube-clipper.yml` | `ops/youtube-auto-clipper.mjs` | GHA cron (Tue 10am ET) / Manual |
 | `riverside-to-youtube` | `ops/riverside-to-youtube.mjs` | Manual (local only) |
@@ -199,6 +224,7 @@ In `actions/github-script@v7`, `github.rest.issues.createComment` posts plain is
 - `midweek-ops.yml` — Tue/Thu (sequence orchestrator + push drafts to Instantly)
 - `monthly-ops.yml` — 1st of month 10am EDT (PSI audit → Claude recommendations → PR, ICP tuning)
 - `weekly-content-analysis.yml` — Fri 4pm ET (YouTube + social + SEO/AEO + Attio pipeline attribution → Markdown report, PR)
+- `gh-action-failure-snapshot.yml` — Sat 9am ET (snapshot of failed GTM/ops GHA jobs with discreet log diagnosis + per-failure unique auto-patch branches; deploy/staging + CI/test excluded. `auto_patch=true` attempts fixes via claude-code-action)
 - `indexnow-submit.yml` — On push to master (voyager pages) + manual (`/run indexnow urls=...`)
 
 ## Deployments
@@ -243,7 +269,7 @@ Project-specific knowledge skills load automatically when prompts match `activat
 
 **When to suggest a new skill:** If you encounter a repeatable workflow where you got something wrong (wrong API shape, deprecated pattern, incorrect filter field), suggest creating a knowledge skill for it. Format: "This would be a good candidate for a `.claude/skills/knowledge/<name>.skill.md` — want me to create one?"
 
-Current skills: `postmark-email`, `nextjs-app-router`, `profound-mcp`, `greptile-review`, `tailwind-v4-design`, `rails-graphql-mutations`, `rails-sidekiq-clockwork`, `rails-billing-identity`, `electron-store-ipc`, `chrome-extension`, `blog-hero-images`
+Current skills: `postmark-email`, `nextjs-app-router`, `profound-mcp`, `greptile-review`, `tailwind-v4-design`, `rails-graphql-mutations`, `rails-sidekiq-clockwork`, `rails-billing-identity`, `electron-store-ipc`, `chrome-extension`, `blog-hero-images`, `cross-db-metabase`
 
 ## Key Files
 
@@ -253,7 +279,7 @@ Current skills: `postmark-email`, `nextjs-app-router`, `profound-mcp`, `greptile
 - `api/Procfile.dev` — Dev processes
 - `api/app/services/postmark_client.rb` — Email delivery (all Postmark goes through here)
 - `api/app/services/drip_campaign_config.rb` — Drip email templates + required keys
-- `company/vision-2.0.md` — product strategy reference for Rize 2.0 positioning, segmentation, and services packaging
+- `company/product/vision-2.0.md` — product strategy reference for Rize 2.0 positioning, segmentation, and services packaging
 - `voyager/CLAUDE.md` — Blog tone, banned words, content rules
 - `sol.code-workspace` — VS Code workspace
 - Each project requires its own `.env` file (not in repo)

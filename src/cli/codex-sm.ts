@@ -13,7 +13,11 @@ import { program } from 'commander';
 import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk';
 import { initializeTracing, trace } from '../core/trace/index.js';
-import { resolveRealCliBin } from './utils/real-cli-bin.js';
+import {
+  resolveRealCliBin,
+  resolveNativeCodexBin,
+  resolveNvmBin,
+} from './utils/real-cli-bin.js';
 import {
   type DeterminismWatcherHandle,
   startDeterminismWatcher,
@@ -163,20 +167,13 @@ class CodexSM {
       explicitBin: this.config.codexBin,
       envBin: process.env['CODEX_BIN'],
       preferredPaths: [
-        path.join(
-          os.homedir(),
-          '.nvm',
-          'versions',
-          'node',
-          'v22.22.0',
-          'bin',
-          'codex'
-        ),
+        ...resolveNativeCodexBin(), // native binary first (no wrapper overhead)
+        resolveNvmBin('codex'), // dynamic nvm/fnm/volta path
         '/usr/local/bin/codex',
         '/opt/homebrew/bin/codex',
         '/usr/local/bin/codex-cli',
         '/opt/homebrew/bin/codex-cli',
-      ],
+      ].filter((p): p is string => !!p),
       pathCommands: ['codex', 'codex-cli'],
     });
   }

@@ -23,8 +23,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9234,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 11985,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "eval-002",
@@ -47,18 +47,18 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 8583,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 12566,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "eval-003",
       "taskName": "fix_bug",
       "weight": 1.2,
       "passed": false,
-      "passRate": 0.3333333333333333,
+      "passRate": 0,
       "criteria": {
         "bug_fixed": {
-          "passed": true,
+          "passed": false,
           "reason": "regex heuristic"
         },
         "no_new_bugs": {
@@ -71,8 +71,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 8369,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10799,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "eval-004",
@@ -99,8 +99,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11377,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9710,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "eval-005",
@@ -123,8 +123,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11284,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9724,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-001",
@@ -155,8 +155,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10574,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9548,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-002",
@@ -183,8 +183,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9132,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10304,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-003",
@@ -211,8 +211,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13166,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9121,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-004",
@@ -239,8 +239,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 8926,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9666,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-005",
@@ -267,8 +267,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12052,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9649,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-006",
@@ -295,8 +295,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9130,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10024,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-007",
@@ -323,8 +323,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9522,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 12820,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-008",
@@ -351,8 +351,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 14060,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9784,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-009",
@@ -379,8 +379,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9727,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 12812,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-010",
@@ -407,8 +407,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12790,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 15986,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-011",
@@ -435,8 +435,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 8454,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10212,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-012",
@@ -463,8 +463,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9208,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 11265,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-013",
@@ -491,8 +491,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11561,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10184,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-014",
@@ -519,8 +519,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12023,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9175,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "pa-015",
@@ -547,8 +547,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 8785,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10881,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "cond-001",
@@ -575,8 +575,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12505,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9857,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "cond-002",
@@ -607,8 +607,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10211,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 15366,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "cond-003",
@@ -635,8 +635,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9068,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9539,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "cond-004",
@@ -663,8 +663,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10925,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 10092,
+      "output": "Credit balance is too low\n"
     },
     {
       "taskId": "cond-005",
@@ -691,8 +691,8 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 9034,
-      "output": "Invalid API key · Fix external API key\n"
+      "duration": 9475,
+      "output": "Credit balance is too low\n"
     }
   ]
 }

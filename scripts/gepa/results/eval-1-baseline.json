@@ -23,7 +23,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 48935,
+      "duration": 7959,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -47,7 +47,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 40064,
+      "duration": 8216,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -71,7 +71,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 33000,
+      "duration": 9726,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -99,7 +99,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 15426,
+      "duration": 8579,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -123,7 +123,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 28266,
+      "duration": 8452,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -155,7 +155,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10516,
+      "duration": 11217,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -183,7 +183,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12335,
+      "duration": 11173,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -211,7 +211,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13021,
+      "duration": 12613,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -239,7 +239,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12148,
+      "duration": 11645,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -267,7 +267,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12936,
+      "duration": 13079,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -295,7 +295,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 14964,
+      "duration": 11964,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -323,7 +323,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 16184,
+      "duration": 12906,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -351,7 +351,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 17168,
+      "duration": 9758,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -379,7 +379,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 14180,
+      "duration": 11870,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -407,7 +407,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 14922,
+      "duration": 10476,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -435,7 +435,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13251,
+      "duration": 12192,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -463,7 +463,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11710,
+      "duration": 11056,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -491,7 +491,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12465,
+      "duration": 9378,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -519,7 +519,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12597,
+      "duration": 10504,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -547,7 +547,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13249,
+      "duration": 10189,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -575,7 +575,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11947,
+      "duration": 10057,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -607,7 +607,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 13817,
+      "duration": 10720,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -635,7 +635,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 11908,
+      "duration": 10842,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -663,7 +663,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 10851,
+      "duration": 8381,
       "output": "Invalid API key · Fix external API key\n"
     },
     {
@@ -691,7 +691,7 @@
         }
       },
       "judgeMode": "regex",
-      "duration": 12411,
+      "duration": 9530,
       "output": "Invalid API key · Fix external API key\n"
     }
   ]

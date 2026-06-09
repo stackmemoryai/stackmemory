@@ -1,1 +1,1 @@
-API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC."},"request_id":"req_011CbVcHHNs5pnpBzgMt8Sm2"}
+Credit balance is too low
