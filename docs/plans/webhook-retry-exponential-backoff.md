@@ -74,12 +74,12 @@ CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status_retry
 
 ## Acceptance Criteria
 
-- [ ] Failed webhook events are retried up to 5 times with exponential backoff
-- [ ] Backoff schedule: 1s, 2s, 4s, 8s, 16s (capped at 300s)
-- [ ] Delivery state persisted in SQLite — survives process restart
-- [ ] Dead deliveries (exceeded max attempts) are logged but not retried
-- [ ] Existing webhook signature verification unchanged
-- [ ] Tests pass with 80%+ coverage on new code
+- [x] Failed webhook events are retried up to 5 times with exponential backoff
+- [x] Backoff schedule: 1s, 2s, 4s, 8s, 16s (capped at 300s)
+- [x] Delivery state persisted in SQLite — survives process restart
+- [x] Dead deliveries (exceeded max attempts) are logged but not retried
+- [x] Existing webhook signature verification unchanged
+- [x] Tests pass with 80%+ coverage on new code
 
 ## Risks
 
