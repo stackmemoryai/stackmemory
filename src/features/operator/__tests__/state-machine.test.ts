@@ -21,6 +21,7 @@ function makeCheckpoint(
     totalPermissionApprovals: 0,
     totalRateLimitHits: 0,
     consecutiveRateLimitHits: 0,
+    nudgeCount: 0,
     ...overrides,
   };
 }
@@ -195,10 +196,19 @@ describe('decideAction', () => {
     expect(action.type).toBe('LOG_ERROR');
   });
 
-  it('marks stuck task as blocked', () => {
+  it('nudges stuck task first before blocking', () => {
     const action = decideAction(
       { state: 'STUCK', confidence: 'high', detail: 'no change for 300s' },
-      makeCheckpoint({ currentTaskId: 'T01' }),
+      makeCheckpoint({ currentTaskId: 'T01', nudgeCount: 0 }),
+      undefined
+    );
+    expect(action.type).toBe('NUDGE');
+  });
+
+  it('blocks stuck task after 2 nudges', () => {
+    const action = decideAction(
+      { state: 'STUCK', confidence: 'high', detail: 'no change for 300s' },
+      makeCheckpoint({ currentTaskId: 'T01', nudgeCount: 2 }),
       undefined
     );
     expect(action.type).toBe('MARK_BLOCKED');

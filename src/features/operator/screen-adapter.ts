@@ -89,7 +89,7 @@ export class TmuxAdapter implements ScreenAdapter {
 // ── ScreenshotAdapter (stub) ──────────────────────────────
 
 export class ScreenshotAdapter implements ScreenAdapter {
-  readonly adapterType = 'screenshot' as const;
+  readonly adapterType = 'desktop' as const;
 
   readScreen(): string {
     throw new Error(

@@ -250,8 +250,10 @@ export class OvernightRunner {
       case 'NUDGE':
         this.adapter.sendInput(action.message);
         this.lastChangeAt = Date.now();
+        this.checkpoint.nudgeCount++;
         this.logger.logEvent('stuck_detected', {
           action: 'nudge',
+          nudgeCount: this.checkpoint.nudgeCount,
           message: action.message,
         });
         break;
@@ -330,6 +332,7 @@ export class OvernightRunner {
     // Update queue and checkpoint
     this.queue.markActive(task.id);
     this.checkpoint.currentTaskId = task.id;
+    this.checkpoint.nudgeCount = 0;
     this.lastChangeAt = Date.now();
 
     this.logger.logEvent('task_injected', {
@@ -401,6 +404,7 @@ export class OvernightRunner {
       totalPermissionApprovals: 0,
       totalRateLimitHits: 0,
       consecutiveRateLimitHits: 0,
+      nudgeCount: 0,
     };
   }
 

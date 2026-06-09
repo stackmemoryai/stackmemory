@@ -108,6 +108,8 @@ export interface OperatorCheckpoint {
   totalPermissionApprovals: number;
   totalRateLimitHits: number;
   consecutiveRateLimitHits: number;
+  /** Nudge count for current task (reset on task change) */
+  nudgeCount: number;
 }
 
 export interface OperatorSummary {

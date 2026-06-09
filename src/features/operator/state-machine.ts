@@ -246,10 +246,18 @@ export function decideAction(
 
     case 'STUCK':
       if (checkpoint.currentTaskId) {
+        // Nudge-then-escalate: try nudging twice before giving up
+        if (checkpoint.nudgeCount < 2) {
+          return {
+            type: 'NUDGE',
+            message:
+              'You appear stuck. Try a different approach or run the tests to check progress.',
+          };
+        }
         return {
           type: 'MARK_BLOCKED',
           taskId: checkpoint.currentTaskId,
-          reason: detection.detail ?? 'stuck — no output',
+          reason: detection.detail ?? 'stuck — no output after nudges',
         };
       }
       return { type: 'KILL_AND_RESTART' };
