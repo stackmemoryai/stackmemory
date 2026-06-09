@@ -24,6 +24,7 @@
     "dist/src",
     "scripts/git-hooks",
     "scripts/hooks",
+    "scripts/portal",
     "scripts/setup",
     "scripts/setup.sh",
     "scripts/install.sh",

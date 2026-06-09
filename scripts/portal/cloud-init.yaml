@@ -1,0 +1,69 @@
+#cloud-config
+# StackMemory Portal — Hetzner Cloud-Init
+#
+# Paste this into the Hetzner Cloud "Cloud config" box when creating a server
+# (Ubuntu 24.04, a CX22 is plenty: 2 vCPU / 4 GB, ~€4.5/mo). On first boot it
+# installs tmux, Node, Claude Code, StackMemory, and Tailscale, then starts the
+# portal as a systemd service.
+#
+# Set TS_AUTHKEY to a Tailscale auth key (https://login.tailscale.com/admin/settings/keys)
+# to auto-join your tailnet. Otherwise SSH in afterwards and run `tailscale up`.
+#
+# After boot, find the access URL + token with:
+#   journalctl -u stackmemory-portal --no-pager | grep -i token
+
+package_update: true
+packages:
+  - tmux
+  - git
+  - curl
+  - ca-certificates
+  - build-essential
+  - python3
+
+write_files:
+  - path: /etc/stackmemory-portal.env
+    permissions: "0600"
+    content: |
+      # Set this to a Tailscale auth key to auto-join the tailnet on boot.
+      TS_AUTHKEY=
+  - path: /etc/systemd/system/stackmemory-portal.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=StackMemory Portal (browser terminal for Claude Code)
+      After=network-online.target tailscaled.service
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory=/root/work
+      Environment=HOME=/root
+      Environment=NODE_ENV=production
+      ExecStart=/usr/bin/env stackmemory portal start --port 7799 --session claude --cwd /root/work
+      Restart=always
+      RestartSec=3
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # Node.js 20.x
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  # Claude Code + StackMemory + node-pty (browser terminal backend)
+  - npm install -g @anthropic-ai/claude-code @stackmemoryai/stackmemory node-pty
+  # Tailscale
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - bash -c 'set -a; . /etc/stackmemory-portal.env; set +a; [ -n "$TS_AUTHKEY" ] && tailscale up --authkey "$TS_AUTHKEY" --ssh || true'
+  # Working dir + start the portal
+  - mkdir -p /root/work
+  - systemctl daemon-reload
+  - systemctl enable --now stackmemory-portal
+
+final_message: |
+  StackMemory Portal is up after $UPTIME seconds.
+  1. If you didn't set TS_AUTHKEY: run `tailscale up` over SSH.
+  2. Authenticate Claude (max plan): `tmux attach -t claude` then log in. Detach with Ctrl-b d.
+  3. Get the URL + token: `journalctl -u stackmemory-portal --no-pager | grep -i token`
