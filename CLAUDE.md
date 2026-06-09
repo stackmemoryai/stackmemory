@@ -60,6 +60,7 @@ Quick reference (agent_docs/):
 Full documentation (docs/):
 - principles.md - Agent programming paradigm
 - architecture.md - Extension model and browser sandbox
+- cost-optimization.md - Prompt/token cost playbook + Max-plan price ramp
 - SPEC.md - Technical specification
 - API_REFERENCE.md - API docs
 - DEVELOPMENT.md - Dev guide
@@ -240,6 +241,20 @@ Route effort by task complexity — not all code changes deserve equal scrutiny:
 Quality gates scale with tier — don't over-engineer AUTOMATE tasks, don't under-review CAREFUL ones.
 
 For AUTOMATE and STANDARD tiers: make only the requested changes. Don't refactor surrounding code, add abstractions for one-time operations, or create helpers that are used once. Three similar lines of code is better than a premature abstraction.
+
+## Cost Optimization
+
+Assume token costs only go up: Max-plan usage ramps from ~80% off to full price over ~3 months (codified in `src/core/models/provider-pricing.ts` → `MAX_PLAN_DISCOUNT_RAMP` / `effectiveSpendMultiplier()`). The cheapest token is the one you don't send. Full playbook: `docs/cost-optimization.md`.
+
+Codified defaults (cheapest lever first):
+- **Route by complexity.** Keep `multiProvider` on — `getOptimalProvider()`/`scoreComplexity()` send simple tasks to cheap models, hard ones to Anthropic. Opus only for CAREFUL/ARCHITECT; Sonnet default; Haiku/cheap providers for AUTOMATE. Output tokens cost 5× input.
+- **Tune `effort` before model.** Default `high` for coding; `medium` for cost-sensitive; `max`/`xhigh` only for correctness-critical. Pair with adaptive thinking.
+- **Protect the prompt cache.** Keep the prefix byte-stable — no timestamps/UUIDs/IDs in the system prompt, no mid-session tool/model swaps (full rebuild). Cache reads are ~0.1×.
+- **Batch non-interactive work** via `AnthropicBatchClient` (50% off).
+- **Cap context** via `ContextBudgetManager`; keep the token-optimization hooks on (dedup/prewarm/script-suggest).
+- **Close the loop:** `conductor learn --evolve` (GEPA) + `stackmemory optimize traces` shrink prompts permanently.
+
+Guardrails (never trade for cost): the sensitive-content guard must keep forcing Anthropic for secrets/PII; correctness tiers stay on the capable model; never truncate inputs silently — cap deliberately via the budget manager.
 
 ## Session Budget
 
