@@ -37,6 +37,7 @@ export function createAdapter(config: AdapterFactoryConfig): ScreenAdapter {
         );
       }
       // Dynamic import to avoid hard dep on desktop-adapter
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { DesktopAdapter } = require('./desktop-adapter.js');
       return new DesktopAdapter(config.appName ?? 'Claude', config.llmConfig);
     }

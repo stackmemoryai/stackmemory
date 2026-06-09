@@ -158,9 +158,11 @@ export function createOperatorCommands(): Command {
     .option('--session <name>', 'tmux session name', 'operator')
     .action((opts) => {
       try {
+        /* eslint-disable @typescript-eslint/no-require-imports */
         const {
           SessionManager,
         } = require('../../features/operator/session-manager.js');
+        /* eslint-enable @typescript-eslint/no-require-imports */
         const mgr = new SessionManager({
           sessionName: opts.session,
           cwd: process.cwd(),

@@ -8,7 +8,7 @@
 import { logger } from '../../core/monitoring/logger.js';
 import { estimateTokens } from '../../core/cache/token-estimator.js';
 import { STRUCTURED_RESPONSE_SUFFIX } from '../../orchestrators/multimodal/constants.js';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -399,12 +399,10 @@ export class ClaudeCodeSubagentClient {
    */
   private isCodexAvailable(): boolean {
     try {
-      const result = require('child_process')
-        .execSync('which codex 2>/dev/null', {
-          encoding: 'utf-8',
-          timeout: 3000,
-        })
-        .trim();
+      const result = execSync('which codex 2>/dev/null', {
+        encoding: 'utf-8',
+        timeout: 3000,
+      }).trim();
       return !!result;
     } catch {
       return false;
@@ -416,12 +414,10 @@ export class ClaudeCodeSubagentClient {
    */
   private isGrokBuildAvailable(): boolean {
     try {
-      const result = require('child_process')
-        .execSync('which grok 2>/dev/null', {
-          encoding: 'utf-8',
-          timeout: 3000,
-        })
-        .trim();
+      const result = execSync('which grok 2>/dev/null', {
+        encoding: 'utf-8',
+        timeout: 3000,
+      }).trim();
       return !!result;
     } catch {
       return false;

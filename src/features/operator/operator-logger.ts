@@ -5,7 +5,13 @@
  * One log file per run. Checkpoint file for status reads.
  */
 
-import { mkdirSync, appendFileSync, writeFileSync, existsSync } from 'fs';
+import {
+  mkdirSync,
+  appendFileSync,
+  writeFileSync,
+  existsSync,
+  readFileSync,
+} from 'fs';
 import { join } from 'path';
 import type {
   TickLogEntry,
@@ -70,7 +76,6 @@ export class OperatorLogger {
     const file = join(checkpointDir, 'checkpoint.json');
     if (!existsSync(file)) return undefined;
     try {
-      const { readFileSync } = require('fs');
       return JSON.parse(readFileSync(file, 'utf-8'));
     } catch {
       return undefined;

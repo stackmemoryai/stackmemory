@@ -8,7 +8,14 @@
  * Opt out: STACKMEMORY_TELEMETRY=0 or telemetry.enabled: false in config.
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from 'fs';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  statSync,
+  mkdirSync,
+} from 'fs';
 import { join, dirname } from 'path';
 import { homedir, platform } from 'os';
 import { randomBytes } from 'crypto';
@@ -74,7 +81,10 @@ export class DaemonTelemetryService {
   }
 
   private isOptedOut(): boolean {
-    if (process.env.STACKMEMORY_TELEMETRY === '0' || process.env.STACKMEMORY_TELEMETRY === 'false') {
+    if (
+      process.env.STACKMEMORY_TELEMETRY === '0' ||
+      process.env.STACKMEMORY_TELEMETRY === 'false'
+    ) {
       return true;
     }
     return !this.config.enabled;
@@ -99,8 +109,11 @@ export class DaemonTelemetryService {
 
   private countSessions(): { total_heartbeats: number; active_now: number } {
     try {
-      if (!existsSync(SESSIONS_DIR)) return { total_heartbeats: 0, active_now: 0 };
-      const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.heartbeat'));
+      if (!existsSync(SESSIONS_DIR))
+        return { total_heartbeats: 0, active_now: 0 };
+      const files = readdirSync(SESSIONS_DIR).filter((f) =>
+        f.endsWith('.heartbeat')
+      );
       const now = Date.now();
       let active = 0;
       for (const file of files) {
@@ -131,7 +144,7 @@ export class DaemonTelemetryService {
     try {
       const handoffsDir = join(SM_DIR, 'handoffs');
       if (!existsSync(handoffsDir)) return 0;
-      return readdirSync(handoffsDir).filter(f => f.endsWith('.md')).length;
+      return readdirSync(handoffsDir).filter((f) => f.endsWith('.md')).length;
     } catch {
       return 0;
     }
@@ -148,13 +161,17 @@ export class DaemonTelemetryService {
       collected_at: new Date().toISOString(),
       platform: platform(),
       node_version: process.version,
-      daemon: daemonState ? {
-        uptime_s: Math.round((daemonState.uptime || 0) / 1000),
-        context_saves: daemonState.services?.context?.saveCount || 0,
-        memory_triggers: daemonState.services?.memory?.triggerCount || 0,
-        ram_percent: Math.round((daemonState.services?.memory?.currentRamPercent || 0) * 100),
-        errors: (daemonState.errors || []).length,
-      } : null,
+      daemon: daemonState
+        ? {
+            uptime_s: Math.round((daemonState.uptime || 0) / 1000),
+            context_saves: daemonState.services?.context?.saveCount || 0,
+            memory_triggers: daemonState.services?.memory?.triggerCount || 0,
+            ram_percent: Math.round(
+              (daemonState.services?.memory?.currentRamPercent || 0) * 100
+            ),
+            errors: (daemonState.errors || []).length,
+          }
+        : null,
       sessions,
       skills: { audit_entries: this.countSkillAudit() },
       handoffs: { total: this.countHandoffs() },
@@ -182,10 +199,15 @@ export class DaemonTelemetryService {
     try {
       const dir = dirname(TELEMETRY_FILE);
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      writeFileSync(TELEMETRY_FILE, JSON.stringify({ version: 1, snapshots: history }, null, 2), 'utf-8');
+      writeFileSync(
+        TELEMETRY_FILE,
+        JSON.stringify({ version: 1, snapshots: history }, null, 2),
+        'utf-8'
+      );
     } catch (err) {
       this.state.errors.push(String(err));
-      if (this.state.errors.length > 5) this.state.errors = this.state.errors.slice(-5);
+      if (this.state.errors.length > 5)
+        this.state.errors = this.state.errors.slice(-5);
       this.onLog('ERROR', 'Failed to save telemetry', { error: String(err) });
       return null;
     }
@@ -206,18 +228,26 @@ export class DaemonTelemetryService {
     this.isRunning = true;
     const intervalMs = (this.config.interval || 1440) * 60 * 1000; // default 24h
 
-    this.onLog('INFO', 'Telemetry service started', { interval_min: this.config.interval });
+    this.onLog('INFO', 'Telemetry service started', {
+      interval_min: this.config.interval,
+    });
 
     // First snapshot after 30s
     setTimeout(() => {
       if (!this.isRunning) return;
       const snap = this.save();
-      if (snap) this.onLog('INFO', 'Telemetry snapshot saved', { sessions: snap.sessions.active_now });
+      if (snap)
+        this.onLog('INFO', 'Telemetry snapshot saved', {
+          sessions: snap.sessions.active_now,
+        });
     }, 30_000);
 
     this.intervalId = setInterval(() => {
       const snap = this.save();
-      if (snap) this.onLog('INFO', 'Telemetry snapshot saved', { sessions: snap.sessions.active_now });
+      if (snap)
+        this.onLog('INFO', 'Telemetry snapshot saved', {
+          sessions: snap.sessions.active_now,
+        });
     }, intervalMs);
 
     if (this.intervalId.unref) this.intervalId.unref();
