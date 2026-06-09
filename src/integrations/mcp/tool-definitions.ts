@@ -38,6 +38,7 @@ export class MCPToolDefinitions {
       ...this.getCrossSearchTools(),
       ...this.getCloudSyncTools(),
       ...this.getMasterTaskTools(),
+      ...this.getWorkflowTools(),
     ];
   }
 
@@ -1552,6 +1553,7 @@ export class MCPToolDefinitions {
       | 'digest'
       | 'provenant'
       | 'cross_search'
+      | 'workflow'
   ): MCPToolDefinition[] {
     switch (category) {
       case 'context':
@@ -1592,6 +1594,8 @@ export class MCPToolDefinitions {
         return this.getCloudSyncTools();
       case 'master_tasks':
         return this.getMasterTaskTools();
+      case 'workflow':
+        return this.getWorkflowTools();
       default:
         return [];
     }
@@ -1734,6 +1738,79 @@ export class MCPToolDefinitions {
             },
           },
           required: ['task'],
+        },
+      },
+    ];
+  }
+
+  private getWorkflowTools(): MCPToolDefinition[] {
+    return [
+      {
+        name: 'workflow_list',
+        description:
+          'List all captured browser workflows with replay stats (name, URL, step count, success rate).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            url_filter: {
+              type: 'string',
+              description: 'Filter workflows by URL host (e.g., "github.com")',
+            },
+          },
+        },
+      },
+      {
+        name: 'workflow_get',
+        description:
+          'Get details of a specific captured workflow including all steps.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Workflow ID' },
+            name: {
+              type: 'string',
+              description: 'Workflow name (fuzzy match)',
+            },
+          },
+        },
+      },
+      {
+        name: 'workflow_replay',
+        description:
+          'Replay a cached browser workflow. Modes: cached (fast), ai (self-healing), hybrid (cache + fallback). Supports {{key}} variable substitution.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Workflow ID to replay' },
+            name: {
+              type: 'string',
+              description: 'Workflow name (fuzzy match)',
+            },
+            mode: {
+              type: 'string',
+              enum: ['cached', 'ai', 'hybrid'],
+              description: 'Replay mode',
+            },
+            variables: {
+              type: 'object',
+              description: 'Variables to substitute in URLs and instructions',
+              additionalProperties: { type: 'string' },
+            },
+          },
+        },
+      },
+      {
+        name: 'workflow_benchmarks',
+        description:
+          'Show benchmark results comparing workflow execution approaches (Stagehand AI, cached, Playwright, CLI agent).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow: {
+              type: 'string',
+              description: 'Filter by workflow name',
+            },
+          },
         },
       },
     ];

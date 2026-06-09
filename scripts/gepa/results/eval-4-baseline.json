@@ -1,0 +1,618 @@
+{
+  "variant": "baseline",
+  "generation": 4,
+  "results": [
+    {
+      "taskId": "skill-001",
+      "taskName": "start_clean_main",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "shows_branch": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "shows_recent_commits": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_next_action": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 36207,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-002",
+      "taskName": "start_dirty_feature",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "shows_branch": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "shows_uncommitted": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_continue_or_commit": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 35440,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-003",
+      "taskName": "stop_with_work",
+      "weight": 1.2,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "captures_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_commit": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 35792,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-004",
+      "taskName": "stop_done",
+      "weight": 1.2,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "captures_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_clear": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38955,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-005",
+      "taskName": "learn_after_changes",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "reviews_session": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "identifies_memory_update": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "structured_output": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38682,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-006",
+      "taskName": "learn_nothing_new",
+      "weight": 1,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "says_nothing_needed": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 35761,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-007",
+      "taskName": "summary_multi_task",
+      "weight": 1,
+      "passed": false,
+      "passRate": 0.5,
+      "criteria": {
+        "lists_actions": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "lists_files": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38577,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-008",
+      "taskName": "next_with_pr_open",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "identifies_ci_fix": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "actionable_suggestion": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "presents_options": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 37421,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-009",
+      "taskName": "start_stale_branch",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "suggests_rebase_or_merge": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "checks_conflicts": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_next_action": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 37185,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-010",
+      "taskName": "start_empty_repo",
+      "weight": 1,
+      "passed": false,
+      "passRate": 0.5,
+      "criteria": {
+        "checks_readme": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_setup": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 37294,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-011",
+      "taskName": "stop_merge_conflict",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "warns_about_conflict": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_resolution_or_stash": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "captures_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 37480,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-012",
+      "taskName": "learn_refactor_session",
+      "weight": 1.2,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "identifies_pattern_change": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_convention_doc": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 37620,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-013",
+      "taskName": "learn_new_integration",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "identifies_memory_update": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "captures_setup_gotcha": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "structured_output": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38020,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-014",
+      "taskName": "next_all_green",
+      "weight": 1,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "checks_todo_queue": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_next_action": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "presents_options": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 40635,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-015",
+      "taskName": "next_blocked_by_review",
+      "weight": 1,
+      "passed": false,
+      "passRate": 0.3333333333333333,
+      "criteria": {
+        "suggests_parallel_work": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "presents_options": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38545,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-016",
+      "taskName": "summary_single_fix",
+      "weight": 1,
+      "passed": true,
+      "passRate": 1,
+      "criteria": {
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 39263,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-017",
+      "taskName": "summary_complex_session",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "lists_actions": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "structured_output": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "captures_key_finding": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38442,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-018",
+      "taskName": "start_with_handoff",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "reads_handoff": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "identifies_continuation": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_next_action": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 39779,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-019",
+      "taskName": "stop_with_failing_tests",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "warns_about_tests": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "captures_context": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_commit_wip_or_stash": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 39625,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-020",
+      "taskName": "adversarial_empty_input",
+      "weight": 1,
+      "passed": false,
+      "duration": 4878,
+      "error": "Error: Input must be provided either through stdin or as a prompt argument when using --print\n"
+    },
+    {
+      "taskId": "skill-021",
+      "taskName": "adversarial_conflicting_state",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "addresses_both_issues": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "prioritizes_correctly": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "presents_options": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 38501,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-022",
+      "taskName": "adversarial_vague_request",
+      "weight": 1,
+      "passed": true,
+      "passRate": 0.6666666666666666,
+      "criteria": {
+        "asks_clarification": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "reason": "regex heuristic"
+        },
+        "concise_output": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 39421,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-023",
+      "taskName": "learn_security_fix",
+      "weight": 1.5,
+      "passed": false,
+      "passRate": 0,
+      "criteria": {
+        "identifies_security_pattern": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "suggests_memory_update": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "identifies_security_issue": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "structured_output": {
+          "passed": false,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 40536,
+      "output": "Invalid API key · Fix external API key\n"
+    },
+    {
+      "taskId": "skill-024",
+      "taskName": "next_multiple_prs",
+      "weight": 1.3,
+      "passed": false,
+      "passRate": 0.25,
+      "criteria": {
+        "prioritizes_correctly": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "actionable_suggestion": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "presents_options": {
+          "passed": false,
+          "reason": "regex heuristic"
+        },
+        "no_overengineering": {
+          "passed": true,
+          "reason": "regex heuristic"
+        }
+      },
+      "judgeMode": "regex",
+      "duration": 39709,
+      "output": "Invalid API key · Fix external API key\n"
+    }
+  ]
+}

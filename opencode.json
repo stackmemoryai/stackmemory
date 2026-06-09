@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "raindrop": {
+      "type": "local",
+      "command": [
+        "/Users/jwu/.raindrop/bin/raindrop",
+        "workshop",
+        "mcp"
+      ],
+      "enabled": true,
+      "environment": {}
+    }
+  }
+}

@@ -1,38 +1,27 @@
-# StackMemory - Project Configuration
+You are a senior Node.js/Express engineer working on this codebase. Write working code over explanations. Run commands before asserting state — never assume branch, file, or test status without verification.
+
+# croissant.ai — Agent Guide
+
+Tool-agnostic reference for AI coding agents working in this repository.
+
+## Stack
+
+Node.js / Express / PostgreSQL / Redis
+Railway deployment | Stripe / Salesforce / QuickBooks integrations
 
 ## Project Structure
 
 ```
 src/
-  cli/             # CLI commands and entry point
-  core/            # Core business logic
-    config/        # Config types and manager
-    context/       # Frame management, enrichment, rehydration
-    database/      # SQLite adapter, migrations, query cache
-    digest/        # Digest generation (hybrid, chronological)
-    errors/        # Error types and recovery
-    merge/         # Stack merge and conflict resolution
-    models/        # Model routing, complexity scoring
-    monitoring/    # Logging, metrics, session monitor
-    performance/   # Caching, profiling, benchmarks
-    query/         # Query parsing and routing
-    retrieval/     # Context retrieval, LLM provider
-    session/       # Handoff, session management
-    skills/        # Skill storage and types
-    storage/       # Tiered storage, remote sync
-    trace/         # Debug tracing, trace detection
-  integrations/    # External integrations
-    claude-code/   # Agent bridge, post-task hooks
-    linear/        # Linear sync, webhooks, OAuth
-    mcp/           # MCP server, 56 tool handlers
-    ralph/         # Multi-agent swarm orchestration
-  daemon/          # Unified daemon, session daemon
-  features/        # Analytics, browser, sweep, TUI
-  hooks/           # Claude Code hook handlers
-  skills/          # Built-in skill implementations
-  utils/           # Shared utilities
-scripts/           # Build and utility scripts
-docs/              # Documentation
+  api/          # Route handlers
+  core/         # monitoring-service, cache-service, queue-service, master-agent, api-validation
+  features/     # Feature modules
+  shared/       # Shared utilities
+  integrations/ # Third-party connectors
+docs/           # Documentation
+scripts/        # Automation scripts
+docker/         # Container configs
+prompts/        # Externalized LLM prompt templates
 ```
 
 ## Key Files
@@ -69,81 +58,64 @@ Full documentation (docs/):
 ## Commands
 
 ```bash
-npm run build          # Compile TypeScript (esbuild)
-npm run lint           # ESLint check
-npm run lint:fix       # Auto-fix lint issues
-npm run lint:fast      # Fast lint via oxlint
-npm run typecheck      # tsc --noEmit (8GB heap, avoids OOM)
-npm test               # Run Vitest (watch)
-npm run test:run       # Run tests once
-npm run linear:sync    # Sync with Linear
-
-# StackMemory CLI
-stackmemory capture    # Save session state for handoff
-stackmemory restore    # Restore from captured state
-stackmemory snapshot save  # Post-run context snapshot (alias: snap)
-stackmemory snapshot list  # List recent snapshots
-stackmemory preflight      # File overlap check for parallel tasks (alias: pf)
-stackmemory conductor start    # Autonomous Linear→worktree→agent orchestrator
-stackmemory conductor learn    # Analyze agent outcomes (success rate, failure phases, error patterns)
-stackmemory conductor learn --evolve  # Auto-mutate prompt template from failure data (GEPA)
-stackmemory conductor status   # Live agent status dashboard
-
-# GEPA Optimizer (scripts/gepa/optimize.js)
-node scripts/gepa/optimize.js run [gens] [--auto-apply]  # Full optimization loop
-node scripts/gepa/optimize.js score [--auto-apply]        # Score variants, select best
-node scripts/gepa/optimize.js run --target skill:start     # Optimize specific target
-node scripts/gepa/optimize.js mutate --auto-phase          # Auto-detect worst phase
-# Flags: --auto-apply (deploy winner), --no-cache (fresh eval), --target <name>, --phase <name>
-stackmemory conductor monitor  # Real-time TUI with phase tracking
-stackmemory conductor finalize # Clean up dead/stale agents
-stackmemory conductor traces <issue-id>  # View conversation traces for an agent run
-stackmemory conductor replay <session-id> # Replay full agent conversation from traces
-stackmemory conductor trace-stats         # Aggregate trace statistics
-stackmemory loop "<cmd>" --until "<pattern>"  # Poll until condition met (alias: watch)
+npm run dev       # Start dev server
+npm run test      # Run test suites (3 parallel Jest workers, maxWorkers=4)
+npm run lint      # Lint check
+npm run migrate   # Run DB migrations
+docker-compose up -d   # Start local DBs
 ```
 
-## Working Directory
+## Git Conventions
 
-- PRIMARY: /Users/jwu/Dev/stackmemory
-- ALLOWED: All subdirectories
-- TEMP: /tmp for temporary operations
+- Branch prefixes: `feature/`, `fix/`, `chore/`
+- Commit format: `type(scope): message`
+- Do NOT add `Co-Authored-By` lines to commits
+- Pre-commit hook runs: `npm run lint` + `npm run test` + E2E browser screenshots
 
-## Validation
+## Testing Rules
 
-Verify each step after code changes — pre-commit hooks catch 80% of CI failures locally:
-1. `npm run lint` - fix any errors AND warnings
-2. `npm run test:run` - verify no regressions
-3. `npm run build` - ensure compilation
-4. Run code to verify it works
+- **Framework**: Jest + SWC
+- **DB mocking**: Use dependency injection (DI), not global mocks
+- **Supertest**: Pass `app` (NOT `server`) to supertest
+- **Global jest**: src/ tests use global `jest` — do NOT import from `@jest/globals` (causes redeclaration errors)
+- **Mock reset**: `jest.clearAllMocks()` resets `mockReturnValue` — always re-set mocks in `beforeEach`
+- **Test runner**: `npm test` is long-running; run in a background process or sub-agent, not inline
 
-Test coverage:
-- New features require tests in `src/**/__tests__/`
-- Maintain or improve coverage (no untested code paths)
-- Critical paths: context management, handoff, Linear sync
+## ESLint Rules
 
-Testing rules:
-- Run `npm run test:run` via subagent or background task — never inline (blocks context)
-- ESLint: use `catch {}` not `catch (_err) {}` (lint rule)
-- `vi.clearAllMocks()` resets `mockReturnValue` — re-set mocks in `beforeEach`
-- Pre-commit hook runs: lint + parallel vitest + build — fix issues before commit, never skip
+- Use `catch {}` not `catch (_err) {}` — underscore prefix not in the allowed pattern
+- CJS format for JS files in `src/`
 
-## Git Rules
+## Key Patterns
 
-The pre-commit hook enforces lint + test + build. Fix the underlying issue rather than bypassing it.
+- Provenance tracking: every data point includes source, timestamp, lineage
+- Multi-tenant container isolation
+- DI route factories for testability
+- Error handling: return undefined over throwing; log and continue over crashing
+- Add `.js` extension to relative ESM imports
 
-- Do not use `--no-verify` on git push or commit — fix the hook failure instead
-- Fix lint/test errors before pushing
-- If pre-push hooks fail, fix the underlying issue
-- Run `npm run lint && npm run test:run` before pushing
-- Commit message format: `type(scope): message`
-- Branch naming: `feature/STA-XXX-description` | `fix/STA-XXX-description` | `chore/description`
+## Task Steering
 
-## Task Management
+**`master-tasks.md`** is the single source of truth for what to build. Agents must:
 
-- Use TodoWrite for 3+ steps or multiple requests
-- Keep one task in_progress at a time
-- Update task status immediately on completion
+1. Read `master-tasks.md` before starting work (especially via `/next`)
+2. Pick the highest-priority (`P0` > `P1` > `P2`) non-blocked `todo` task
+3. Prefer tasks with `owner=@agent` over `owner=@me` (unless user overrides)
+4. Update task status to `active` when starting, `done` when complete
+5. Add branch/PR info to the table row
+6. Never create tasks in Linear or GitHub unless `sync` column says so
+
+## StackMemory Context Rule
+
+- When an agent fetches conversation context for active work, it must pass the exact current assignment or question as `task_query`.
+- Prefer the MCP shape:
+  - `org_id`
+  - `conversation_id`
+  - `worker_mode: true`
+  - `task_query`
+  - `recover_on_low_signal: true`
+- Do not fetch raw `get_conversation` context for worker execution unless full transcript behavior is explicitly required.
+- The current assignment is persisted under `.stackmemory/worker-context/current-assignment.json` so wrappers and hooks can auto-fill or enforce `task_query`.
 
 ## Security
 

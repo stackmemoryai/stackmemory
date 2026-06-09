@@ -8,7 +8,7 @@
 import { logger } from '../../core/monitoring/logger.js';
 import { estimateTokens } from '../../core/cache/token-estimator.js';
 import { STRUCTURED_RESPONSE_SUFFIX } from '../../orchestrators/multimodal/constants.js';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -48,12 +48,15 @@ export interface SubagentRequest {
     | 'review'
     | 'improve'
     | 'context'
-    | 'publish';
+    | 'publish'
+    | 'design';
   task: string;
   context: Record<string, any>;
   systemPrompt?: string;
   files?: string[];
   timeout?: number;
+  /** Force routing to a specific provider (bypasses model-router) */
+  forceProvider?: 'claude' | 'codex' | 'grok';
 }
 
 export interface SubagentResponse {
@@ -91,8 +94,12 @@ export class ClaudeCodeSubagentClient {
 
   /**
    * Execute a subagent task.
-   * When multiProvider is enabled, routes cheap tasks to external providers.
-   * Falls back to Claude Code CLI path when disabled or for complex tasks.
+   *
+   * Routing priority (subscription-first to minimize API costs):
+   *   1. Codex CLI — subagents included in ChatGPT Plus/Pro subscription
+   *   2. Grok Build CLI — included in Grok Build subscription ($300/mo)
+   *   3. External API providers — when multiProvider enabled (DeepSeek, xAI, etc.)
+   *   4. Claude Code CLI — falls back here (uses API tokens, not subscription)
    */
   async executeSubagent(request: SubagentRequest): Promise<SubagentResponse> {
     const startTime = Date.now();
@@ -109,7 +116,52 @@ export class ClaudeCodeSubagentClient {
       return this.getMockResponse(request, startTime, subagentId);
     }
 
-    // Route to external providers when multiProvider is enabled
+    // Design tasks always route to Claude — it's the design specialist
+    if (request.type === 'design' || request.forceProvider === 'claude') {
+      return this.executeSubagentViaCLI(request, startTime, subagentId);
+    }
+
+    // Explicit provider override
+    if (request.forceProvider === 'codex' && this.isCodexAvailable()) {
+      return this.executeSubagentViaCodex(request, startTime, subagentId);
+    }
+    if (request.forceProvider === 'grok' && this.isGrokBuildAvailable()) {
+      return this.executeSubagentViaGrokBuild(request, startTime, subagentId);
+    }
+
+    // 1. Prefer Codex CLI — subagents are free on ChatGPT subscription
+    if (this.isCodexAvailable()) {
+      try {
+        return await this.executeSubagentViaCodex(
+          request,
+          startTime,
+          subagentId
+        );
+      } catch (error: any) {
+        logger.warn('Codex subagent failed, trying next provider', {
+          subagentId,
+          error: error.message,
+        });
+      }
+    }
+
+    // 2. Try Grok Build CLI — included in subscription
+    if (this.isGrokBuildAvailable()) {
+      try {
+        return await this.executeSubagentViaGrokBuild(
+          request,
+          startTime,
+          subagentId
+        );
+      } catch (error: any) {
+        logger.warn('Grok Build subagent failed, trying next provider', {
+          subagentId,
+          error: error.message,
+        });
+      }
+    }
+
+    // 3. Route to external API providers when multiProvider is enabled
     if (isFeatureEnabled('multiProvider')) {
       const taskType = request.type as TaskType;
       const complexity = scoreComplexity(request.task, request.context);
@@ -139,7 +191,7 @@ export class ClaudeCodeSubagentClient {
       }
     }
 
-    // Default path: use Claude Code CLI
+    // 4. Default path: Claude Code CLI (uses API tokens)
     return this.executeSubagentViaCLI(request, startTime, subagentId);
   }
 
@@ -343,6 +395,160 @@ export class ClaudeCodeSubagentClient {
   }
 
   /**
+   * Check if Codex CLI is available (installed + authenticated via ChatGPT subscription)
+   */
+  private isCodexAvailable(): boolean {
+    try {
+      const result = execSync('which codex 2>/dev/null', {
+        encoding: 'utf-8',
+        timeout: 3000,
+      }).trim();
+      return !!result;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if Grok Build CLI is available
+   */
+  private isGrokBuildAvailable(): boolean {
+    try {
+      const result = execSync('which grok 2>/dev/null', {
+        encoding: 'utf-8',
+        timeout: 3000,
+      }).trim();
+      return !!result;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Execute subagent via Codex CLI.
+   * Subagents run against ChatGPT subscription — no API cost.
+   */
+  private async executeSubagentViaCodex(
+    request: SubagentRequest,
+    startTime: number,
+    subagentId: string
+  ): Promise<SubagentResponse> {
+    const prompt = this.buildSubagentPrompt(request);
+
+    logger.info('Routing subagent to Codex CLI (subscription-free)', {
+      subagentId,
+      type: request.type,
+    });
+
+    return new Promise((resolve, reject) => {
+      const args = ['-q', '--json', '-a', 'full-auto', prompt];
+
+      const proc = spawn('codex', args, {
+        cwd: process.cwd(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: request.timeout ?? 300_000,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout?.on('data', (d: Buffer) => {
+        stdout += d.toString();
+      });
+      proc.stderr?.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Codex exited ${code}: ${stderr.slice(0, 500)}`));
+          return;
+        }
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(stdout);
+        } catch {
+          parsed = { rawOutput: stdout };
+        }
+
+        resolve({
+          success: true,
+          result: parsed,
+          output: stdout,
+          duration: Date.now() - startTime,
+          subagentType: `codex:${request.type}`,
+        });
+      });
+
+      proc.on('error', reject);
+    });
+  }
+
+  /**
+   * Execute subagent via Grok Build CLI.
+   * Runs against Grok Build subscription — no per-token API cost.
+   */
+  private async executeSubagentViaGrokBuild(
+    request: SubagentRequest,
+    startTime: number,
+    subagentId: string
+  ): Promise<SubagentResponse> {
+    const prompt = this.buildSubagentPrompt(request);
+
+    logger.info('Routing subagent to Grok Build CLI (subscription-free)', {
+      subagentId,
+      type: request.type,
+    });
+
+    return new Promise((resolve, reject) => {
+      const args = ['run', '--quiet', '--json', prompt];
+
+      const proc = spawn('grok', args, {
+        cwd: process.cwd(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: request.timeout ?? 300_000,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout?.on('data', (d: Buffer) => {
+        stdout += d.toString();
+      });
+      proc.stderr?.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(`Grok Build exited ${code}: ${stderr.slice(0, 500)}`)
+          );
+          return;
+        }
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(stdout);
+        } catch {
+          parsed = { rawOutput: stdout };
+        }
+
+        resolve({
+          success: true,
+          result: parsed,
+          output: stdout,
+          duration: Date.now() - startTime,
+          subagentType: `grok-build:${request.type}`,
+        });
+      });
+
+      proc.on('error', reject);
+    });
+  }
+
+  /**
    * Check if an error message indicates quota/rate limit exhaustion
    */
   private isQuotaError(message: string): boolean {
@@ -537,6 +743,24 @@ export class ClaudeCodeSubagentClient {
         Search parameters are in the context file.
         
         Output relevant context snippets.`,
+
+      design: `You are a Frontend Design Subagent. You make creative, opinionated UI/UX decisions while implementing exactly what's scoped.
+
+        Task: ${request.task}
+
+        Instructions:
+        1. Make strong design decisions — pick colors, spacing, layout, typography, interactions
+        2. Write production-ready code (React/TSX + Tailwind preferred, adapt to project stack)
+        3. Favor distinctive, polished UI over generic/boilerplate aesthetics
+        4. Ensure responsive design and accessibility basics (contrast, focus, semantic HTML)
+        5. Include hover states, transitions, and micro-interactions where appropriate
+        6. Match existing design system if one exists in the project, otherwise create cohesive choices
+
+        The prompt is well-scoped but you own the UI/UX decisions. Don't ask — decide.
+
+        Context and requirements are in the provided file.
+
+        Output the implementation code with brief notes on design choices made.`,
 
       publish: `You are a Publishing Subagent handling releases and deployments.
         
@@ -764,6 +988,16 @@ function greetUser(name: string): string {
         published: false,
         reason: 'Mock mode - no actual publishing',
       },
+
+      design: {
+        implementation: '<div className="flex flex-col gap-4 p-6">...</div>',
+        files_modified: ['src/components/Example.tsx'],
+        design_choices: [
+          'Dark mode default',
+          'Space Grotesk typography',
+          '8px grid',
+        ],
+      },
     };
 
     const result = mockResponses[request.type] || {};
@@ -798,6 +1032,32 @@ function greetUser(name: string): string {
         }
       }
     }
+  }
+
+  /**
+   * Delegate a design/frontend task to Claude.
+   * Always routes to Claude CLI regardless of subscription-first ordering,
+   * because Claude is the design specialist.
+   *
+   * Usage from any wrapper (codex-sm, opencode-sm, etc.):
+   *   const client = new ClaudeCodeSubagentClient();
+   *   const result = await client.delegateDesign(
+   *     'Build a settings page with dark/light toggle, user avatar, and notification preferences',
+   *     { stack: 'react+tailwind', designSystem: 'nothing' }
+   *   );
+   */
+  async delegateDesign(
+    task: string,
+    context: Record<string, any> = {},
+    options?: { systemPrompt?: string; files?: string[]; timeout?: number }
+  ): Promise<SubagentResponse> {
+    return this.executeSubagent({
+      type: 'design',
+      task,
+      context,
+      forceProvider: 'claude',
+      ...options,
+    });
   }
 
   /**

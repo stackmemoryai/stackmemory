@@ -22,6 +22,8 @@ export type ModelProvider =
   | 'anthropic'
   | 'qwen'
   | 'openai'
+  | 'xai'
+  | 'deepseek'
   | 'ollama'
   | 'cerebras'
   | 'deepinfra'
@@ -37,7 +39,8 @@ export type TaskType =
   | 'review'
   | 'linting'
   | 'context'
-  | 'testing';
+  | 'testing'
+  | 'design';
 
 /**
  * Known context window sizes (max tokens) for popular models.
@@ -66,6 +69,14 @@ export const MODEL_TOKEN_LIMITS: Record<string, number> = {
   // Moonshot (Kimi)
   'kimi-k2.6': 256000,
   'kimi-k2.5': 256000,
+  // xAI (Grok)
+  'grok-4.1-fast': 131072,
+  'grok-4.3': 131072,
+  'grok-4': 131072,
+  // DeepSeek
+  'deepseek-v4-flash': 131072,
+  'deepseek-v4': 131072,
+  'deepseek-v4-pro': 131072,
 };
 
 /** Default context window when model is unknown */
@@ -102,6 +113,7 @@ export interface ModelRouterConfig {
     linting?: ModelProvider; // Lint checks
     context?: ModelProvider; // Context retrieval
     testing?: ModelProvider; // Test generation
+    design?: ModelProvider; // Frontend/UI design (defaults to anthropic)
   };
 
   // Fallback configuration
@@ -120,6 +132,8 @@ export interface ModelRouterConfig {
     anthropic?: ModelConfig;
     qwen?: ModelConfig;
     openai?: ModelConfig;
+    xai?: ModelConfig;
+    deepseek?: ModelConfig;
     ollama?: ModelConfig;
     cerebras?: ModelConfig;
     deepinfra?: ModelConfig;
@@ -192,6 +206,18 @@ const DEFAULT_CONFIG: ModelRouterConfig = {
       model: 'kimi-k2.6',
       baseUrl: 'https://api.moonshot.ai/v1',
       apiKeyEnv: 'MOONSHOT_API_KEY',
+    },
+    xai: {
+      provider: 'xai',
+      model: 'grok-4.1-fast',
+      baseUrl: 'https://api.x.ai/v1',
+      apiKeyEnv: 'XAI_API_KEY',
+    },
+    deepseek: {
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKeyEnv: 'DEEPSEEK_API_KEY',
     },
     'anthropic-batch': {
       provider: 'anthropic-batch',
@@ -423,6 +449,18 @@ const CHEAP_PROVIDERS: {
   apiKeyEnv: string;
   baseUrl?: string;
 }[] = [
+  {
+    provider: 'deepseek',
+    model: 'deepseek-v4-flash',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    baseUrl: 'https://api.deepseek.com/v1',
+  },
+  {
+    provider: 'xai',
+    model: 'grok-4.1-fast',
+    apiKeyEnv: 'XAI_API_KEY',
+    baseUrl: 'https://api.x.ai/v1',
+  },
   {
     provider: 'moonshot',
     model: 'kimi-k2.6',

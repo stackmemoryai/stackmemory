@@ -1,0 +1,74 @@
+name: ops/log-investigation
+version: 1.0.0
+description: AI-powered investigation skill for structured log analysis. Teaches agents how to reconstruct request timelines, diagnose billing/API/webhook issues, and find root causes from wide-format structured logs.
+author: stackmemory
+license: MIT
+runtime:
+  type: local
+ingestion:
+  sources:
+    - axiom
+    - datadog
+    - cloudwatch
+    - stackmemory-traces
+  scope: detect-investigations
+ontology:
+  entities:
+    - Request
+    - Customer
+    - Session
+    - Error
+    - Webhook
+    - Subscription
+  relations:
+    - triggered_by
+    - caused
+    - preceded
+    - resolved_by
+mcp:
+  tools:
+    - name: trace_events
+      description: Query trace events by session, operation, time range, or error status
+      inputSchema:
+        type: object
+        properties:
+          session_id:
+            type: string
+          operation:
+            type: string
+          since:
+            type: string
+            description: ISO 8601 timestamp
+          until:
+            type: string
+          limit:
+            type: number
+    - name: trace_event_stats
+      description: Aggregate statistics — total events, errors, operation distribution
+      inputSchema:
+        type: object
+        properties:
+          session_id:
+            type: string
+          since:
+            type: string
+    - name: trace_event_annotate
+      description: Tag events with root cause findings for feedback loop
+      inputSchema:
+        type: object
+        properties:
+          id:
+            type: string
+          score:
+            type: number
+          feedback:
+            type: string
+        required:
+          - id
+examples:
+  - input: "Customer upgraded but cancellation wasn't undone"
+    output: "Investigation: Query billing events for customer, reconstruct state transitions (free -> premium), check for scheduled cancellation events that should have been cleared on upgrade. Root cause: upgrade handler didn't check scheduledCustomerProduct field."
+  - input: "Webhook processing delayed by 30 minutes"
+    output: "Investigation: Query webhook events by timestamp range, check queue depth and processing times. Look for retry storms or dead-letter patterns. Root cause: queue consumer was down for maintenance, webhooks queued up and processed in burst on restart."
+  - input: "Why did this user get charged twice?"
+    output: "Investigation: Filter billing events by customer_id, reconstruct payment timeline. Check for race condition between checkout completion and subscription renewal. Root cause: checkout session completed during active subscription renewal window."

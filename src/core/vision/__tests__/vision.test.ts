@@ -7,7 +7,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { parseVision, scaffoldVision, setObjectiveDone } from '../vision-file.js';
+import {
+  parseVision,
+  scaffoldVision,
+  setObjectiveDone,
+} from '../vision-file.js';
 import { SignalInbox } from '../signals.js';
 import { VisionLoop, type BrainPort, type Delegate } from '../vision-loop.js';
 import type { Candidate, DelegationOutcome } from '../types.js';
@@ -122,7 +126,10 @@ class FakeBrain implements BrainPort {
     );
   }
   record(input: { title: string; conclusion?: string }) {
-    this.entries.push({ title: input.title, conclusion: input.conclusion ?? '' });
+    this.entries.push({
+      title: input.title,
+      conclusion: input.conclusion ?? '',
+    });
     return undefined;
   }
 }
@@ -168,7 +175,10 @@ describe('VisionLoop', () => {
 
   it('falls back to the next undone objective when no signals', async () => {
     const brain = new FakeBrain();
-    const delegate: Delegate = async () => ({ success: true, conclusion: 'ok' });
+    const delegate: Delegate = async () => ({
+      success: true,
+      conclusion: 'ok',
+    });
     const { loop } = makeLoop(brain, delegate);
     const d = await loop.tick(0);
     expect(d.candidate?.kind).toBe('objective');
@@ -177,8 +187,14 @@ describe('VisionLoop', () => {
 
   it('skips work the brain already concluded (no repeats)', async () => {
     const brain = new FakeBrain();
-    brain.entries.push({ title: 'add retry with jitter', conclusion: 'shipped last week' });
-    const delegate = vi.fn<Delegate>(async () => ({ success: true, conclusion: 'x' }));
+    brain.entries.push({
+      title: 'add retry with jitter',
+      conclusion: 'shipped last week',
+    });
+    const delegate = vi.fn<Delegate>(async () => ({
+      success: true,
+      conclusion: 'x',
+    }));
     const { loop } = makeLoop(brain, delegate);
 
     const d = await loop.tick(0);
@@ -189,7 +205,10 @@ describe('VisionLoop', () => {
 
   it('does not delegate in dry-run / plan mode', async () => {
     const brain = new FakeBrain();
-    const delegate = vi.fn<Delegate>(async () => ({ success: true, conclusion: 'x' }));
+    const delegate = vi.fn<Delegate>(async () => ({
+      success: true,
+      conclusion: 'x',
+    }));
     const { loop } = makeLoop(brain, delegate);
     const d = await loop.tick(0, true);
     expect(d.candidate).toBeTruthy();
@@ -214,7 +233,10 @@ describe('VisionLoop', () => {
 
   it('marks objectives done on success and advances', async () => {
     const brain = new FakeBrain();
-    const delegate: Delegate = async () => ({ success: true, conclusion: 'done' });
+    const delegate: Delegate = async () => ({
+      success: true,
+      conclusion: 'done',
+    });
     const { loop, visionPath } = makeLoop(brain, delegate);
     await loop.run({ maxIterations: 5 });
     const after = parseVision(readFileSync(visionPath, 'utf-8'));

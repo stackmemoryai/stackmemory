@@ -59,7 +59,11 @@ describe('resolveConfig', () => {
   });
 
   it('honors overrides', () => {
-    const cfg = resolveConfig({ port: 8080, session: 'agent', command: 'claude --resume' });
+    const cfg = resolveConfig({
+      port: 8080,
+      session: 'agent',
+      command: 'claude --resume',
+    });
     expect(cfg.port).toBe(8080);
     expect(cfg.session).toBe('agent');
     expect(cfg.command).toBe('claude --resume');
@@ -100,7 +104,11 @@ describe('PortalServer HTTP layer', () => {
 
   beforeEach(async () => {
     port = 38000 + Math.floor(Math.random() * 1500);
-    server = new PortalServer({ port, host: '127.0.0.1', token: 'secret-token' });
+    server = new PortalServer({
+      port,
+      host: '127.0.0.1',
+      token: 'secret-token',
+    });
     await server.start();
   });
 
@@ -137,7 +145,11 @@ describe('PortalServer HTTP layer', () => {
     await server.stop();
     expect(readStatus()).toEqual({ running: false });
     // re-create for afterEach idempotency
-    server = new PortalServer({ port, host: '127.0.0.1', token: 'secret-token' });
+    server = new PortalServer({
+      port,
+      host: '127.0.0.1',
+      token: 'secret-token',
+    });
     await server.start();
   });
 });

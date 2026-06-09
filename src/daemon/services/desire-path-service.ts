@@ -23,6 +23,7 @@ import {
   readdirSync,
   statSync,
   renameSync,
+  unlinkSync,
 } from 'fs';
 import { join, basename, dirname, extname } from 'path';
 import { homedir } from 'os';
@@ -399,6 +400,15 @@ export class DaemonDesirePathService {
     const suggestions: SkillSuggestion[] = [];
 
     for (const pattern of pats.slice(0, 10)) {
+      // Skip and clean up trivial patterns (single-tool or <3 steps)
+      const uniqueTools = new Set(
+        pattern.sequence.map((s) => s.split(':', 2)[0].toLowerCase())
+      );
+      if (uniqueTools.size < 2 || pattern.sequence.length < 3) {
+        this.cleanTrivialSuggestion(pattern);
+        continue;
+      }
+
       const suggestion = this.patternToSuggestion(pattern);
       if (!suggestion) continue;
 
@@ -420,6 +430,40 @@ export class DaemonDesirePathService {
     this.autoPromote(suggestions);
 
     return suggestions;
+  }
+
+  /** Remove suggestion files for trivial patterns that don't warrant skills. */
+  private cleanTrivialSuggestion(pattern: DetectedPattern): void {
+    // Build the name the same way patternToSuggestion would
+    const tools = pattern.sequence.map((s) => {
+      const [tool, target] = s.split(':', 2);
+      return { tool, target: target || '*' };
+    });
+    const toolNames = [...new Set(tools.map((t) => t.tool.toLowerCase()))];
+    const targets = tools.map((t) => t.target).filter((t) => t !== '*');
+    const dominantDir =
+      targets.length > 0
+        ? targets[0]
+            .split('/')
+            .slice(0, 3)
+            .join('-')
+            .replace(/[^a-zA-Z0-9-]/g, '')
+        : '';
+    const nameSuffix = dominantDir ? `-${dominantDir}` : '';
+    const name = `auto-${toolNames.join('-')}${nameSuffix}`;
+
+    // Delete from suggestions dir
+    const sugFile = join(SUGGESTIONS_DIR, `${name}.skill.md`);
+    try {
+      if (existsSync(sugFile)) {
+        unlinkSync(sugFile);
+        this.onLog('DEBUG', `Cleaned trivial suggestion: ${name}`, {
+          pattern_id: pattern.id,
+          uniqueTools: toolNames.length,
+          steps: pattern.sequence.length,
+        });
+      }
+    } catch {}
   }
 
   // ─── 4. Auto-Promotion ────────────────────────────────────

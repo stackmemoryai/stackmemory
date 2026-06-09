@@ -34,7 +34,12 @@ describe('provider-pricing table', () => {
   });
 
   it('calculates cost from token counts', () => {
-    const c = calculateCost('anthropic', 'claude-opus-4-8', 1_000_000, 1_000_000);
+    const c = calculateCost(
+      'anthropic',
+      'claude-opus-4-8',
+      1_000_000,
+      1_000_000
+    );
     expect(c).not.toBeNull();
     expect(c!.totalCost).toBeCloseTo(30.0, 6); // $5 in + $25 out
   });
@@ -58,13 +63,21 @@ describe('Max-plan discount ramp', () => {
   };
 
   it('is 80% off at (or before) the ramp start', () => {
-    expect(effectiveSpendMultiplier(new Date('2026-06-06'), ramp)).toBeCloseTo(0.2);
-    expect(effectiveSpendMultiplier(new Date('2026-01-01'), ramp)).toBeCloseTo(0.2);
+    expect(effectiveSpendMultiplier(new Date('2026-06-06'), ramp)).toBeCloseTo(
+      0.2
+    );
+    expect(effectiveSpendMultiplier(new Date('2026-01-01'), ramp)).toBeCloseTo(
+      0.2
+    );
   });
 
   it('is full price at (or after) the ramp end', () => {
-    expect(effectiveSpendMultiplier(new Date('2026-09-06'), ramp)).toBeCloseTo(1.0);
-    expect(effectiveSpendMultiplier(new Date('2027-01-01'), ramp)).toBeCloseTo(1.0);
+    expect(effectiveSpendMultiplier(new Date('2026-09-06'), ramp)).toBeCloseTo(
+      1.0
+    );
+    expect(effectiveSpendMultiplier(new Date('2027-01-01'), ramp)).toBeCloseTo(
+      1.0
+    );
   });
 
   it('interpolates linearly mid-ramp', () => {
@@ -75,7 +88,11 @@ describe('Max-plan discount ramp', () => {
   });
 
   it('falls back to full price on a misconfigured ramp', () => {
-    const bad: DiscountRamp = { ...ramp, start: '2026-09-06', end: '2026-06-06' };
+    const bad: DiscountRamp = {
+      ...ramp,
+      start: '2026-09-06',
+      end: '2026-06-06',
+    };
     expect(effectiveSpendMultiplier(new Date('2026-07-01'), bad)).toBe(1.0);
   });
 

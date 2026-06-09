@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "raindrop": {
+      "command": "/Users/jwu/.raindrop/bin/raindrop",
+      "args": [
+        "workshop",
+        "mcp"
+      ]
+    }
+  }
+}

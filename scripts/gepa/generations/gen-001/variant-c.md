@@ -1,1 +1,1 @@
-Invalid API key · Fix external API key
+Credit balance is too low

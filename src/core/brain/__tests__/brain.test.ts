@@ -43,13 +43,19 @@ describe('BrainStore', () => {
 
   it('does not leak entries across repos by default', () => {
     store.record({ title: 'repoA secret' });
-    const storeB = new BrainStore(db, { projectId: 'repoB', workspaceId: 'orgX' });
+    const storeB = new BrainStore(db, {
+      projectId: 'repoB',
+      workspaceId: 'orgX',
+    });
     expect(storeB.recall({}).length).toBe(0);
   });
 
   it('finds cross-repo entries via org scope', () => {
     store.record({ title: 'from repoA', tags: ['shared'] });
-    const storeB = new BrainStore(db, { projectId: 'repoB', workspaceId: 'orgX' });
+    const storeB = new BrainStore(db, {
+      projectId: 'repoB',
+      workspaceId: 'orgX',
+    });
     storeB.record({ title: 'from repoB', tags: ['shared'] });
 
     const repoOnly = store.recall({ text: 'shared' });
@@ -100,7 +106,10 @@ describe('BrainStore', () => {
 
   it('counts repo vs org', () => {
     store.record({ title: 'a' });
-    const storeB = new BrainStore(db, { projectId: 'repoB', workspaceId: 'orgX' });
+    const storeB = new BrainStore(db, {
+      projectId: 'repoB',
+      workspaceId: 'orgX',
+    });
     storeB.record({ title: 'b' });
     expect(store.count(false)).toBe(1);
     expect(store.count(true)).toBe(2);
@@ -130,13 +139,11 @@ describe('BrainSync', () => {
 
   it('pushes locally-updated entries and advances the cursor', async () => {
     store.record({ title: 'to push' });
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(JSON.stringify({ accepted: 1, serverCursor: 123 }), {
-          status: 200,
-        })
-      );
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ accepted: 1, serverCursor: 123 }), {
+        status: 200,
+      })
+    );
 
     const res = await sync.push();
     expect(res.success).toBe(true);
@@ -169,7 +176,11 @@ describe('BrainSync', () => {
     };
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
-        JSON.stringify({ entries: [remote], serverCursor: 1000, hasMore: false }),
+        JSON.stringify({
+          entries: [remote],
+          serverCursor: 1000,
+          hasMore: false,
+        }),
         { status: 200 }
       )
     );
@@ -193,7 +204,11 @@ describe('BrainSync', () => {
     };
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
-        JSON.stringify({ entries: [stale], serverCursor: 1000, hasMore: false }),
+        JSON.stringify({
+          entries: [stale],
+          serverCursor: 1000,
+          hasMore: false,
+        }),
         { status: 200 }
       )
     );

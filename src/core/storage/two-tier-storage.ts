@@ -19,8 +19,15 @@ import {
   PutObjectCommand,
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
-import type { RedisClientType } from 'redis';
-import { createClient as createRedisClient } from 'redis';
+// Redis is optional — lazy import to avoid crash when not installed
+type RedisClientType = import('redis').RedisClientType;
+let createRedisClient: typeof import('redis').createClient;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  createRedisClient = require('redis').createClient;
+} catch {
+  // redis not installed — remote tier will fail at runtime if used
+}
 import { Pool } from 'pg';
 import * as zlib from 'zlib';
 import { promisify } from 'util';

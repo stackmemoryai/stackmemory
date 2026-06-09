@@ -3,6 +3,17 @@
 # Linear Auto-Sync Daemon for StackMemory
 # Automatically syncs tasks with Linear at regular intervals
 
+# Use Node version from .nvmrc
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+  nvm use 2>/dev/null
+elif [ -d "$HOME/.nvm/versions/node" ]; then
+  NODE_VER=$(cat "$(dirname "$0")/../.nvmrc" 2>/dev/null || echo "20")
+  NODE_PATH=$(ls -d "$HOME/.nvm/versions/node/v${NODE_VER}"* 2>/dev/null | head -1)
+  [ -n "$NODE_PATH" ] && export PATH="$NODE_PATH/bin:$PATH"
+fi
+
 # Configuration
 INTERVAL=${1:-5}  # Default 5 minutes
 PID_FILE="/tmp/stackmemory-linear-sync.pid"

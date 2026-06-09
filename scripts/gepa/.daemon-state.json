@@ -1,0 +1,14 @@
+{
+  "hashes": {
+    "global": "b9f053a22ca5",
+    "provenantai": "ab337a8a7446",
+    "dispatch": "4499a0c9a8c0",
+    "skill:start": "c2df33ab3507",
+    "skill:stop": "6a42ceff3017",
+    "skill:learn": "33c918636dc7",
+    "skill:next": "7311377a488f",
+    "skill:summary": "46687d1f80fe"
+  },
+  "lastSweep": "2026-05-28T15:55:50.520Z",
+  "optimizations": 0
+}

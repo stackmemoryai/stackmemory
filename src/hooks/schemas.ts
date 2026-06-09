@@ -20,6 +20,8 @@ export const ModelProviderSchema = z.enum([
   'anthropic',
   'qwen',
   'openai',
+  'xai',
+  'deepseek',
   'ollama',
   'cerebras',
   'deepinfra',
@@ -50,6 +52,7 @@ export const ModelRouterConfigSchema = z.object({
       linting: ModelProviderSchema.optional(),
       context: ModelProviderSchema.optional(),
       testing: ModelProviderSchema.optional(),
+      design: ModelProviderSchema.optional(),
     })
     .optional()
     .default({}),

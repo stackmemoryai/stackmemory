@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-04-07T22:57:08.193Z",
+  "generation": 1,
+  "patterns": {
+    "commonErrors": [],
+    "toolUsage": {},
+    "feedbackPatterns": {
+      "positive": 0,
+      "negative": 0,
+      "corrections": 0,
+      "retries": 0
+    },
+    "performanceByVariant": {}
+  },
+  "insights": {
+    "type": "error",
+    "error": {
+      "type": "authentication_error",
+      "message": "Invalid authentication credentials"
+    },
+    "request_id": "req_011CZqEivgxVqXYSzurzmJzj"
+  }
+}
