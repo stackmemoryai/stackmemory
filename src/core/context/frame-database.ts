@@ -320,6 +320,28 @@ export class FrameDatabase {
           cursor_value TEXT NOT NULL,
           updated_at INTEGER NOT NULL
         );
+
+        -- Learned behavioral patterns (observe → learn → apply)
+        CREATE TABLE IF NOT EXISTS patterns (
+          id TEXT PRIMARY KEY,
+          domain TEXT NOT NULL,
+          trigger TEXT NOT NULL,
+          action TEXT NOT NULL,
+          evidence TEXT DEFAULT '[]',
+          confidence REAL DEFAULT 0.3,
+          observation_count INTEGER DEFAULT 0,
+          scope TEXT DEFAULT 'project',
+          project_id TEXT,
+          status TEXT DEFAULT 'pending',
+          source TEXT DEFAULT 'observed',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+          last_matched_at INTEGER,
+          superseded_by TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_patterns_project ON patterns(project_id, status);
+        CREATE INDEX IF NOT EXISTS idx_patterns_domain ON patterns(domain, confidence DESC);
+        CREATE INDEX IF NOT EXISTS idx_patterns_status ON patterns(status, confidence DESC);
       `);
 
       logger.info('Frame database schema initialized');
