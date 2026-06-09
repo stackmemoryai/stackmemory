@@ -215,6 +215,90 @@ export class PatternStore {
     };
   }
 
+  /** Promote a project-scoped pattern to global */
+  promote(id: string): void {
+    this.db
+      .prepare(
+        "UPDATE patterns SET scope = 'global', project_id = NULL, updated_at = ? WHERE id = ?"
+      )
+      .run(Date.now(), id);
+  }
+
+  /** List distinct project IDs with pattern counts */
+  projects(): Array<{
+    projectId: string;
+    count: number;
+    avgConfidence: number;
+  }> {
+    const rows = this.db
+      .prepare(
+        `
+      SELECT project_id, COUNT(*) as count, AVG(confidence) as avg_confidence
+      FROM patterns
+      WHERE project_id IS NOT NULL AND status != 'archived'
+      GROUP BY project_id
+      ORDER BY count DESC
+    `
+      )
+      .all() as Array<{
+      project_id: string;
+      count: number;
+      avg_confidence: number;
+    }>;
+
+    return rows.map((r) => ({
+      projectId: r.project_id,
+      count: r.count,
+      avgConfidence: r.avg_confidence,
+    }));
+  }
+
+  /** Find patterns that appear in 2+ projects (promotion candidates) */
+  promotionCandidates(minConfidence: number = 0.7): Pattern[] {
+    // Find patterns with the same trigger+action across different projects
+    const rows = this.db
+      .prepare(
+        `
+      SELECT p1.* FROM patterns p1
+      WHERE p1.scope = 'project'
+        AND p1.confidence >= ?
+        AND p1.status = 'active'
+        AND EXISTS (
+          SELECT 1 FROM patterns p2
+          WHERE p2.trigger = p1.trigger
+            AND p2.action = p1.action
+            AND p2.project_id != p1.project_id
+            AND p2.status = 'active'
+        )
+      ORDER BY p1.confidence DESC
+    `
+      )
+      .all(minConfidence) as PatternRow[];
+
+    return rows.map((r) => this.toPattern(r));
+  }
+
+  /** Find clusters of related patterns (for evolve) */
+  findClusters(
+    minSize: number = 2
+  ): Array<{ domain: string; patterns: Pattern[] }> {
+    const active = this.list({ status: 'active', limit: 500 });
+    const byDomain: Map<string, Pattern[]> = new Map();
+
+    for (const p of active) {
+      const list = byDomain.get(p.domain) ?? [];
+      list.push(p);
+      byDomain.set(p.domain, list);
+    }
+
+    return Array.from(byDomain.entries())
+      .filter(([, patterns]) => patterns.length >= minSize)
+      .map(([domain, patterns]) => ({
+        domain,
+        patterns: patterns.sort((a, b) => b.confidence - a.confidence),
+      }));
+  }
+
   /** Find patterns relevant to a query string */
   search(query: string, projectId?: string): Pattern[] {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);

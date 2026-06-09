@@ -213,6 +213,133 @@ export function createPatternsCommand(): Command {
       process.stdout.write(`Imported ${imported} patterns.\n`);
     });
 
+  // ── promote ───────────────────────────────────────
+
+  patterns
+    .command('promote')
+    .description('Promote a project-scoped pattern to global')
+    .argument('[id]', 'Pattern ID to promote (omit for auto-candidates)')
+    .option('--dry-run', 'Show candidates without promoting')
+    .action((id, opts) => {
+      const store = getStore();
+
+      if (id) {
+        const pattern = store.get(id);
+        if (!pattern) {
+          process.stderr.write(`Pattern not found: ${id}\n`);
+          process.exit(1);
+        }
+        if (pattern.scope === 'global') {
+          process.stdout.write(`Already global: ${id}\n`);
+          return;
+        }
+        if (!opts.dryRun) {
+          store.promote(id);
+          process.stdout.write(`Promoted to global: ${id}\n`);
+        } else {
+          process.stdout.write(
+            `Would promote: ${id} (confidence: ${pattern.confidence.toFixed(2)})\n`
+          );
+        }
+        return;
+      }
+
+      // Auto-detect candidates (seen in 2+ projects with high confidence)
+      const candidates = store.promotionCandidates(0.7);
+      if (candidates.length === 0) {
+        process.stdout.write(
+          'No promotion candidates found (need 0.7+ confidence in 2+ projects).\n'
+        );
+        return;
+      }
+
+      for (const c of candidates) {
+        const action = opts.dryRun ? 'candidate' : 'promoted';
+        if (!opts.dryRun) store.promote(c.id);
+        process.stdout.write(
+          `${action}: ${c.id} (${c.confidence.toFixed(2)}, project: ${c.projectId})\n`
+        );
+      }
+
+      if (opts.dryRun) {
+        process.stdout.write(
+          `\n${candidates.length} candidates. Run without --dry-run to promote.\n`
+        );
+      }
+    });
+
+  // ── projects ──────────────────────────────────────
+
+  patterns
+    .command('projects')
+    .description('List projects with pattern counts')
+    .option('--json', 'Output JSON')
+    .action((opts) => {
+      const store = getStore();
+      const projs = store.projects();
+
+      if (opts.json) {
+        process.stdout.write(JSON.stringify(projs, null, 2) + '\n');
+        return;
+      }
+
+      if (projs.length === 0) {
+        process.stdout.write('No project-scoped patterns found.\n');
+        return;
+      }
+
+      for (const p of projs) {
+        process.stdout.write(
+          `${p.projectId}  ${p.count} patterns  avg confidence: ${p.avgConfidence.toFixed(2)}\n`
+        );
+      }
+    });
+
+  // ── evolve ────────────────────────────────────────
+
+  patterns
+    .command('evolve')
+    .description('Analyze pattern clusters and suggest evolved structures')
+    .option('--min-cluster <n>', 'Minimum cluster size', '2')
+    .option('--json', 'Output JSON')
+    .action((opts) => {
+      const store = getStore();
+      const clusters = store.findClusters(parseInt(opts.minCluster, 10));
+
+      if (opts.json) {
+        process.stdout.write(JSON.stringify(clusters, null, 2) + '\n');
+        return;
+      }
+
+      if (clusters.length === 0) {
+        process.stdout.write(
+          'No pattern clusters found. Need 2+ active patterns in a domain.\n'
+        );
+        return;
+      }
+
+      for (const cluster of clusters) {
+        const avgConf =
+          cluster.patterns.reduce((s, p) => s + p.confidence, 0) /
+          cluster.patterns.length;
+        const label =
+          avgConf >= 0.8
+            ? 'SKILL candidate'
+            : avgConf >= 0.6
+              ? 'command candidate'
+              : 'cluster';
+
+        process.stdout.write(
+          `\n[${cluster.domain}] ${cluster.patterns.length} patterns — ${label} (avg: ${avgConf.toFixed(2)})\n`
+        );
+        for (const p of cluster.patterns) {
+          process.stdout.write(
+            `  ${confidenceBar(p.confidence)} ${p.id}: ${p.trigger}\n`
+          );
+        }
+      }
+    });
+
   return patterns;
 }
 
