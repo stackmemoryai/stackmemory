@@ -1,10 +1,10 @@
 /**
- * POETIC Platform Overview Integration Tests
+ * PROSE Platform Overview Integration Tests
  *
- * POETIC = Purpose, Observables, Edges, Triggers, Invariants, Contracts
- * Spec source: docs/specs/POETIC-platform-overview.md
+ * PROSE = Purpose, Rules & Constraints, Observables, Scenarios, Expectations
+ * Spec source: docs/specs/PROSE-platform-overview.md
  *
- * Each test maps to a POETIC ID in the spec so prose and code stay coupled.
+ * Each test maps to a PROSE ID in the spec so prose and code stay coupled.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -49,13 +49,13 @@ function run(args: string, cwd: string, expectError = false): string {
   }
 }
 
-describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
+describe('PROSE Platform Overview', { timeout: 60_000 }, () => {
   let testDir: string;
 
   beforeEach(() => {
     const rawDir = path.join(
       os.tmpdir(),
-      `stackmemory-poetic-test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      `stackmemory-prose-test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     );
     fs.mkdirSync(rawDir, { recursive: true });
     // Resolve symlinks (macOS /var -> /private/var) so the test's path matches
@@ -93,6 +93,52 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
       const listOutput = run('decision list', testDir);
       expect(listOutput).toContain('SQLite');
       expect(listOutput).toContain('Zero-config');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // R — Rules & Constraints
+  // ---------------------------------------------------------------------------
+
+  describe('R.1 Uninitialized projects', () => {
+    it('fails gracefully outside an initialized project', () => {
+      run('init', testDir);
+      fs.rmSync(path.join(testDir, '.stackmemory', 'context.db'), {
+        force: true,
+      });
+
+      const output = execSync(`node ${cliPath} context show`, {
+        cwd: testDir,
+        encoding: 'utf8',
+        timeout: 30_000,
+        env: { ...process.env, STACKMEMORY_LOG_LEVEL: 'ERROR' },
+      });
+      expect(output).toMatch(/not initialized|not set up|no project/i);
+    });
+  });
+
+  describe('R.2 Empty result sets', () => {
+    it('returns empty results for non-matching search', () => {
+      run('init', testDir);
+      run('decision add "Some decision" --why "Some rationale"', testDir);
+
+      const searchOutput = run('search xyznonexistentquery123', testDir);
+      // Empty result should not throw; output should indicate no matches or be empty-ish.
+      expect(searchOutput).not.toContain('Error');
+    });
+  });
+
+  describe('R.3 Idempotent initialization', () => {
+    it('init is idempotent', () => {
+      run('init', testDir);
+      const firstInitFiles = fs.readdirSync(path.join(testDir, '.stackmemory'));
+
+      run('init', testDir);
+      const secondInitFiles = fs.readdirSync(
+        path.join(testDir, '.stackmemory')
+      );
+
+      expect(secondInitFiles.sort()).toEqual(firstInitFiles.sort());
     });
   });
 
@@ -154,57 +200,13 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
       const searchOutput = run('search FTS5', testDir);
       expect(searchOutput).toMatch(/FTS5|search|result/i);
     });
-
-    it('returns empty results for non-matching search', () => {
-      run('init', testDir);
-      run('decision add "Some decision" --why "Some rationale"', testDir);
-
-      const searchOutput = run('search xyznonexistentquery123', testDir);
-      // Empty result should not throw; output should indicate no matches or be empty-ish.
-      expect(searchOutput).not.toContain('Error');
-    });
   });
 
   // ---------------------------------------------------------------------------
-  // E — Edges & Constraints
+  // S — Scenarios
   // ---------------------------------------------------------------------------
 
-  describe('E.1 Uninitialized projects', () => {
-    it('fails gracefully outside an initialized project', () => {
-      run('init', testDir);
-      fs.rmSync(path.join(testDir, '.stackmemory', 'context.db'), {
-        force: true,
-      });
-
-      const output = execSync(`node ${cliPath} context show`, {
-        cwd: testDir,
-        encoding: 'utf8',
-        timeout: 30_000,
-        env: { ...process.env, STACKMEMORY_LOG_LEVEL: 'ERROR' },
-      });
-      expect(output).toMatch(/not initialized|not set up|no project/i);
-    });
-  });
-
-  describe('E.3 Idempotent initialization', () => {
-    it('init is idempotent', () => {
-      run('init', testDir);
-      const firstInitFiles = fs.readdirSync(path.join(testDir, '.stackmemory'));
-
-      run('init', testDir);
-      const secondInitFiles = fs.readdirSync(
-        path.join(testDir, '.stackmemory')
-      );
-
-      expect(secondInitFiles.sort()).toEqual(firstInitFiles.sort());
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // T — Triggers
-  // ---------------------------------------------------------------------------
-
-  describe('T.1 Frame push', () => {
+  describe('S.1 Frame push', () => {
     it('pushing a frame creates a scoped entry', () => {
       run('init', testDir);
       run('context push "Feature: payment flow"', testDir);
@@ -214,7 +216,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('T.2 Frame pop', () => {
+  describe('S.2 Frame pop', () => {
     it('popping a frame restores the previous frame', () => {
       run('init', testDir);
       run('context push "Outer frame"', testDir);
@@ -232,7 +234,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('T.3 Decision record', () => {
+  describe('S.3 Decision record', () => {
     it('recording a decision persists rationale', () => {
       run('init', testDir);
       run('decision add "Use pnpm" --why "Fast, disk efficient"', testDir);
@@ -243,7 +245,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('T.4 Snapshot capture', () => {
+  describe('S.4 Snapshot capture', () => {
     it('capturing a snapshot persists handoff state', () => {
       run('init', testDir);
       run(
@@ -252,7 +254,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
       );
 
       const captureOutput = run(
-        'capture --no-commit -m "POETIC snapshot"',
+        'capture --no-commit -m "PROSE snapshot"',
         testDir
       );
       expect(captureOutput).toMatch(/handoff|snapshot|capture/i);
@@ -260,10 +262,10 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
   });
 
   // ---------------------------------------------------------------------------
-  // I — Invariants
+  // E — Expectations
   // ---------------------------------------------------------------------------
 
-  describe('I.1 Frame stack integrity', () => {
+  describe('E.1 Frame stack integrity', () => {
     it('active frame stack remains consistent', () => {
       run('init', testDir);
       run('context push "Alpha frame"', testDir);
@@ -280,7 +282,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('I.2 Decision immutability', () => {
+  describe('E.2 Decision immutability', () => {
     it('recorded decisions are immutable', () => {
       run('init', testDir);
       run(
@@ -302,7 +304,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('I.3 Project isolation', () => {
+  describe('E.3 Project isolation', () => {
     it('projects in different directories are isolated', () => {
       const projectA = path.join(testDir, 'project-a');
       const projectB = path.join(testDir, 'project-b');
@@ -320,11 +322,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // C — Contracts
-  // ---------------------------------------------------------------------------
-
-  describe('C.1 CLI contract', () => {
+  describe('E.4 CLI contract', () => {
     it('CLI commands return correct exit codes', () => {
       expect(() => run('init', testDir)).not.toThrow();
       expect(() => run('decision list', testDir)).not.toThrow();
@@ -334,7 +332,7 @@ describe('POETIC Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('C.2 SQLite contract', () => {
+  describe('E.5 SQLite contract', () => {
     it('SQLite database is self-contained in .stackmemory', () => {
       run('init', testDir);
       run('decision add "DB test" --why "Check local DB"', testDir);
