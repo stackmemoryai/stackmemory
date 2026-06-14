@@ -512,4 +512,4 @@ Grounded in distributed systems theory: FLP impossibility, Byzantine→Crash con
 
 ## License
 
-Licensed under the [Business Source License 1.1](./LICENSE). You can use, modify, and self-host StackMemory freely. The one restriction: you may not offer it as a competing hosted service. The license converts to MIT after 4 years per release.
+Licensed under the [MIT License](./LICENSE).
