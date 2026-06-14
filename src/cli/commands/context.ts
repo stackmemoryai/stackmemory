@@ -55,6 +55,7 @@ export function createContextCommands(): Command {
         const frameManager = new FrameManager(db, projectId, {
           skipContextBridge: true,
         });
+        await frameManager.initialize();
 
         const depth = frameManager.getStackDepth();
         const activePath = frameManager.getActiveFramePath();
@@ -137,6 +138,7 @@ export function createContextCommands(): Command {
         const frameManager = new FrameManager(db, projectId, {
           skipContextBridge: true,
         });
+        await frameManager.initialize();
 
         // Get current top frame as parent
         const activePath = frameManager.getActiveFramePath();
@@ -203,6 +205,7 @@ export function createContextCommands(): Command {
         const frameManager = new FrameManager(db, projectId, {
           skipContextBridge: true,
         });
+        await frameManager.initialize();
 
         const activePath = frameManager.getActiveFramePath();
 
@@ -264,6 +267,7 @@ export function createContextCommands(): Command {
         const frameManager = new FrameManager(db, projectId, {
           skipContextBridge: true,
         });
+        await frameManager.initialize();
 
         const activePath = frameManager.getActiveFramePath();
 
@@ -338,6 +342,7 @@ export function createContextCommands(): Command {
         const frameManager = new FrameManager(db, projectId, {
           skipContextBridge: true,
         });
+        await frameManager.initialize();
 
         if (options.list || action === 'list') {
           // List all worktree contexts

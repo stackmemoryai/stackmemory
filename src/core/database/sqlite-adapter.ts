@@ -78,7 +78,23 @@ export class SQLiteAdapter extends FeatureAwareDatabaseAdapter {
     const dir = path.dirname(this.dbPath);
     await fs.mkdir(dir, { recursive: true });
 
-    this.db = new Database(this.dbPath);
+    try {
+      this.db = new Database(this.dbPath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.includes('NODE_MODULE_VERSION') ||
+        msg.includes('was compiled against a different Node.js version')
+      ) {
+        const nodeVersion = process.version;
+        throw new Error(
+          `better-sqlite3 was compiled for a different Node.js version than the one currently running (${nodeVersion}).\n` +
+            `Fix: cd ${process.cwd()} && npm rebuild better-sqlite3\n` +
+            `If that fails: npm install`
+        );
+      }
+      throw err;
+    }
 
     // Enforce referential integrity
     this.db.pragma('foreign_keys = ON');
