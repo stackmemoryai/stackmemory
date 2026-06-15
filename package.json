@@ -62,7 +62,7 @@
     "url": "https://github.com/stackmemoryai/stackmemory/issues"
   },
   "author": "StackMemory AI",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "publishConfig": {
     "access": "public"
   },

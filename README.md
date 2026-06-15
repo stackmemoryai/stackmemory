@@ -512,4 +512,6 @@ Grounded in distributed systems theory: FLP impossibility, Byzantine→Crash con
 
 ## License
 
-Licensed under the [MIT License](./LICENSE).
+Licensed under the [PolyForm Noncommercial License 1.0.0](./LICENSE).
+
+Free for personal, research, educational, and noncommercial use. Commercial use requires a separate license from StackMemory AI.
