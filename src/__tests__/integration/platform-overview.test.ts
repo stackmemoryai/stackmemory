@@ -263,9 +263,13 @@ describe('PROSE Platform Overview', { timeout: 60_000 }, () => {
 
   // ---------------------------------------------------------------------------
   // E — Expectations
+  //
+  // Each Expectation is grounded in an SOP (Standard Operating Procedure) so
+  // that business outcomes can be standardized, QA'd, and automated.
+  // SOP source: docs/sops/
   // ---------------------------------------------------------------------------
 
-  describe('E.1 Frame stack integrity', () => {
+  describe('E.1 Frame stack integrity (SOP-101)', () => {
     it('active frame stack remains consistent', () => {
       run('init', testDir);
       run('context push "Alpha frame"', testDir);
@@ -282,7 +286,7 @@ describe('PROSE Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('E.2 Decision immutability', () => {
+  describe('E.2 Decision immutability (SOP-102)', () => {
     it('recorded decisions are immutable', () => {
       run('init', testDir);
       run(
@@ -304,7 +308,7 @@ describe('PROSE Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('E.3 Project isolation', () => {
+  describe('E.3 Project isolation (SOP-103)', () => {
     it('projects in different directories are isolated', () => {
       const projectA = path.join(testDir, 'project-a');
       const projectB = path.join(testDir, 'project-b');
@@ -322,7 +326,7 @@ describe('PROSE Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('E.4 CLI contract', () => {
+  describe('E.4 CLI contract (SOP-201)', () => {
     it('CLI commands return correct exit codes', () => {
       expect(() => run('init', testDir)).not.toThrow();
       expect(() => run('decision list', testDir)).not.toThrow();
@@ -332,7 +336,7 @@ describe('PROSE Platform Overview', { timeout: 60_000 }, () => {
     });
   });
 
-  describe('E.5 SQLite contract', () => {
+  describe('E.5 SQLite contract (SOP-202)', () => {
     it('SQLite database is self-contained in .stackmemory', () => {
       run('init', testDir);
       run('decision add "DB test" --why "Check local DB"', testDir);
