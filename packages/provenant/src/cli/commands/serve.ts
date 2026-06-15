@@ -14,5 +14,5 @@ export function serve(opts: ServeOpts): void {
     console.error(`Invalid port: ${opts.port}`);
     process.exit(1);
   }
-  startServer({ port, dbPath: opts.db });
+  startServer({ port, dbPath: opts.db, apiKey: process.env['PROVENANT_API_KEY'] });
 }
