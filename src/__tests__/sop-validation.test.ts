@@ -1,0 +1,64 @@
+import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, extname } from 'node:path';
+
+const SOP_DIR = join(__dirname, '..', '..', 'docs', 'sops');
+const SOP_GENERATED_DIR = join(SOP_DIR, 'generated');
+
+function collectSopFiles(): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(SOP_DIR)) {
+    const path = join(SOP_DIR, entry);
+    if (extname(entry) === '.md') {
+      files.push(path);
+    }
+  }
+  try {
+    for (const entry of readdirSync(SOP_GENERATED_DIR)) {
+      const path = join(SOP_GENERATED_DIR, entry);
+      if (extname(entry) === '.md') {
+        files.push(path);
+      }
+    }
+  } catch {
+    // generated dir may not exist
+  }
+  return files;
+}
+
+describe('SOP validation', () => {
+  const files = collectSopFiles();
+
+  it('finds more than 5 SOP files', () => {
+    expect(files.length).toBeGreaterThan(5);
+  });
+
+  it('each SOP has a unique ID', () => {
+    const ids = new Set<string>();
+    for (const file of files) {
+      const content = readFileSync(file, 'utf8');
+      const match = content.match(/# (SOP-\d+)/);
+      expect(match).toBeTruthy();
+      const id = match![1]!;
+      expect(ids.has(id)).toBe(false);
+      ids.add(id);
+    }
+  });
+
+  it('each SOP has required sections', () => {
+    const required = ['## Objective', '## Procedure', '## Verification'];
+    for (const file of files) {
+      const content = readFileSync(file, 'utf8');
+      for (const section of required) {
+        expect(content).toContain(section);
+      }
+    }
+  });
+
+  it('each SOP references a PROSE Expectation', () => {
+    for (const file of files) {
+      const content = readFileSync(file, 'utf8');
+      expect(content).toMatch(/Related PROSE Expectation.*E\.\d+/);
+    }
+  });
+});
