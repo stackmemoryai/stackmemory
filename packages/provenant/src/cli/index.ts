@@ -17,6 +17,7 @@ import {
 } from './commands/log-override.js';
 import { serve } from './commands/serve.js';
 import { calibrate } from './commands/calibrate.js';
+import { compliance } from './commands/compliance.js';
 
 const DB_DEFAULT = process.env['PROVENANT_DB'] || '.provenant/graph.db';
 
@@ -134,6 +135,14 @@ program
   .option('-p, --port <port>', 'Port to listen on', '3847')
   .option('--db <path>', 'Database path (or set PROVENANT_DB)', DB_DEFAULT)
   .action(serve);
+
+// SOP compliance report
+program
+  .command('compliance')
+  .description('Show SOP compliance report from logged PROSE test results')
+  .option('--db <path>', 'Database path (or set PROVENANT_DB)', DB_DEFAULT)
+  .option('--system <system>', 'Source system to report on', 'prose-test-run')
+  .action(compliance);
 
 // Shadow mode calibration
 program

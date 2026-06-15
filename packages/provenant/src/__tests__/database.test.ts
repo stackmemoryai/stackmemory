@@ -117,6 +117,29 @@ describe('Database — sources and source edges', () => {
     expect(db.getSourceByExternalId('slack', 'msg-99')).toBeUndefined();
     expect(db.getSourceByExternalId('linear', 'msg-42')).toBeUndefined();
   });
+
+  it('finds nodes by source system', () => {
+    const node = db.insertNode({
+      type: 'decision',
+      content: 'E.1 / SOP-101 Frame Lifecycle: compliance verified',
+      embedding: null,
+      actor: 'prose-harness',
+      confidence: 0.95,
+    });
+    const source = db.insertSource({
+      system: 'prose-test-run',
+      external_id: 'run-1:E.1',
+      raw_payload: '{}',
+      hash: 'run-1:E.1',
+    });
+    db.linkNodeToSource(node.id, source.id, 'prose-test-run', 'run-1:E.1');
+
+    const found = db.getNodesBySourceSystem('prose-test-run');
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe(node.id);
+
+    expect(db.getNodesBySourceSystem('other-system')).toHaveLength(0);
+  });
 });
 
 describe('Database — rejection log', () => {

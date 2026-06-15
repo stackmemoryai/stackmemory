@@ -339,6 +339,18 @@ export class Database {
       .all(nodeId) as Source[];
   }
 
+  getNodesBySourceSystem(system: string): Node[] {
+    return this.db
+      .prepare(
+        `SELECT n.* FROM nodes n
+         JOIN source_edges se ON se.node_id = n.id
+         JOIN sources s ON s.id = se.source_id
+         WHERE s.system = ?
+         ORDER BY n.created_at DESC`
+      )
+      .all(system) as Node[];
+  }
+
   // --- Rejection Log ---
 
   insertRejection(params: {
