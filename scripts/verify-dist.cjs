@@ -43,14 +43,21 @@ function main() {
     join(dist, 'cli/codex-sm-danger.js'),
     join(dist, 'cli/claude-sm.js'),
     join(dist, 'cli/claude-sm-danger.js'),
+    join(dist, 'cli/hermes-sm.js'),
+    join(dist, 'cli/opencode-sm.js'),
+    join(dist, 'cli/gemini-sm.js'),
   ];
   requiredFiles.forEach(checkFile);
 
   // 2) Bin launchers reference dist/src/* (ESM dynamic import)
-  fileContains('bin/codex-sm', "import('../dist/src/cli/codex-sm.js')");
-  fileContains('bin/codex-smd', "import('../dist/src/cli/codex-sm-danger.js')");
-  fileContains('bin/claude-sm', "import('../dist/src/cli/claude-sm.js')");
-  fileContains('bin/claude-smd', "import('../dist/src/cli/claude-sm-danger.js')");
+  fileContains('bin/codex-sm', "../dist/src/cli/codex-sm.js");
+  fileContains('bin/codex-smd', "../dist/src/cli/codex-sm-danger.js");
+  fileContains('bin/claude-sm', "../dist/src/cli/claude-sm.js");
+  fileContains('bin/claude-smd', "../dist/src/cli/claude-sm-danger.js");
+  fileContains('bin/hermes-sm', "../dist/src/cli/hermes-sm.js");
+  fileContains('bin/hermes-smd', "../dist/src/cli/hermes-sm.js");
+  fileContains('bin/opencode-sm', "../dist/src/cli/opencode-sm.js");
+  fileContains('bin/gemini-sm', "../dist/src/cli/gemini-sm.js");
 
   // 3) package.json scripts point to correct paths
   try {

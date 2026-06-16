@@ -102,6 +102,106 @@ The local SQLite database is self-contained within `.stackmemory/` and portable 
 
 **SOP basis:** `SOP-202 Data Portability` — the database must be relocatable and restorable without external services.
 
+### E.6 Error Handling contract
+Errors are surfaced through structured responses with sufficient context for callers to recover or retry.
+
+**SOP basis:** `SOP-1601 Circuit Breaking` and generated error-handling SOPs — failures must be isolated and observable.
+
+### E.7 Observability contract
+The platform emits metrics, logs, or traces that make internal state visible to operators.
+
+**SOP basis:** Generated observability SOPs — state changes must be observable without relying on ad-hoc inspection.
+
+### E.8 Backup and Recovery contract
+User data can be exported and restored within the same major CLI version without external services.
+
+**SOP basis:** Generated backup-and-recovery SOPs — data loss scenarios must have a documented recovery path.
+
+### E.9 Authentication contract
+Actions that modify project state are attributable to an authenticated actor.
+
+**SOP basis:** Generated authentication SOPs — identity must be established before privileged operations.
+
+### E.10 Authorization contract
+Access to project context is enforced according to the actor's permissions.
+
+**SOP basis:** Generated authorization SOPs — unauthorized access to project memory is non-compliant.
+
+### E.11 Data Encryption contract
+Sensitive data at rest is encrypted using platform-standard algorithms.
+
+**SOP basis:** Generated data-encryption SOPs — plaintext storage of secrets or credentials is non-compliant.
+
+### E.12 Input Validation contract
+External input is validated before processing to prevent injection or corruption.
+
+**SOP basis:** Generated input-validation SOPs — invalid input must be rejected at the boundary.
+
+### E.13 Rate Limiting contract
+API and CLI operations respect configured rate limits to prevent abuse or overload.
+
+**SOP basis:** Generated rate-limiting SOPs — exceeding configured limits must be throttled.
+
+### E.14 Audit Logging contract
+Security-relevant actions are recorded in an append-only audit log.
+
+**SOP basis:** Generated audit-logging SOPs — privileged actions must leave a traceable record.
+
+### E.15 Dependency Management contract
+External dependencies are tracked and scanned for known vulnerabilities.
+
+**SOP basis:** Generated dependency-management SOPs — unmanaged dependencies are non-compliant.
+
+### E.16 Secret Rotation contract
+Credentials and secrets are rotated on a defined schedule.
+
+**SOP basis:** Generated secret-rotation SOPs — expired or stale secrets must be replaced.
+
+### E.17 Multi-Agent Coordination contract
+Concurrent agents operating on the same project do not corrupt shared state.
+
+**SOP basis:** Generated multi-agent-coordination SOPs — conflicting writes must be resolved safely.
+
+### E.18 API Versioning contract
+Public API changes preserve backward compatibility within a major version.
+
+**SOP basis:** Generated API-versioning SOPs — breaking changes must be versioned explicitly.
+
+### E.19 Configuration Management contract
+Configuration is validated at load time and changes are traceable.
+
+**SOP basis:** Generated configuration-management SOPs — invalid or untracked config is non-compliant.
+
+### E.20 Schema Migration contract
+Database schema changes are forward-compatible and reversible within a major version.
+
+**SOP basis:** Generated schema-migration SOPs — migrations must not destroy user data.
+
+### E.21 Performance Budget contract
+Operations complete within defined latency and resource limits.
+
+**SOP basis:** Generated performance-budget SOPs — consistent budget violations are non-compliant.
+
+### E.22 Caching Strategy contract
+Cached data is invalidated or refreshed when underlying state changes.
+
+**SOP basis:** Generated caching-strategy SOPs — stale cache reads are non-compliant.
+
+### E.23 Retry Policy contract
+Transient failures are retried with backoff and jitter before surfacing as errors.
+
+**SOP basis:** Generated retry-policy SOPs — unbounded or immediate retries are non-compliant.
+
+### E.24 Circuit Breaking contract
+Repeated failures trigger circuit breaking to prevent cascading overload.
+
+**SOP basis:** `SOP-1601 Circuit Breaking` and generated circuit-breaking SOPs — the circuit must open after configured thresholds.
+
+### E.25 Feature Flagging contract
+Feature flags are evaluated consistently and changes are auditable.
+
+**SOP basis:** Generated feature-flagging SOPs — flag state must be deterministic and traceable.
+
 ---
 
 ## SOP → PROSE → Tests workflow
@@ -145,3 +245,23 @@ For example, `SOP-101 Frame Lifecycle` becomes PROSE `E.1`, which becomes the te
 | E.3 | `SOP-103 Project Boundary Enforcement` | `projects in different directories are isolated` |
 | E.4 | `SOP-201 CLI Exit-Code Compliance` | `CLI commands return correct exit codes` |
 | E.5 | `SOP-202 Data Portability` | `SQLite database is self-contained in .stackmemory` |
+| E.6 | `SOP-1xxx Error Handling` | `errors are surfaced as structured responses` |
+| E.7 | `SOP-1xxx Observability` | `platform emits observable metrics/logs/traces` |
+| E.8 | `SOP-1xxx Backup and Recovery` | `data can be exported and restored` |
+| E.9 | `SOP-1xxx Authentication` | `modifications are attributable to an actor` |
+| E.10 | `SOP-1xxx Authorization` | `access is enforced by permission` |
+| E.11 | `SOP-1xxx Data Encryption` | `sensitive data at rest is encrypted` |
+| E.12 | `SOP-1xxx Input Validation` | `invalid input is rejected at the boundary` |
+| E.13 | `SOP-1xxx Rate Limiting` | `operations respect configured rate limits` |
+| E.14 | `SOP-1xxx Audit Logging` | `security actions are append-only logged` |
+| E.15 | `SOP-1xxx Dependency Management` | `dependencies are tracked and scanned` |
+| E.16 | `SOP-1xxx Secret Rotation` | `secrets are rotated on schedule` |
+| E.17 | `SOP-1xxx Multi-Agent Coordination` | `concurrent agents do not corrupt state` |
+| E.18 | `SOP-1xxx API Versioning` | `public API changes preserve compatibility` |
+| E.19 | `SOP-1xxx Configuration Management` | `config is validated and traceable` |
+| E.20 | `SOP-1xxx Schema Migration` | `schema changes are forward-compatible` |
+| E.21 | `SOP-1xxx Performance Budget` | `operations stay within latency/resource limits` |
+| E.22 | `SOP-1xxx Caching Strategy` | `cache is invalidated on state change` |
+| E.23 | `SOP-1xxx Retry Policy` | `transient failures retry with backoff` |
+| E.24 | `SOP-1601 Circuit Breaking` | `circuit opens after failure thresholds` |
+| E.25 | `SOP-1xxx Feature Flagging` | `flag evaluation is deterministic and auditable` |

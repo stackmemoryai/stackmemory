@@ -17,7 +17,9 @@ interface ComplianceEntry {
 
 export function compliance(opts: ComplianceOpts): void {
   if (!existsSync(opts.db)) {
-    console.error('No database found. Run `provenant log-decision` or ingest first.');
+    console.error(
+      'No database found. Run `provenant log-decision` or ingest first.'
+    );
     process.exit(1);
   }
 
@@ -42,13 +44,19 @@ export function compliance(opts: ComplianceOpts): void {
         // ignore malformed payload
       }
 
-      const proseId = (metadata['proseId'] as string) ?? extractProseId(node.content);
+      const proseId =
+        (metadata['proseId'] as string) ?? extractProseId(node.content);
       const sop = (metadata['sop'] as string) ?? extractSop(node.content);
       if (!proseId || seen.has(proseId)) continue;
       seen.add(proseId);
 
-      const passed = node.content.includes('compliance verified');
-      const failed = node.content.includes('compliance NOT verified');
+      const metadataStatus = metadata['status'] as string | undefined;
+      const passed =
+        metadataStatus === 'passed' ||
+        node.content.includes('compliance verified');
+      const failed =
+        metadataStatus === 'failed' ||
+        node.content.includes('compliance NOT verified');
 
       entries.push({
         proseId,
@@ -76,14 +84,17 @@ export function compliance(opts: ComplianceOpts): void {
     const failed = entries.filter((e) => e.status === 'fail').length;
 
     for (const entry of entries) {
-      const icon = entry.status === 'pass' ? '✓' : entry.status === 'fail' ? '✗' : '?';
+      const icon =
+        entry.status === 'pass' ? '✓' : entry.status === 'fail' ? '✗' : '?';
       console.log(
         `${icon} ${entry.proseId}  ${entry.sop.slice(0, 40).padEnd(40)}  confidence ${entry.confidence.toFixed(2)}`
       );
     }
 
     console.log('─'.repeat(60));
-    console.log(`Total: ${entries.length}  Passed: ${passed}  Failed: ${failed}`);
+    console.log(
+      `Total: ${entries.length}  Passed: ${passed}  Failed: ${failed}`
+    );
   } finally {
     db.close();
   }

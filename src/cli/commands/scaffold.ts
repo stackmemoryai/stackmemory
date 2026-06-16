@@ -21,7 +21,9 @@ const TEMPLATES: Record<string, string> = {
   'company/design.md':
     '---\nname: Design System\ndescription: Logos, colors, components\n---\n\n# Design System\n\n## Colors\n- Primary:\n- Secondary:\n\n## Logos\n- [paths or URLs]\n',
   'wiki/README.md':
-    '# Wiki — SOPs & Playbooks\n\nAdd markdown files here. Files with skill frontmatter become Claude skills.\n',
+    '# Wiki — SOPs & Playbooks\n\nAdd markdown files here. Files with skill frontmatter become Claude skills.\n\nSOPs should follow the Company OS schema:\n\n- `## Objective`\n- `## Procedure`\n- `## Verification`\n- `## Non-compliance`\n\nEach SOP must reference a PROSE Expectation from `docs/specs/COMPANY-OS-PROSE.md`.\n',
+  'wiki/SOP-301-onboarding.md':
+    '# SOP-301 New Hire Onboarding\n\n**Owner:** People Ops  \n**Status:** Active  \n**Related PROSE Expectation:** [E.1 Onboarding completeness](../docs/specs/COMPANY-OS-PROSE.md#e1-onboarding-completeness)\n\n## Objective\nEnsure every new hire has accounts, hardware, and access documented before their start date.\n\n## Procedure\n\n1. **Pre-start checklist (5 days before)**\n   - Hiring manager opens an onboarding ticket.\n   - People Ops confirms laptop requirement and shipping address.\n\n2. **Account provisioning (3 days before)**\n   - IT creates SSO account and adds the hire to default groups.\n   - People Ops sends welcome email with first-week schedule.\n\n3. **Access verification (1 day before)**\n   - Hiring manager verifies the hire can log in to primary systems.\n\n## Verification\n\n- Run audit: `stackmemory company-os audit onboarding`\n- Expected result: 100% of hires in last 30 days have completed checklist.\n\n## Non-compliance\n\nOnboarding missing SSO access or hardware assignment on start date is non-compliant.\n',
   'skills/README.md':
     '# Skills\n\nClaude skill-packs. Each file is a markdown instruction set with frontmatter.\n\n```yaml\n---\nname: skill-name\ndescription: What this skill does\nactivates_on: [keyword1, keyword2]\nversion: "1.0"\n---\n```\n',
   'clients/README.md':

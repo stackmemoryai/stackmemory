@@ -106,6 +106,7 @@ export class WikiCompiler {
     concepts: string;
     sources: string;
     synthesis: string;
+    sops: string;
   };
 
   constructor(config: WikiConfig) {
@@ -121,6 +122,7 @@ export class WikiCompiler {
       concepts: join(this.config.wikiDir, 'concepts'),
       sources: join(this.config.wikiDir, 'sources'),
       synthesis: join(this.config.wikiDir, 'synthesis'),
+      sops: join(this.config.wikiDir, 'sops'),
     };
   }
 
@@ -207,6 +209,10 @@ export class WikiCompiler {
       this.writeArticle(path, this.buildSessionSource(ctx.sessionDigest));
       created.push(path);
     }
+
+    // 6. Derived Company OS SOPs from anchors
+    const derivedSops = this.generateDerivedSops(ctx.anchors);
+    created.push(...derivedSops);
 
     this.updateIndex();
     this.appendLog(
@@ -311,6 +317,10 @@ export class WikiCompiler {
       if (existsSync(filepath)) updated.push(path);
       else created.push(path);
     }
+
+    // 6. Derived Company OS SOPs from anchors
+    const derivedSops = this.generateDerivedSops(ctx.anchors);
+    created.push(...derivedSops);
 
     if (created.length > 0 || updated.length > 0) {
       this.updateIndex();
@@ -765,6 +775,12 @@ export class WikiCompiler {
         f.endsWith('.md')
       ).length;
     }
+    // Backfill categories that may not exist yet
+    byCategory['entities'] ??= 0;
+    byCategory['concepts'] ??= 0;
+    byCategory['sources'] ??= 0;
+    byCategory['synthesis'] ??= 0;
+    byCategory['sops'] ??= 0;
 
     const logPath = join(this.dirs.root, 'log.md');
     let lastCompile: string | null = null;
@@ -1150,6 +1166,117 @@ export class WikiCompiler {
     }
 
     return groups;
+  }
+
+  /**
+   * Derive Company OS SOPs from recurring frame anchors.
+   * Creates lightweight SOP drafts in wiki/sops/ for DECISION, CONSTRAINT, RISK, FACT anchors.
+   */
+  private generateDerivedSops(anchors: AnchorRow[]): string[] {
+    const created: string[] = [];
+    const derivedConfig: Array<{
+      type: string;
+      id: number;
+      name: string;
+      proseId: string;
+      objective: string;
+    }> = [
+      {
+        type: 'DECISION',
+        id: 401,
+        name: 'Decision-derived Process',
+        proseId: 'E.9',
+        objective:
+          'Preserve recurring decisions as repeatable guidance so the team does not re-debate settled questions.',
+      },
+      {
+        type: 'CONSTRAINT',
+        id: 402,
+        name: 'Constraint-derived Process',
+        proseId: 'E.10',
+        objective:
+          'Preserve recurring constraints as repeatable guidance so the team respects known boundaries.',
+      },
+      {
+        type: 'RISK',
+        id: 403,
+        name: 'Risk-derived Process',
+        proseId: 'E.11',
+        objective:
+          'Preserve recurring risks as repeatable guidance so the team mitigates them consistently.',
+      },
+      {
+        type: 'FACT',
+        id: 404,
+        name: 'Fact-derived Process',
+        proseId: 'E.12',
+        objective:
+          'Preserve recurring facts as repeatable guidance so the team operates from shared knowledge.',
+      },
+    ];
+
+    for (const config of derivedConfig) {
+      const typeAnchors = anchors.filter((a) => a.type === config.type);
+      if (typeAnchors.length === 0) continue;
+
+      const path = `sops/SOP-${config.id}-${this.slugify(config.name)}.md`;
+      const items = typeAnchors
+        .slice(-20)
+        .map((a) => {
+          const date = new Date(a.created_at * 1000).toISOString().slice(0, 10);
+          return `- ${a.text} _(observed ${date} in [[sources/${this.slugify(a.frame_name)}]])_`;
+        })
+        .join('\n');
+
+      const article = [
+        '---',
+        `title: "SOP-${config.id} ${config.name}"`,
+        `category: sop`,
+        `derived_from: "${config.type} anchors"`,
+        `created: ${new Date().toISOString()}`,
+        `updated: ${new Date().toISOString()}`,
+        `tags: [sop, derived, ${config.type.toLowerCase()}]`,
+        '---',
+        '',
+        `# SOP-${config.id} ${config.name}`,
+        '',
+        '**Owner:** Derived from frame anchors  ',
+        '**Status:** Active  ',
+        `**Related PROSE Expectation:** [${config.proseId} ${config.name}](../../docs/specs/COMPANY-OS-PROSE.md)`,
+        '',
+        '## Objective',
+        config.objective,
+        '',
+        '## Procedure',
+        '',
+        `1. **Review**`,
+        `   - Review the latest ${config.type} anchors below before taking action.`,
+        '',
+        `2. **Apply**`,
+        `   - Treat these ${config.type.toLowerCase()}s as guidance for current and future work.`,
+        '',
+        `3. **Update**`,
+        `   - When a ${config.type.toLowerCase()} changes, record the new state in a frame so this SOP can be regenerated.`,
+        '',
+        '## Verification',
+        '',
+        `- Run \`stackmemory company-os audit ${config.type.toLowerCase()}-derived\``,
+        `- Expected result: the derived ${config.type.toLowerCase()}s below are reflected in current work.`,
+        '',
+        '### Derived anchors',
+        `${items}`,
+        '',
+        '## Non-compliance',
+        '',
+        `Ignoring or overriding these ${config.type.toLowerCase()}s without a new recorded decision is non-compliant.`,
+        '',
+      ].join('\n');
+
+      this.writeArticle(path, article);
+      created.push(path);
+    }
+
+    return created;
   }
 
   // ── Reading helpers ──
