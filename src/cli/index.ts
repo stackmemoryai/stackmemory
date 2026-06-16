@@ -84,6 +84,7 @@ import { createSkillCommand } from './commands/skill.js';
 import { createPackCommand } from './commands/pack.js';
 import { createCacheCommand } from './commands/cache.js';
 import { createScaffoldCommand } from './commands/scaffold.js';
+import { createCompanyOsCommand } from './commands/company-os.js';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -840,6 +841,7 @@ program.addCommand(createSkillCommand());
 program.addCommand(createPackCommand());
 program.addCommand(createCacheCommand());
 program.addCommand(createScaffoldCommand());
+program.addCommand(createCompanyOsCommand());
 
 // Register setup and diagnostic commands
 registerSetupCommands(program);
