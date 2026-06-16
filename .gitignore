@@ -73,6 +73,7 @@ __pycache__/
 *$py.class
 *.egg-info/
 .Python
+.venv/
 venv/
 env/
 ENV/
@@ -140,6 +141,7 @@ packages/diffmem/
 
 # GEPA runtime state (modified by hooks)
 scripts/gepa/.hook-state.json
+scripts/gepa/.before-optimize.md
 scripts/gepa/results/scores.jsonl
 scripts/gepa/state.json
 scripts/gepa/results/

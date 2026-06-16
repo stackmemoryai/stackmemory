@@ -1,4 +1,4 @@
-name: PROSE SOP Compliance
+name: Company OS SOP Compliance
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: prose-compliance-${{ github.ref }}
+  group: company-os-compliance-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -34,19 +34,19 @@ jobs:
       - name: Restore Provenant graph database
         uses: actions/cache@v4
         with:
-          path: .provenant/graph.db
-          key: provenant-db-${{ github.run_number }}
-          restore-keys: provenant-db-
+          path: .provenant/company-os.db
+          key: provenant-company-os-db-${{ github.run_number }}
+          restore-keys: provenant-company-os-db-
 
-      - name: Run PROSE integration tests and log to Provenant
-        run: npx tsx scripts/log-prose-results.ts .provenant/graph.db
+      - name: Run Company OS integration tests and log to Provenant
+        run: npx tsx scripts/log-company-os-results.ts .provenant/company-os.db
 
-      - name: Print SOP compliance report
-        run: npx tsx packages/provenant/src/cli/index.ts compliance --db .provenant/graph.db
+      - name: Print Company OS SOP compliance report
+        run: npx tsx packages/provenant/src/cli/index.ts compliance --db .provenant/company-os.db --system company-os-test-run
 
       - name: Upload graph database
         uses: actions/upload-artifact@v4
         with:
-          name: provenant-graph-prose-${{ github.run_number }}
-          path: .provenant/graph.db
+          name: provenant-graph-company-os-${{ github.run_number }}
+          path: .provenant/company-os.db
           retention-days: 30

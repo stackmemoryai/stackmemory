@@ -3,4 +3,19 @@
  * Gemini-SM CLI Launcher (ESM)
  * Delegates to built CLI in dist without requiring tsx.
  */
-import('../dist/src/cli/gemini-sm.js');
+import { existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const target = join(__dirname, '../dist/src/cli/gemini-sm.js');
+
+if (!existsSync(target)) {
+  console.error('Error: StackMemory has not been built.');
+  console.error(`Missing: ${target}`);
+  console.error('Run: npm install && npm run build');
+  process.exit(1);
+}
+
+import(target);

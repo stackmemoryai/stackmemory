@@ -195,3 +195,17 @@ export LINEAR_API_KEY="your_key"
 ### Debug Commands
 - `stackmemory --debug [command]` - Run with debug output
 - `stackmemory --version` - Show version
+
+## Safety Rules
+
+### Blocked Commands
+The following commands are **banned** unless the user explicitly requests them and confirms the target:
+- `rm -rf` — never use recursive force removal. Use `git rm -r --cached` to stop tracking files, or move items to trash and ask before deleting.
+- `git reset --hard`, `git clean -fd`, and other destructive git mutations — ask for confirmation first.
+- Direct deletion of ignored local state directories (e.g., `.stackmemory/`, `.continue/`, `.ralph/`, `.swarm/`, `.opencode/`) — stop tracking with `git rm -r --cached` if needed, but leave local files intact unless the user explicitly asks to remove them.
+
+### Safe Cleanup Pattern
+1. Identify files/directories to clean.
+2. Stop tracking in git with `git rm -r --cached <path>` if they are tracked.
+3. For local-only ignored artifacts, ask before deleting or move to trash instead of `rm -rf`.
+4. Never delete state/data directories that may contain user context.
