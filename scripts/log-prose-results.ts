@@ -56,7 +56,10 @@ function runTests(): VitestResult {
   return JSON.parse(raw.slice(start)) as VitestResult;
 }
 
-function mapTestToSop(testName: string, fullName: string): { sop?: string; proseId?: string } {
+function mapTestToSop(
+  testName: string,
+  fullName: string
+): { sop?: string; proseId?: string } {
   const mapping: Record<string, { sop: string; proseId: string }> = {
     'active frame stack remains consistent': {
       sop: 'SOP-101 Frame Lifecycle',
@@ -109,7 +112,9 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log(`Test run complete: ${result.numPassedTests ?? 0} passed, ${result.numFailedTests ?? 0} failed`);
+  console.log(
+    `Test run complete: ${result.numPassedTests ?? 0} passed, ${result.numFailedTests ?? 0} failed`
+  );
 
   const db = new Database(dbPath);
   try {
