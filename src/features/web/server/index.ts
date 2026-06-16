@@ -13,6 +13,7 @@ import { FrameManager } from '../../../core/context/index.js';
 import Database from 'better-sqlite3';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { getSpendSummary } from './spend-calculator.js';
 // Type-safe environment variable access
 function _getEnv(key: string, defaultValue?: string): string {
   const value = process.env[key];
@@ -178,6 +179,16 @@ app.get('/api/analytics', (req, res) => {
     res.json(analytics);
   } catch {
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+app.get('/api/evals', async (req, res) => {
+  try {
+    const spend = await getSpendSummary();
+    res.json(spend);
+  } catch (error: unknown) {
+    console.error('Error fetching evals spend:', error);
+    res.status(500).json({ error: 'Failed to fetch AI spend estimate' });
   }
 });
 
