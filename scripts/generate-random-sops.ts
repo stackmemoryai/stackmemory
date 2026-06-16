@@ -39,13 +39,31 @@ const CONCERNS = [
   'Feature Flagging',
 ];
 
-const VERBS = [
-  'must',
-  'should',
-  'shall',
-  'is required to',
-  'must always',
-];
+// Maps each concern to a stable PROSE Expectation ID (E.6–E.25).
+const CONCERN_TO_PROSE_ID: Record<string, number> = {
+  'Error Handling': 6,
+  Observability: 7,
+  'Backup and Recovery': 8,
+  Authentication: 9,
+  Authorization: 10,
+  'Data Encryption': 11,
+  'Input Validation': 12,
+  'Rate Limiting': 13,
+  'Audit Logging': 14,
+  'Dependency Management': 15,
+  'Secret Rotation': 16,
+  'Multi-Agent Coordination': 17,
+  'API Versioning': 18,
+  'Configuration Management': 19,
+  'Schema Migration': 20,
+  'Performance Budget': 21,
+  'Caching Strategy': 22,
+  'Retry Policy': 23,
+  'Circuit Breaking': 24,
+  'Feature Flagging': 25,
+};
+
+const VERBS = ['must', 'should', 'shall', 'is required to', 'must always'];
 
 const ACTIONS = [
   'return a structured error response',
@@ -77,21 +95,20 @@ function rand<T>(arr: T[]): T {
 
 function generateSopId(index: number): string {
   // Start at 1000 to avoid collisions with hand-written SOPs (100-202).
-  const area = 1000 + Math.floor(Math.random() * 9) * 100; // 1000-1800
-  const seq = (index % 99) + 1;
-  return `SOP-${area + seq}`;
+  // Use deterministic IDs so re-running the generator is idempotent.
+  return `SOP-${1000 + index + 1}`;
 }
 
-function generateSopContent(id: string, index: number): string {
-  const concern = rand(CONCERNS);
+function generateSopContent(id: string, concern: string): string {
   const verb = rand(VERBS);
   const action = rand(ACTIONS);
   const scope = rand(SCOPES);
+  const proseId = CONCERN_TO_PROSE_ID[concern] ?? 6;
   return `# ${id} ${concern}
 
 **Owner:** Platform Team  
 **Status:** Active  
-**Related PROSE Expectation:** [E.${(index % 20) + 1} ${concern}](../specs/PROSE-platform-overview.md)
+**Related PROSE Expectation:** [E.${proseId} ${concern}](../specs/PROSE-platform-overview.md#e${proseId}-${concern.toLowerCase().replace(/\s+/g, '-')})
 
 ## Objective
 Ensure ${concern.toLowerCase()} is handled consistently across the platform.
@@ -122,7 +139,9 @@ function main(): void {
   const outDir = process.argv[2] ?? DEFAULT_OUT_DIR;
   const count = parseInt(process.argv[3] ?? '10', 10);
   if (isNaN(count) || count < 1 || count > 1000) {
-    console.error('Usage: npx tsx scripts/generate-random-sops.ts [outDir] <count>');
+    console.error(
+      'Usage: npx tsx scripts/generate-random-sops.ts [outDir] <count>'
+    );
     process.exit(1);
   }
 
@@ -131,16 +150,19 @@ function main(): void {
   const generated: string[] = [];
   for (let i = 0; i < count; i++) {
     const id = generateSopId(i);
-    const filename = `${id.toLowerCase().replace(/-/g, '-')}-${rand(
-      CONCERNS
-    ).toLowerCase().replace(/\s+/g, '-')}.md`;
-    const content = generateSopContent(id, i);
+    const concern = rand(CONCERNS);
+    const filename = `${id.toLowerCase()}-${concern.toLowerCase().replace(/\s+/g, '-')}.md`;
+    const content = generateSopContent(id, concern);
     writeFileSync(resolve(outDir, filename), content);
     generated.push(id);
   }
 
-  console.log(`Generated ${generated.length} randomized SOP files in ${outDir}`);
-  console.log(generated.slice(0, 10).join(', ') + (generated.length > 10 ? '...' : ''));
+  console.log(
+    `Generated ${generated.length} randomized SOP files in ${outDir}`
+  );
+  console.log(
+    generated.slice(0, 10).join(', ') + (generated.length > 10 ? '...' : '')
+  );
 }
 
 main();

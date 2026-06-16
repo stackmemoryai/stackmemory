@@ -1,16 +1,16 @@
-# SOP-1216 Multi-Agent Coordination
+# SOP-1002 Observability
 
 **Owner:** Platform Team  
 **Status:** Active  
-**Related PROSE Expectation:** [E.16 Multi-Agent Coordination](../specs/PROSE-platform-overview.md)
+**Related PROSE Expectation:** [E.7 Observability](../specs/PROSE-platform-overview.md#e7-observability)
 
 ## Objective
-Ensure multi-agent coordination is handled consistently across the platform.
+Ensure observability is handled consistently across the platform.
 
 ## Procedure
 
 1. **Trigger detection**
-   - The system is required to detect conditions that require multi-agent coordination during ingestion.
+   - The system is required to detect conditions that require observability during ingestion.
 
 2. **Action**
    - Upon detection, the system is required to return a structured error response during ingestion.
@@ -21,7 +21,7 @@ Ensure multi-agent coordination is handled consistently across the platform.
 ## Verification
 
 - Run the relevant integration test suite.
-- Expected result: no violations of the multi-agent coordination rule are observed.
+- Expected result: no violations of the observability rule are observed.
 
 ## Non-compliance
 

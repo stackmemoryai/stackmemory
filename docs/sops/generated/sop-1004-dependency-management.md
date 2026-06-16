@@ -1,8 +1,8 @@
-# SOP-1615 Dependency Management
+# SOP-1004 Dependency Management
 
 **Owner:** Platform Team  
 **Status:** Active  
-**Related PROSE Expectation:** [E.15 Dependency Management](../specs/PROSE-platform-overview.md)
+**Related PROSE Expectation:** [E.15 Dependency Management](../specs/PROSE-platform-overview.md#e15-dependency-management)
 
 ## Objective
 Ensure dependency management is handled consistently across the platform.
@@ -13,7 +13,7 @@ Ensure dependency management is handled consistently across the platform.
    - The system is required to detect conditions that require dependency management when querying the graph.
 
 2. **Action**
-   - Upon detection, the system is required to expire cached entries on update when querying the graph.
+   - Upon detection, the system is required to persist an audit record when querying the graph.
 
 3. **Verification**
    - Each occurrence is required to be traceable to a decision node or audit log entry.
@@ -25,4 +25,4 @@ Ensure dependency management is handled consistently across the platform.
 
 ## Non-compliance
 
-Failure to expire cached entries on update when querying the graph is considered non-compliant.
+Failure to persist an audit record when querying the graph is considered non-compliant.
