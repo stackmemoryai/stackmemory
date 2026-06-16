@@ -1,1 +1,0 @@
-{"passed":false,"passRate":0.3333333333333333,"criteria":{"captures_context":{"passed":false,"reason":"regex heuristic"},"suggests_clear":{"passed":false,"reason":"regex heuristic"},"concise_output":{"passed":true,"reason":"regex heuristic"}},"judgeMode":"regex","duration":38955,"output":"Invalid API key · Fix external API key\n"}

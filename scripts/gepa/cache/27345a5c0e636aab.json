@@ -1,1 +1,0 @@
-{"passed":false,"passRate":0,"criteria":{},"judgeMode":"llm","duration":28392,"output":"API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-06-01 at 00:00 UTC.\"},\"request_id\":\"req_011CbJ4J7fioyBkDeL27wpFw\"}\n"}

@@ -1,1 +1,0 @@
-{"passed":false,"passRate":0,"criteria":{"ctx_schema":{"passed":false,"reason":"regex heuristic"},"tenant_scoping":{"passed":false,"reason":"regex heuristic"},"existing_service":{"passed":false,"reason":"regex heuristic"},"graph_service_wrapper":{"passed":false,"reason":"regex heuristic"}},"judgeMode":"regex","duration":128460,"output":"Invalid API key · Fix external API key\n"}

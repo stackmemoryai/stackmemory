@@ -47,8 +47,9 @@ function loadGoldSet(phase) {
 }
 
 /**
- * Score a phase prompt against its gold set using heuristic evaluation.
- * This is a fast, offline eval (no LLM calls) based on outcome patterns.
+ * Score a phase prompt against its gold set using structural evaluation.
+ * Checks for meaningful coverage of failure patterns — not raw keyword presence.
+ * A keyword-stuffed mutation that appends glossary terms should NOT pass.
  *
  * For LLM-judge evaluation, use the full GEPA optimize.js eval pipeline.
  */
@@ -64,6 +65,14 @@ function evalPhase(phase) {
   }
 
   const prompt = fs.readFileSync(promptPath, 'utf-8');
+  // Split into lines to distinguish sections from keyword dumps
+  const lines = prompt.split('\n');
+  const headings = lines
+    .filter((l) => /^#{1,3}\s/.test(l))
+    .map((l) => l.toLowerCase());
+  const bodyLines = lines.filter((l) => !/^#{1,3}\s/.test(l));
+  const body = bodyLines.join('\n').toLowerCase();
+
   let passed = 0;
   const failures = [];
 
@@ -71,59 +80,103 @@ function evalPhase(phase) {
     const expected = entry.expected;
     if (!expected) continue;
 
-    // Heuristic: check if the prompt addresses the failure patterns
     let entryPassed = true;
+    let failReason = null;
 
     switch (phase) {
       case 'understand': {
-        // Check if prompt guides complexity assessment
-        if (expected.complexity === 'careful' && !prompt.includes('plan')) {
-          entryPassed = false;
+        if (expected.complexity === 'careful') {
+          // Prompt must have a section or sentence about planning/scoping CAREFUL tasks,
+          // not just contain the word "plan" anywhere.
+          const hasPlanSection = headings.some((h) =>
+            /plan|scope|careful|classify/i.test(h)
+          );
+          const hasPlanSentence =
+            /careful.{0,60}(plan|scope)|plan.{0,60}careful/i.test(body);
+          if (!hasPlanSection && !hasPlanSentence) {
+            entryPassed = false;
+            failReason =
+              'missing plan/scope guidance for CAREFUL complexity tasks';
+          }
         }
         break;
       }
 
       case 'implement': {
-        // Check if prompt constrains scope
-        if (!expected.scopeKept && !prompt.includes('scope')) {
-          entryPassed = false;
+        if (!expected.scopeKept) {
+          // Must have substantive anti-scope-creep instruction (sentence, not just the word)
+          const hasScopeInstruction =
+            /do not.{0,60}scope|stay.{0,60}scope|scope.{0,60}(limit|crep|bound|only)/i.test(
+              body
+            );
+          if (!hasScopeInstruction) {
+            entryPassed = false;
+            failReason = 'missing anti-scope-creep instruction';
+          }
         }
-        // Check ESM import guidance
-        if (
-          entry.errorTail &&
-          /import|ESM/i.test(entry.errorTail) &&
-          !prompt.includes('.js')
-        ) {
-          entryPassed = false;
+        if (entry.errorTail && /import|ESM/i.test(entry.errorTail)) {
+          // Must have ESM .js extension rule in a sentence (not just ".js" floating alone)
+          const hasEsmRule =
+            /\.js.{0,80}(import|esm|relative)|import.{0,80}\.js/i.test(body);
+          if (!hasEsmRule) {
+            entryPassed = false;
+            failReason = 'missing ESM .js extension import rule';
+          }
         }
         break;
       }
 
       case 'validate': {
-        // Check if prompt covers the specific failure type
-        if (expected.retryStrategy === 'fix_lint' && !prompt.includes('lint')) {
-          entryPassed = false;
+        if (expected.retryStrategy === 'fix_lint') {
+          const hasLintInstruction = /lint.{0,80}(fix|run|check|error)/i.test(
+            body
+          );
+          if (!hasLintInstruction) {
+            entryPassed = false;
+            failReason = 'missing lint fix instruction';
+          }
         }
-        if (expected.retryStrategy === 'fix_test' && !prompt.includes('test')) {
-          entryPassed = false;
+        if (expected.retryStrategy === 'fix_test') {
+          const hasTestInstruction = /test.{0,80}(fail|fix|run|pass)/i.test(
+            body
+          );
+          if (!hasTestInstruction) {
+            entryPassed = false;
+            failReason = 'missing test fix instruction';
+          }
         }
-        if (
-          expected.retryStrategy === 'fix_build' &&
-          !prompt.includes('build')
-        ) {
-          entryPassed = false;
+        if (expected.retryStrategy === 'fix_build') {
+          const hasBuildInstruction = /build.{0,80}(fail|error|fix)/i.test(
+            body
+          );
+          if (!hasBuildInstruction) {
+            entryPassed = false;
+            failReason = 'missing build fix instruction';
+          }
         }
-        // Check --no-verify prevention
-        if (!prompt.includes('no-verify') && !prompt.includes('--no-verify')) {
+        // --no-verify prevention: must be a prohibition sentence, not a bare keyword
+        const hasNoVerifyProhibition =
+          /(never|do not|don't|avoid).{0,80}(no.verify|--no-verify|skip.{0,20}hook)/i.test(
+            body
+          );
+        if (!hasNoVerifyProhibition) {
           entryPassed = false;
+          failReason =
+            failReason ||
+            'missing prohibition against --no-verify / hook bypass';
         }
         break;
       }
 
       case 'deliver': {
-        // Check commit format guidance
-        if (!prompt.includes('type(scope)') && !prompt.includes('commit')) {
+        // Must have conventional commit format instruction
+        const hasCommitFormat =
+          /type\(scope\)|conventional.{0,40}commit|commit.{0,40}format/i.test(
+            body
+          );
+        if (!hasCommitFormat) {
           entryPassed = false;
+          failReason = 'missing conventional commit format instruction';
         }
         break;
       }
@@ -135,7 +188,9 @@ function evalPhase(phase) {
       failures.push({
         issue: entry.issue,
         outcome: entry.outcome,
-        reason: `Prompt missing guidance for: ${JSON.stringify(expected)}`,
+        reason:
+          failReason ||
+          `Prompt missing guidance for: ${JSON.stringify(expected)}`,
       });
     }
   }

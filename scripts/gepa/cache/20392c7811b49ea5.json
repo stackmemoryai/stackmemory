@@ -1,1 +1,0 @@
-{"passed":false,"passRate":0,"criteria":{"identifies_memory_update":{"passed":false,"reason":"regex heuristic"},"captures_setup_gotcha":{"passed":false,"reason":"regex heuristic"},"structured_output":{"passed":false,"reason":"regex heuristic"}},"judgeMode":"regex","duration":38020,"output":"Invalid API key · Fix external API key\n"}

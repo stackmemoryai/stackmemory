@@ -1,1 +1,0 @@
-{"passed":false,"passRate":0,"criteria":{"vite_base_path":{"passed":false,"reason":"regex heuristic"},"design_system":{"passed":false,"reason":"regex heuristic"},"build_command":{"passed":false,"reason":"regex heuristic"},"product_gating":{"passed":false,"reason":"regex heuristic"}},"judgeMode":"regex","duration":68288,"output":"Invalid API key · Fix external API key\n"}

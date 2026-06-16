@@ -123,7 +123,7 @@ import { createHash } from 'crypto';
 
 function evalCacheKey(taskId, variantContent) {
   return createHash('sha256')
-    .update(`${taskId}:${variantContent.slice(0, 500)}`)
+    .update(`${taskId}:${variantContent}`)
     .digest('hex')
     .slice(0, 16);
 }
@@ -421,7 +421,11 @@ async function mutate() {
     const lastSelect = [...state.history]
       .reverse()
       .find((h) => h.action === 'select' && h.scores?.length >= 2);
-    if (lastSelect) {
+    if (!lastSelect) {
+      console.log(
+        `  Crossover skipped: no prior selection history (generation ${nextGen} is first eval round)`
+      );
+    } else {
       const topTwo = lastSelect.scores.slice(0, 2);
       const parentAPath = getGenPath(
         state.currentGeneration,
@@ -1569,8 +1573,11 @@ async function scoreAndSelect() {
   // Select best
   const best = scores[0];
 
+  // Always advance the generation counter so the next mutate() writes the
+  // correct gen-N+1 directory instead of overwriting the current one.
+  state.currentGeneration = gen;
+
   if (best.score > state.bestScore) {
-    state.currentGeneration = gen;
     state.bestVariant = best.variant;
     state.bestScore = best.score;
 
